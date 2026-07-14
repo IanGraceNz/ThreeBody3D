@@ -113,7 +113,7 @@ function benchmark_solvers(system::ThreeBodySystem, u0::AbstractVector,
         profile = accuracy_profile(profile_name)
         result = simulate(system, u0, tspan; solver=profile_name, saveat, kwargs...)
         report = diagnostics_report(result)
-        stats = result.solution.destats
+        stats = result.solution.stats
         periodic_error = isnothing(period) ? nothing : periodicity_error(result, period)
         T = typeof(report.maximum_relative_energy_drift)
         push!(benchmarks, SolverBenchmark{T}(
