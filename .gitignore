@@ -1,0 +1,20 @@
+# Julia package environment
+Manifest.toml
+
+# Julia compiled files
+*.ji
+
+# Generated media
+*.mp4
+*.gif
+
+# Test and coverage output
+*.cov
+coverage/
+
+# Logs
+*.log
+
+# Operating-system files
+.DS_Store
+Thumbs.db
