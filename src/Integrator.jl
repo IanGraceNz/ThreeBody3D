@@ -21,7 +21,7 @@ Return a built-in integration profile:
 
 - `:fast` uses `Tsit5()` with `1e-9` tolerances.
 - `:accurate` uses `Vern9()` with `1e-12` tolerances.
-- `:extreme` uses `Feagin14()` with `1e-13` tolerances.
+- `:extreme` uses `Vern9()` with `1e-13` tolerances.
 
 The profiles are starting points, not universal guarantees. Close encounters
 may require stricter tolerances, shorter spans, and eventually regularized
@@ -30,7 +30,7 @@ coordinates.
 function accuracy_profile(name::Symbol=:accurate)
     name === :fast && return AccuracyProfile(:fast, Tsit5(), 1e-9, 1e-9)
     name === :accurate && return AccuracyProfile(:accurate, Vern9(), 1e-12, 1e-12)
-    name === :extreme && return AccuracyProfile(:extreme, Feagin14(), 1e-13, 1e-13)
+    name === :extreme && return AccuracyProfile(:extreme, Vern9(), 1e-13, 1e-13)
     throw(ArgumentError("Unknown accuracy profile $name. Use :fast, :accurate, or :extreme."))
 end
 
