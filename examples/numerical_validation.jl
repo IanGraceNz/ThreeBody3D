@@ -20,13 +20,7 @@ benchmarks = benchmark_solvers(
 )
 
 for benchmark in benchmarks
-    println("\nProfile: ", benchmark.profile)
-    println("  algorithm:                    ", benchmark.algorithm)
-    println("  accepted steps:               ", benchmark.accepted_steps)
-    println("  rejected steps:               ", benchmark.rejected_steps)
-    println("  maximum relative energy drift:", benchmark.maximum_relative_energy_drift)
-    println("  periodicity error:             ", benchmark.periodicity_error)
-    println("  minimum separation:            ", benchmark.minimum_separation)
+    println("\n", benchmark)
 end
 
 result = simulate(system, u0, (0.0, FIGURE_EIGHT_PERIOD);

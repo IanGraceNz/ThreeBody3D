@@ -1,5 +1,6 @@
 using Test
 using LinearAlgebra
+using Logging
 using StaticArrays
 using SciMLBase
 using ThreeBody3D
@@ -90,6 +91,121 @@ end
     end
 end
 
+@testset "Profile accuracy regression" begin
+    system, u0 = figure_eight_setup()
+    period = 6.32591398
+    fast = simulate(system, u0, (0.0, 2period); solver=:fast, saveat=period/50)
+    accurate = simulate(system, u0, (0.0, 2period); solver=:accurate, saveat=period/50)
+
+    fast_drift = diagnostics_report(fast).maximum_relative_energy_drift
+    accurate_drift = diagnostics_report(accurate).maximum_relative_energy_drift
+    @test accurate_drift < fast_drift
+
+    extreme = @test_logs (:warn, r"promoting non-BigFloat inputs") simulate(
+        system, u0, (0.0, 0.02); solver=:extreme, precision=128, saveat=0.01
+    )
+    @test eltype(extreme.solution.u[1]) === BigFloat
+    @test precision(extreme.solution.u[1][1]) == 128
+end
+
+@testset "BigFloat extreme reference accuracy" begin
+    setprecision(BigFloat, 256) do
+        system = ThreeBodySystem(
+            (big"1.0", big"1.0", big"1.0");
+            G=big"1.0",
+        )
+        u0 = statevector(
+            [big"-0.97000436", big"0.24308753", big"0.0"],
+            [big"0.466203685", big"0.432365730", big"0.0"],
+            [big"0.97000436", big"-0.24308753", big"0.0"],
+            [big"0.466203685", big"0.432365730", big"0.0"],
+            [big"0.0", big"0.0", big"0.0"],
+            [big"-0.93240737", big"-0.86473146", big"0.0"],
+        )
+        result = simulate(
+            system, u0, (big"0.0", big"0.1");
+            solver=:extreme,
+            precision=256,
+            saveat=big"0.01",
+        )
+        report = diagnostics_report(result)
+        @test eltype(result.solution.u[1]) === BigFloat
+        @test precision(result.solution.u[1][1]) == 256
+        @test report.maximum_relative_energy_drift < big"1e-25"
+        @test report.maximum_angular_momentum_drift < big"1e-25"
+    end
+end
+
+
+@testset "Continuous close-approach monitoring" begin
+    system, u0 = figure_eight_setup()
+    threshold = 0.8
+
+    coarse = simulate(system, u0, (0.0, 4.0);
+                      solver=:accurate, saveat=2.0,
+                      close_approach_threshold=threshold,
+                      close_approach_policy=:ignore)
+    fine = simulate(system, u0, (0.0, 4.0);
+                    solver=:accurate, saveat=0.01,
+                    close_approach_threshold=threshold,
+                    close_approach_policy=:ignore)
+
+    @test !isempty(coarse.close_approach_events)
+    @test !isempty(fine.close_approach_events)
+    coarse_event = first(coarse.close_approach_events)
+    fine_event = first(fine.close_approach_events)
+    @test coarse_event.pair == fine_event.pair
+    @test coarse_event.separation ≈ threshold atol=1e-9
+    @test fine_event.separation ≈ threshold atol=1e-9
+    @test coarse_event.time ≈ fine_event.time atol=1e-9
+    @test occursin("CloseApproachEvent", sprint(show, coarse_event))
+    @test !terminated_by_close_approach(coarse)
+
+    terminated = simulate(system, u0, (0.0, 4.0);
+                          solver=:accurate, saveat=2.0,
+                          close_approach_threshold=threshold,
+                          close_approach_policy=:terminate)
+    @test terminated_by_close_approach(terminated)
+    @test length(terminated.close_approach_events) == 1
+    @test last(terminated.solution.t) ≈ first(terminated.close_approach_events).time atol=1e-9
+    @test last(terminated.solution.t) < 4.0
+    @test terminated.close_approach_terminated
+
+    warned = @test_logs min_level=Logging.Warn match_mode=:any (
+        :warn, r"Close-approach threshold crossed"
+    ) simulate(
+        system, u0, (0.0, 4.0);
+        solver=:accurate, saveat=2.0,
+        close_approach_threshold=threshold,
+        close_approach_policy=:warn,
+    )
+    @test !isempty(warned.close_approach_events)
+    @test !terminated_by_close_approach(warned)
+
+    user_event = Ref(false)
+    user_condition(u, t, integrator) = t - 0.25
+    user_affect!(integrator) = (user_event[] = true)
+    user_callback = SciMLBase.ContinuousCallback(user_condition, user_affect!)
+    combined = simulate(
+        system, u0, (0.0, 4.0);
+        solver=:accurate, saveat=2.0,
+        close_approach_threshold=threshold,
+        close_approach_policy=:ignore,
+        callback=user_callback,
+    )
+    @test user_event[]
+    @test !isempty(combined.close_approach_events)
+
+    @test_throws ArgumentError simulate(system, u0, (0.0, 1.0);
+                                        close_approach_threshold=0.0)
+    @test_throws ArgumentError simulate(system, u0, (0.0, 1.0);
+                                        close_approach_threshold=0.8,
+                                        close_approach_policy=:invalid)
+    @test_throws ArgumentError simulate(system, u0, (0.0, 1.0);
+                                        close_approach_threshold=2.0,
+                                        close_approach_policy=:terminate)
+end
+
 @testset "Visualization smoke tests" begin
     system, u0 = figure_eight_setup()
     result = simulate(system, u0, (0.0, 0.2); saveat=0.02)
@@ -106,7 +222,10 @@ end
     @test accurate.name == :accurate
     @test extreme.name == :extreme
     @test fast.reltol > accurate.reltol > extreme.reltol
+    @test occursin("Vern9", string(typeof(extreme.algorithm)))
+    @test extreme.reltol isa BigFloat
     @test_throws ArgumentError accuracy_profile(:unknown)
+    @test_throws ArgumentError accuracy_profile(:extreme; precision=32)
 
     system, u0 = figure_eight_setup()
     result = simulate(system, u0, (0.0, 0.2); solver=:fast, saveat=0.01)
@@ -116,10 +235,13 @@ end
     @test_throws ArgumentError periodicity_error(result, 1.0)
 
     close = close_approach_report(result; threshold=10.0)
+    sampled_close = close_approach_report(result; threshold=10.0, refine=false)
     @test close.detected
     @test close.minimum_separation > 0
+    @test close.minimum_separation <= sampled_close.minimum_separation
     @test close.pair in ((1, 2), (1, 3), (2, 3))
     @test first(result.solution.t) <= close.time <= last(result.solution.t)
+    @test occursin("minimum_separation", sprint(show, close))
     @test_throws ArgumentError close_approach_report(result; threshold=0.0)
 
     benchmarks = benchmark_solvers(system, u0, (0.0, 0.1);
@@ -128,7 +250,23 @@ end
     @test benchmarks[1].profile == :fast
     @test benchmarks[1].saved_states >= 2
     @test benchmarks[1].accepted_steps > 0
+    @test benchmarks[1].rhs_evaluations > 0
+    @test benchmarks[1].elapsed_seconds >= 0
     @test benchmarks[1].maximum_relative_energy_drift >= 0
+    @test occursin("accepted internal steps", sprint(show, benchmarks[1]))
     @test_throws ArgumentError benchmark_solvers(system, u0, (0.0, 0.1);
                                                   profiles=(), saveat=0.02)
+
+    hp = benchmark_extreme_solvers(
+        system, u0, (0.0, 0.01);
+        algorithms=(:vern9,), precision=128,
+        reltol="1e-20", abstol="1e-20", saveat=0.005,
+    )
+    @test length(hp) == 1
+    @test hp[1].profile == :vern9
+    @test hp[1].maximum_relative_energy_drift isa BigFloat
+    @test hp[1].elapsed_seconds >= 0
+    @test_throws ArgumentError benchmark_extreme_solvers(
+        system, u0, (0.0, 0.01); algorithms=(:unknown,), precision=128
+    )
 end
