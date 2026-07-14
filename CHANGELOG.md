@@ -25,3 +25,21 @@
 
 - Audited baseline with validated state/system construction, conservation
   diagnostics, plotting, animation, MP4 recording, examples, and tests.
+- Stored close-approach termination status explicitly instead of inferring it
+  from floating-point time equality.
+- Added warning-policy and user-callback composition regression tests.
+- Added `examples/close_approach_policies.jl`.
+
+### High-precision reference mode
+
+- Redefined `:extreme` as a scoped 256-bit `BigFloat` profile using
+  `Vern9()` and `1e-30` tolerances by default.
+- Added a warning when ordinary floating-point inputs are promoted, because
+  promotion cannot restore digits already lost to Float64 rounding.
+- Selected BigFloat `Vern9` as the long-term `:extreme` reference solver after
+  local benchmarking showed roughly `1e-32` relative energy drift versus
+  `1e-11` to `1e-10` for the tested Feagin methods.
+- Retained `benchmark_extreme_solvers` to compare BigFloat `Vern9`, `Feagin12`,
+  and `Feagin14` on future problems and SciML versions.
+- Added `examples/high_precision_reference.jl` and regression tests for the
+  arbitrary-precision path.

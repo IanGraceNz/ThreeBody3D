@@ -146,6 +146,7 @@ struct SolverBenchmark{T}
     accepted_steps::Int
     rejected_steps::Int
     rhs_evaluations::Int
+    elapsed_seconds::Float64
     maximum_relative_energy_drift::T
     maximum_linear_momentum_drift::T
     maximum_angular_momentum_drift::T
@@ -161,6 +162,7 @@ function Base.show(io::IO, benchmark::SolverBenchmark)
     println(io, "  accepted internal steps:       ", benchmark.accepted_steps)
     println(io, "  rejected internal steps:       ", benchmark.rejected_steps)
     println(io, "  RHS evaluations:               ", benchmark.rhs_evaluations)
+    println(io, "  elapsed seconds:               ", benchmark.elapsed_seconds)
     println(io, "  maximum relative energy drift: ", benchmark.maximum_relative_energy_drift)
     println(io, "  maximum momentum drift:        ", benchmark.maximum_linear_momentum_drift)
     println(io, "  maximum angular momentum drift:", benchmark.maximum_angular_momentum_drift)
@@ -187,7 +189,9 @@ function benchmark_solvers(system::ThreeBodySystem, u0::AbstractVector,
     for profile_name in profiles
         profile_name isa Symbol || throw(ArgumentError("Each profile name must be a Symbol."))
         profile = accuracy_profile(profile_name)
+        started = time_ns()
         result = simulate(system, u0, tspan; solver=profile_name, saveat, kwargs...)
+        elapsed_seconds = (time_ns() - started) / 1.0e9
         report = diagnostics_report(result)
         stats = result.solution.stats
         periodic_error = isnothing(period) ? nothing : periodicity_error(result, period)
@@ -199,6 +203,7 @@ function benchmark_solvers(system::ThreeBodySystem, u0::AbstractVector,
             Int(stats.naccept),
             Int(stats.nreject),
             Int(stats.nf),
+            elapsed_seconds,
             report.maximum_relative_energy_drift,
             report.maximum_linear_momentum_drift,
             report.maximum_angular_momentum_drift,
@@ -209,4 +214,79 @@ function benchmark_solvers(system::ThreeBodySystem, u0::AbstractVector,
     end
 
     benchmarks
+end
+
+const _HIGH_PRECISION_ALGORITHMS = (
+    vern9 = Vern9(),
+    feagin12 = Feagin12(),
+    feagin14 = Feagin14(),
+)
+
+"""
+    benchmark_extreme_solvers(system, u0, tspan;
+                              algorithms=(:vern9, :feagin12, :feagin14),
+                              precision=256, reltol="1e-30", abstol="1e-30",
+                              saveat=nothing, period=nothing, kwargs...)
+
+Compare candidate arbitrary-precision reference solvers on the same problem.
+All integrations use `BigFloat` inside a scoped `precision`-bit context.
+`reltol` and `abstol` may be real numbers or decimal strings; strings are
+recommended because they avoid prior Float64 rounding.
+
+The returned [`SolverBenchmark`](@ref) records use profile labels `:vern9`,
+`:feagin12`, and `:feagin14`. This routine benchmarks candidates; it does not
+assume that the highest formal order is the most efficient or most accurate in
+practice.
+"""
+function benchmark_extreme_solvers(system::ThreeBodySystem, u0::AbstractVector,
+                                   tspan::Tuple{<:Real,<:Real};
+                                   algorithms=(:vern9, :feagin12, :feagin14),
+                                   precision::Integer=256,
+                                   reltol="1e-30", abstol="1e-30",
+                                   saveat=nothing, period=nothing, kwargs...)
+    precision >= 64 || throw(ArgumentError("precision must be at least 64 bits."))
+    isempty(algorithms) && throw(ArgumentError("algorithms must not be empty."))
+
+    setprecision(BigFloat, precision) do
+        rt = reltol isa AbstractString ? parse(BigFloat, reltol) : BigFloat(reltol)
+        at = abstol isa AbstractString ? parse(BigFloat, abstol) : BigFloat(abstol)
+        rt > 0 || throw(ArgumentError("reltol must be positive."))
+        at > 0 || throw(ArgumentError("abstol must be positive."))
+        converted_period = isnothing(period) ? nothing : BigFloat(period)
+        benchmarks = SolverBenchmark[]
+
+        for name in algorithms
+            name isa Symbol || throw(ArgumentError("Each algorithm name must be a Symbol."))
+            hasproperty(_HIGH_PRECISION_ALGORITHMS, name) ||
+                throw(ArgumentError("Unknown high-precision algorithm $name. Use :vern9, :feagin12, or :feagin14."))
+            algorithm = getproperty(_HIGH_PRECISION_ALGORITHMS, name)
+            started = time_ns()
+            result = _simulate_impl(system, u0, tspan;
+                                    solver=algorithm, reltol=rt, abstol=at,
+                                    precision, force_bigfloat=true, saveat,
+                                    kwargs...)
+            elapsed_seconds = (time_ns() - started) / 1.0e9
+            report = diagnostics_report(result)
+            stats = result.solution.stats
+            periodic_error = isnothing(converted_period) ? nothing :
+                periodicity_error(result, converted_period)
+            T = typeof(report.maximum_relative_energy_drift)
+            push!(benchmarks, SolverBenchmark{T}(
+                name,
+                string(typeof(algorithm)),
+                length(result.solution.t),
+                Int(stats.naccept),
+                Int(stats.nreject),
+                Int(stats.nf),
+                elapsed_seconds,
+                report.maximum_relative_energy_drift,
+                report.maximum_linear_momentum_drift,
+                report.maximum_angular_momentum_drift,
+                report.maximum_center_of_mass_residual,
+                report.minimum_separation,
+                isnothing(periodic_error) ? nothing : T(periodic_error),
+            ))
+        end
+        benchmarks
+    end
 end

@@ -24,7 +24,7 @@ export ThreeBodySystem,
        minimum_separation, relative_energy_error,
        DiagnosticsReport, diagnostics_report,
        periodicity_error, CloseApproachReport, close_approach_report,
-       SolverBenchmark, benchmark_solvers,
+       SolverBenchmark, benchmark_solvers, benchmark_extreme_solvers,
        plot_trajectory, animate, record_animation
 
 end

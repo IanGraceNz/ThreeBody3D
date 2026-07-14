@@ -150,3 +150,56 @@ digits published with the original figure-eight result. The observed periodicity
 error therefore includes uncertainty in those benchmark constants; tighter solver
 tolerances cannot recover digits that are absent from the initial data. Energy and
 momentum conservation remain useful independent accuracy checks.
+
+A complete policy demonstration is available in:
+
+```julia
+include("examples/close_approach_policies.jl")
+```
+
+`terminated_by_close_approach(result)` reads an explicit termination flag
+recorded by the integration callback; it does not infer termination from
+floating-point equality between event and final times.
+
+## Arbitrary-precision reference calculations
+
+The `:extreme` profile is a reference-computation mode rather than a faster or
+more convenient version of `:accurate`. It performs the complete integration
+with `BigFloat`, uses 256-bit precision by default, and starts with
+`Vern9()` at `1e-30` relative and absolute tolerances:
+
+```julia
+reference = simulate(
+    system_big,
+    u0_big,
+    (big"0.0", big"6.32591398");
+    solver=:extreme,
+    precision=256,
+    saveat=big"0.01",
+)
+```
+
+For genuine reference work, construct masses, state components, times, and
+thresholds from decimal strings. `BigFloat(0.1)` preserves the already-rounded
+Float64 value; `parse(BigFloat, "0.1")` or `big"0.1"` starts from the decimal
+value.
+
+The default was selected from measured results on the figure-eight benchmark: BigFloat `Vern9` delivered approximately `1e-32` relative energy drift, while the tested Feagin methods remained near `1e-11` to `1e-10`. The comparison harness is retained because solver performance can change across problems and future SciML releases:
+
+```julia
+benchmarks = benchmark_extreme_solvers(
+    system_big,
+    u0_big,
+    (big"0.0", big"6.32591398");
+    algorithms=(:vern9, :feagin12, :feagin14),
+    precision=256,
+    reltol="1e-30",
+    abstol="1e-30",
+    saveat=big"0.01",
+)
+```
+
+See `examples/high_precision_reference.jl` for a complete example. Very tight
+local tolerances do not prove equally small global trajectory error, especially
+for chaotic trajectories, close encounters, interpolation, or truncated
+initial data.
