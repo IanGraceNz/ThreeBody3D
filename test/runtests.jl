@@ -105,6 +105,50 @@ end
     @test extreme_drift <= 10 * accurate_drift
 end
 
+
+@testset "Continuous close-approach monitoring" begin
+    system, u0 = figure_eight_setup()
+    threshold = 0.8
+
+    coarse = simulate(system, u0, (0.0, 4.0);
+                      solver=:accurate, saveat=2.0,
+                      close_approach_threshold=threshold,
+                      close_approach_policy=:ignore)
+    fine = simulate(system, u0, (0.0, 4.0);
+                    solver=:accurate, saveat=0.01,
+                    close_approach_threshold=threshold,
+                    close_approach_policy=:ignore)
+
+    @test !isempty(coarse.close_approach_events)
+    @test !isempty(fine.close_approach_events)
+    coarse_event = first(coarse.close_approach_events)
+    fine_event = first(fine.close_approach_events)
+    @test coarse_event.pair == fine_event.pair
+    @test coarse_event.separation ≈ threshold atol=1e-9
+    @test fine_event.separation ≈ threshold atol=1e-9
+    @test coarse_event.time ≈ fine_event.time atol=1e-9
+    @test occursin("CloseApproachEvent", sprint(show, coarse_event))
+    @test !terminated_by_close_approach(coarse)
+
+    terminated = simulate(system, u0, (0.0, 4.0);
+                          solver=:accurate, saveat=2.0,
+                          close_approach_threshold=threshold,
+                          close_approach_policy=:terminate)
+    @test terminated_by_close_approach(terminated)
+    @test length(terminated.close_approach_events) == 1
+    @test last(terminated.solution.t) ≈ first(terminated.close_approach_events).time atol=1e-9
+    @test last(terminated.solution.t) < 4.0
+
+    @test_throws ArgumentError simulate(system, u0, (0.0, 1.0);
+                                        close_approach_threshold=0.0)
+    @test_throws ArgumentError simulate(system, u0, (0.0, 1.0);
+                                        close_approach_threshold=0.8,
+                                        close_approach_policy=:invalid)
+    @test_throws ArgumentError simulate(system, u0, (0.0, 1.0);
+                                        close_approach_threshold=2.0,
+                                        close_approach_policy=:terminate)
+end
+
 @testset "Visualization smoke tests" begin
     system, u0 = figure_eight_setup()
     result = simulate(system, u0, (0.0, 0.2); saveat=0.02)

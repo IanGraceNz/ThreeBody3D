@@ -106,6 +106,36 @@ not a regularization method, and can miss an encounter that is not bracketed by
 the saved grid. Use a sufficiently dense `saveat` for encounter studies. Exact
 collisions remain singular.
 
+
+### Continuous close-approach monitoring
+
+For threshold detection during integration, use the continuous event monitor:
+
+```julia
+result = simulate(
+    system, u0, (0.0, 20.0);
+    solver=:accurate,
+    saveat=0.1,
+    close_approach_threshold=0.7,
+    close_approach_policy=:warn,
+)
+
+for event in result.close_approach_events
+    println(event)
+end
+```
+
+The available policies are:
+
+- `:ignore` — record inward threshold crossings and continue;
+- `:warn` — record, emit a warning, and continue;
+- `:terminate` — record and stop at the first inward crossing.
+
+Crossing times are found by the ODE solver's continuous root finder and do not
+depend on `saveat`. A callback supplied through `callback=` is combined with the
+monitor. This detects threshold entries only; it is not collision
+regularization and does not alter the Newtonian force law.
+
 Run the complete numerical comparison example with:
 
 ```julia
