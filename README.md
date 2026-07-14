@@ -100,12 +100,23 @@ approach = close_approach_report(accurate_result; threshold=0.7)
 println(approach.minimum_separation, " at t = ", approach.time)
 ```
 
-`close_approach_report` examines saved states. It is a monitoring tool, not a
-regularization method, and can miss an undersampled minimum. Use dense output
-for encounter studies. Exact collisions remain singular.
+`close_approach_report` uses saved states to bracket a candidate encounter and,
+by default, refines it using dense interpolation. It is still a monitoring tool,
+not a regularization method, and can miss an encounter that is not bracketed by
+the saved grid. Use a sufficiently dense `saveat` for encounter studies. Exact
+collisions remain singular.
 
 Run the complete numerical comparison example with:
 
 ```julia
 include("examples/numerical_validation.jl")
 ```
+
+
+### Figure-eight benchmark precision
+
+The standard Simó initial conditions and period used in the examples are the
+digits published with the original figure-eight result. The observed periodicity
+error therefore includes uncertainty in those benchmark constants; tighter solver
+tolerances cannot recover digits that are absent from the initial data. Energy and
+momentum conservation remain useful independent accuracy checks.

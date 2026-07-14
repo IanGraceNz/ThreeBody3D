@@ -90,6 +90,21 @@ end
     end
 end
 
+@testset "Profile accuracy regression" begin
+    system, u0 = figure_eight_setup()
+    period = 6.32591398
+    fast = simulate(system, u0, (0.0, 2period); solver=:fast, saveat=period/50)
+    accurate = simulate(system, u0, (0.0, 2period); solver=:accurate, saveat=period/50)
+    extreme = simulate(system, u0, (0.0, 2period); solver=:extreme, saveat=period/50)
+
+    fast_drift = diagnostics_report(fast).maximum_relative_energy_drift
+    accurate_drift = diagnostics_report(accurate).maximum_relative_energy_drift
+    extreme_drift = diagnostics_report(extreme).maximum_relative_energy_drift
+
+    @test accurate_drift < fast_drift
+    @test extreme_drift <= 10 * accurate_drift
+end
+
 @testset "Visualization smoke tests" begin
     system, u0 = figure_eight_setup()
     result = simulate(system, u0, (0.0, 0.2); saveat=0.02)
@@ -116,10 +131,13 @@ end
     @test_throws ArgumentError periodicity_error(result, 1.0)
 
     close = close_approach_report(result; threshold=10.0)
+    sampled_close = close_approach_report(result; threshold=10.0, refine=false)
     @test close.detected
     @test close.minimum_separation > 0
+    @test close.minimum_separation <= sampled_close.minimum_separation
     @test close.pair in ((1, 2), (1, 3), (2, 3))
     @test first(result.solution.t) <= close.time <= last(result.solution.t)
+    @test occursin("minimum_separation", sprint(show, close))
     @test_throws ArgumentError close_approach_report(result; threshold=0.0)
 
     benchmarks = benchmark_solvers(system, u0, (0.0, 0.1);
@@ -128,7 +146,9 @@ end
     @test benchmarks[1].profile == :fast
     @test benchmarks[1].saved_states >= 2
     @test benchmarks[1].accepted_steps > 0
+    @test benchmarks[1].rhs_evaluations > 0
     @test benchmarks[1].maximum_relative_energy_drift >= 0
+    @test occursin("accepted internal steps", sprint(show, benchmarks[1]))
     @test_throws ArgumentError benchmark_solvers(system, u0, (0.0, 0.1);
                                                   profiles=(), saveat=0.02)
 end
