@@ -631,3 +631,75 @@ end
     @test_throws ArgumentError integrate_levi_civita_sundman(circular, (0.0, 1.0); initial_time=Inf)
     @test_throws ArgumentError levi_civita_physical_time(circular, Inf)
 end
+
+@testset "Levi-Civita bounded physical-time targeting" begin
+    circular = LeviCivitaOscillator(1.0, [1.0, 0.0], [0.0, 1.0])
+    for target in (0.0, π / 4, π, -π / 3, 8π)
+        s = levi_civita_fictitious_time(circular, target)
+        @test s ≈ target atol=2e-13 rtol=2e-13
+        @test levi_civita_physical_time(circular, s) ≈ target atol=3e-13 rtol=3e-13
+    end
+
+    state = levi_civita_state_at_time(circular, π / 2)
+    @test state.physical_time == π / 2
+    @test state.fictitious_time ≈ π / 2 atol=2e-13
+    @test state.position ≈ SVector(0.0, 1.0) atol=5e-13
+    @test state.velocity ≈ SVector(-1.0, 0.0) atol=5e-13
+
+    eccentric = LeviCivitaOscillator(1.0, [1.0, 0.0], [0.0, 0.5])
+    eccentric_reference = KeplerReference(
+        1.0, [1.0, 0.0, 0.0], [0.0, 0.5, 0.0],
+    )
+    for target in (0.1, 0.5, 1.0, -0.4)
+        targeted = levi_civita_state_at_time(eccentric, target)
+        @test levi_civita_physical_time(eccentric, targeted.fictitious_time) ≈ target atol=8e-13 rtol=8e-13
+        r_ref, v_ref = kepler_state(eccentric_reference, target)
+        @test targeted.position ≈ r_ref[1:2] atol=2e-11 rtol=2e-11
+        @test targeted.velocity ≈ v_ref[1:2] atol=2e-11 rtol=2e-11
+    end
+
+    # The inverse remains well defined at and beyond a radial collision, even
+    # though Cartesian velocity reconstruction is singular at exact collision.
+    radial = LeviCivitaOscillator(1.0, [2.0, 0.0], [0.0, 0.0])
+    collision_time = radial_free_fall_time(1.0, 2.0)
+    collision_s = levi_civita_fictitious_time(radial, collision_time)
+    collision_u, collision_w = levi_civita_fictitious_state(radial, collision_s)
+    # At collision dt/ds = |u|² vanishes, so inversion of t(s) is locally
+    # ill-conditioned: a machine-precision physical-time residual does not
+    # imply machine-precision fictitious time. Validate the physical target
+    # and proximity to the regularized collision instead of π itself.
+    @test levi_civita_physical_time(radial, collision_s) ≈ collision_time atol=2e-13 rtol=2e-13
+    @test norm(collision_u) ≤ 5e-5
+    @test all(isfinite, collision_w)
+    after_s = levi_civita_fictitious_time(radial, collision_time + 0.25)
+    @test after_s > collision_s
+    @test levi_civita_physical_time(radial, after_s) ≈ collision_time + 0.25 atol=3e-13 rtol=3e-13
+
+    setprecision(BigFloat, 256) do
+        big_eccentric = LeviCivitaOscillator(
+            big"1.0", BigFloat[big"1.0", big"0.0"],
+            BigFloat[big"0.0", big"0.5"],
+        )
+        target = big"0.75"
+        s = levi_civita_fictitious_time(
+            big_eccentric, target; tolerance=big"1e-60",
+        )
+        @test abs(levi_civita_physical_time(big_eccentric, s) - target) < big"1e-58"
+        targeted = levi_civita_state_at_time(
+            big_eccentric, target; tolerance=big"1e-60",
+        )
+        reference = KeplerReference(
+            big"1.0",
+            BigFloat[big"1.0", big"0.0", big"0.0"],
+            BigFloat[big"0.0", big"0.5", big"0.0"],
+        )
+        r_ref, v_ref = kepler_state(reference, target; tolerance=big"1e-65")
+        @test norm(targeted.position - r_ref[1:2]) < big"1e-55"
+        @test norm(targeted.velocity - v_ref[1:2]) < big"1e-55"
+    end
+
+    @test_throws ArgumentError levi_civita_fictitious_time(circular, Inf)
+    @test_throws ArgumentError levi_civita_fictitious_time(circular, 1.0; initial_step=0.0)
+    @test_throws ArgumentError levi_civita_fictitious_time(circular, 1.0; tolerance=0.0)
+    @test_throws ArgumentError levi_civita_fictitious_time(circular, 1.0; max_iterations=0)
+end

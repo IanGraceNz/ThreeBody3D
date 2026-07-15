@@ -77,3 +77,9 @@
 - Added fixed-fictitious-time numerical integration of `dt/ds = |u|²`.
 - Added monotonicity, radial-collision, Kepler-reference, and BigFloat tests.
 - No callback or physical-time stopping is included in this stage.
+
+## v0.4 Stage 4C
+
+- Added bounded inversion of the exact Sundman map from physical time to fictitious time.
+- Added exact physical-time state queries without ODE callbacks.
+- Added forward, backward, radial-collision, and BigFloat validation.

@@ -129,3 +129,123 @@ function levi_civita_cartesian_state(result::LeviCivitaSundmanResult, s::Real)
         throw(DomainError(radius, "Cartesian velocity is undefined at exact binary collision."))
     return levi_civita_position(u), levi_civita_velocity(u, w / radius)
 end
+
+"""
+    levi_civita_fictitious_time(oscillator, target_time;
+                                initial_time=0, tolerance=nothing,
+                                initial_step=1, max_iterations=256)
+
+Invert the exact Sundman map and return the fictitious time `s` satisfying
+`levi_civita_physical_time(oscillator, s; initial_time) == target_time`.
+
+The method first expands a bracket in the required time direction and then
+uses bisection. It uses no ODE callback and is valid for forward and backward
+queries. The physical-time map is monotone. At a regularized radial collision
+its derivative vanishes, so the inverse is locally ill-conditioned: the
+returned physical time remains accurate, while the corresponding fictitious
+time may be less accurate in finite precision.
+"""
+function levi_civita_fictitious_time(
+    oscillator::LeviCivitaOscillator{T},
+    target_time::Real;
+    initial_time::Real=zero(T),
+    tolerance=nothing,
+    initial_step::Real=one(T),
+    max_iterations::Integer=256,
+) where {T}
+    target = T(target_time)
+    t0 = T(initial_time)
+    step0 = T(initial_step)
+    all(isfinite, (target, t0, step0)) ||
+        throw(ArgumentError("target_time, initial_time, and initial_step must be finite."))
+    step0 > zero(T) || throw(ArgumentError("initial_step must be positive."))
+    max_iterations > 0 || throw(ArgumentError("max_iterations must be positive."))
+
+    Δt = target - t0
+    iszero(Δt) && return zero(T)
+    direction = sign(Δt)
+    tol = isnothing(tolerance) ? T(64) * eps(T) * max(one(T), abs(target), abs(t0)) : T(tolerance)
+    isfinite(tol) && tol > zero(T) ||
+        throw(ArgumentError("tolerance must be finite and positive."))
+
+    f(s) = levi_civita_physical_time(oscillator, s; initial_time=t0) - target
+    a = zero(T)
+    fa = -Δt
+    b = direction * step0
+    fb = f(b)
+
+    expansions = 0
+    while signbit(fa) == signbit(fb) && !iszero(fb)
+        expansions += 1
+        expansions <= max_iterations ||
+            throw(ErrorException("Unable to bracket the requested physical time."))
+        b *= T(2)
+        isfinite(b) || throw(ErrorException("Fictitious-time bracket overflowed."))
+        fb = f(b)
+    end
+    iszero(fb) && return b
+
+    left, right = minmax(a, b)
+    fleft = f(left)
+    fright = f(right)
+    signbit(fleft) != signbit(fright) ||
+        throw(ErrorException("Internal error: physical-time root is not bracketed."))
+
+    for _ in 1:max_iterations
+        midpoint = (left + right) / T(2)
+        fm = f(midpoint)
+        time_converged = abs(fm) <= tol
+        bracket_converged =
+            abs(right - left) <= T(32) * eps(T) * max(one(T), abs(midpoint))
+        if time_converged && bracket_converged
+            return midpoint
+        end
+        if signbit(fleft) == signbit(fm)
+            left = midpoint
+            fleft = fm
+        else
+            right = midpoint
+            fright = fm
+        end
+    end
+
+    throw(ErrorException("Physical-to-fictitious time inversion did not converge."))
+end
+
+"""
+    levi_civita_state_at_time(oscillator, target_time; kwargs...)
+
+Return the isolated Levi-Civita state at an exact requested physical time.
+The Sundman map is inverted with [`levi_civita_fictitious_time`](@ref), after
+which the exact regularized oscillator is evaluated and reconstructed.
+
+The returned named tuple contains `physical_time`, `fictitious_time`,
+`regularized_position`, `regularized_derivative`, `position`, and `velocity`.
+At an exact binary collision the physical velocity is singular and a
+`DomainError` is thrown; the fictitious time can still be obtained separately.
+"""
+function levi_civita_state_at_time(
+    oscillator::LeviCivitaOscillator{T},
+    target_time::Real;
+    initial_time::Real=zero(T),
+    kwargs...,
+) where {T}
+    target = T(target_time)
+    s = levi_civita_fictitious_time(
+        oscillator, target; initial_time=initial_time, kwargs...,
+    )
+    u, w = levi_civita_fictitious_state(oscillator, s)
+    radius = dot(u, u)
+    radius > zero(T) ||
+        throw(DomainError(radius, "Cartesian velocity is undefined at exact binary collision."))
+    q = levi_civita_position(u)
+    qdot = levi_civita_velocity(u, w / radius)
+    return (
+        physical_time=target,
+        fictitious_time=s,
+        regularized_position=u,
+        regularized_derivative=w,
+        position=q,
+        velocity=qdot,
+    )
+end

@@ -270,3 +270,11 @@ u, uprime, physical_time = levi_civita_sundman_state(result, 0.8)
 ```
 
 This remains a research validation path and does not alter `simulate`.
+
+### Stage 4C: requested physical-time states
+
+`levi_civita_fictitious_time` inverts the monotone exact Sundman map with an expanding bracket and bisection. `levi_civita_state_at_time` returns the isolated regularized solution at a requested physical time without callbacks.
+
+```julia
+state = levi_civita_state_at_time(oscillator, 0.75)
+```
