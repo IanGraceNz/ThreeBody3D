@@ -250,3 +250,10 @@ q, qdot = from_levi_civita(lc)
 The two branches selected by `branch=1` and `branch=-1` are gauge-equivalent.
 These functions do not yet integrate Levi-Civita equations or introduce a
 Sundman time transformation.
+
+## Experimental fixed-fictitious-time Levi-Civita oscillator
+
+Stage 4A provides `LeviCivitaOscillator` and
+`integrate_levi_civita_fictitious` for the isolated planar Kepler problem.
+This experimental layer integrates only fictitious time; physical-time
+reconstruction and stopping are intentionally deferred to Stage 4B.

@@ -449,3 +449,100 @@ end
     @test_throws ArgumentError to_levi_civita([1.0, 0.0], [0.0, 0.0]; branch=0)
     @test_throws ArgumentError to_levi_civita([Inf, 0.0], [0.0, 0.0])
 end
+
+@testset "Isolated Levi-Civita oscillator in fixed fictitious time" begin
+    circular = LeviCivitaOscillator(1.0, [1.0, 0.0], [0.0, 1.0])
+    @test circular.specific_energy ≈ -0.5
+    @test circular.u0 ≈ SVector(1.0, 0.0)
+    @test circular.uprime0 ≈ SVector(0.0, 0.5)
+
+    u_exact, w_exact = levi_civita_fictitious_state(circular, π)
+    @test u_exact ≈ SVector(0.0, 1.0) atol=2e-15
+    @test w_exact ≈ SVector(-0.5, 0.0) atol=2e-15
+    q_exact, v_exact = levi_civita_cartesian_state(circular, π)
+    @test q_exact ≈ SVector(-1.0, 0.0) atol=4e-15
+    @test v_exact ≈ SVector(0.0, -1.0) atol=4e-15
+
+    result = integrate_levi_civita_fictitious(
+        circular, (0.0, π); saveat=π / 16, reltol=1e-13, abstol=1e-13,
+    )
+    u_num, w_num = levi_civita_fictitious_state(result, π)
+    @test u_num ≈ u_exact atol=2e-12 rtol=2e-12
+    @test w_num ≈ w_exact atol=2e-12 rtol=2e-12
+    @test length(result.solution.t) == 17
+
+    # Gauge-related initial states remain negatives of one another in
+    # regularized space and reconstruct the same Cartesian state.
+    circular_negative = LeviCivitaOscillator(
+        1.0, [1.0, 0.0], [0.0, 1.0]; branch=-1,
+    )
+    un, wn = levi_civita_fictitious_state(circular_negative, π / 3)
+    up, wp = levi_civita_fictitious_state(circular, π / 3)
+    @test un ≈ -up atol=8eps(Float64)
+    @test wn ≈ -wp atol=8eps(Float64)
+    @test levi_civita_position(un) ≈ levi_civita_position(up) atol=8eps(Float64)
+
+    # Positive-energy state exercises the hyperbolic exact branch.
+    hyperbolic = LeviCivitaOscillator(1.0, [1.0, 0.0], [0.0, 2.0])
+    @test hyperbolic.specific_energy > 0
+    hyper_result = integrate_levi_civita_fictitious(
+        hyperbolic, (0.0, 0.5); reltol=1e-13, abstol=1e-13,
+    )
+    uh_exact, wh_exact = levi_civita_fictitious_state(hyperbolic, 0.5)
+    uh_num, wh_num = levi_civita_fictitious_state(hyper_result, 0.5)
+    @test uh_num ≈ uh_exact atol=3e-12 rtol=3e-12
+    @test wh_num ≈ wh_exact atol=3e-12 rtol=3e-12
+
+    # A radial fall passes through u = 0 at finite fictitious time. The
+    # regularized solution remains finite on both sides of the collision.
+    radial = LeviCivitaOscillator(1.0, [2.0, 0.0], [0.0, 0.0])
+    collision_s = π
+    ur, wr = levi_civita_fictitious_state(radial, collision_s)
+    @test norm(ur) < 5e-15
+    @test all(isfinite, wr)
+    radial_result = integrate_levi_civita_fictitious(
+        radial, (0.0, 3π / 2); saveat=[collision_s, 3π / 2],
+        reltol=1e-13, abstol=1e-13,
+    )
+    ur_num, wr_num = levi_civita_fictitious_state(radial_result, collision_s)
+    @test norm(ur_num) < 3e-12
+    @test all(isfinite, wr_num)
+    u_after, w_after = levi_civita_fictitious_state(radial_result, 3π / 2)
+    @test all(isfinite, u_after)
+    @test all(isfinite, w_after)
+
+    # Floating-point evaluation at the analytic collision time is generally
+    # only numerically close to u = 0, because π and the trigonometric values
+    # are not represented exactly. Verify that the propagated state reaches
+    # collision to roundoff without imposing an arbitrary snapping threshold.
+    @test norm(ur) ≤ 100eps(Float64)
+    @test isfinite(norm(wr))
+
+    # Cartesian velocity reconstruction is singular only at an exact binary
+    # collision. Construct that state explicitly so the DomainError test does
+    # not depend on floating-point evaluation of the analytic collision time.
+    exact_collision = LeviCivitaOscillator{Float64}(
+        1.0, radial.specific_energy, SVector(0.0, 0.0), wr, 1,
+    )
+    @test_throws DomainError levi_civita_cartesian_state(exact_collision, 0.0)
+
+    setprecision(BigFloat, 256) do
+        big_circular = LeviCivitaOscillator(
+            big"1.0", BigFloat[big"1.0", big"0.0"],
+            BigFloat[big"0.0", big"1.0"],
+        )
+        sb = BigFloat(pi) / 3
+        big_result = integrate_levi_civita_fictitious(
+            big_circular, (big"0.0", sb);
+            reltol=big"1e-40", abstol=big"1e-40",
+        )
+        ub_exact, wb_exact = levi_civita_fictitious_state(big_circular, sb)
+        ub_num, wb_num = levi_civita_fictitious_state(big_result, sb)
+        @test norm(ub_num - ub_exact) < big"1e-35"
+        @test norm(wb_num - wb_exact) < big"1e-35"
+    end
+
+    @test_throws ArgumentError LeviCivitaOscillator(0.0, [1.0, 0.0], [0.0, 1.0])
+    @test_throws ArgumentError integrate_levi_civita_fictitious(circular, (0.0, 0.0))
+    @test_throws ArgumentError integrate_levi_civita_fictitious(circular, (0.0, 1.0); reltol=0.0)
+end

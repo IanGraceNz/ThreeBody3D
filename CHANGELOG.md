@@ -64,3 +64,9 @@
 - Added inverse initialization with explicit `±` gauge selection.
 - Added collision-limit, sign-equivalence, Float64, and BigFloat tests.
 - No regularized equations or integrator switching are introduced in this stage.
+
+### v0.4 Stage 4A
+- Added isolated planar Levi-Civita oscillator integration over fixed fictitious time.
+- Added exact elliptic, parabolic, and hyperbolic regularized-state propagation.
+- Added collision-passage, gauge, Float64, and BigFloat validation.
+- Physical-time integration and stopping remain deferred to Stage 4B.

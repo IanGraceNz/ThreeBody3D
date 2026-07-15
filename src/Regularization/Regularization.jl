@@ -3,3 +3,5 @@
 include("PairCoordinates.jl")
 include("KeplerValidation.jl")
 include("LeviCivita.jl")
+
+include("LeviCivitaOscillator.jl")
