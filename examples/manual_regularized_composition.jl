@@ -1,4 +1,5 @@
 using ThreeBody3D
+using LinearAlgebra
 
 system = ThreeBodySystem((1.0, 1.0, 0.01))
 relative_speed = sqrt(2.0)
