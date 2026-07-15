@@ -270,3 +270,47 @@ end
         system, u0, (0.0, 0.01); algorithms=(:unknown,), precision=128
     )
 end
+
+@testset "Pair-centred coordinate transformations" begin
+    system = ThreeBodySystem((2, 3.0, 5f0); G=2)
+    u = statevector(
+        [1, 2, 3], [4, 5, 6],
+        [-2, 1, 7], [3, -4, 2],
+        [8, -3, 1], [-1, 2, -5],
+    )
+
+    for pair in ((1, 2), (2, 1), (1, 3), (3, 1), (2, 3), (3, 2))
+        coordinates = to_pair_coordinates(system, u, pair)
+        reconstructed = from_pair_coordinates(system, coordinates)
+        @test reconstructed ≈ u rtol=8eps(eltype(u)) atol=8eps(eltype(u))
+        @test coordinates.third == only(setdiff(1:3, collect(pair)))
+
+        i, j = pair
+        @test coordinates.relative_position == body_position(u, i) - body_position(u, j)
+        @test coordinates.relative_velocity == velocity(u, i) - velocity(u, j)
+
+        mi, mj = system.masses[i], system.masses[j]
+        @test coordinates.binary_com_position ==
+              (mi * body_position(u, i) + mj * body_position(u, j)) / (mi + mj)
+        @test coordinates.binary_com_velocity ==
+              (mi * velocity(u, i) + mj * velocity(u, j)) / (mi + mj)
+    end
+
+    forward = to_pair_coordinates(system, u, (1, 2))
+    reverse = to_pair_coordinates(system, u, (2, 1))
+    @test reverse.relative_position == -forward.relative_position
+    @test reverse.relative_velocity == -forward.relative_velocity
+    @test reverse.binary_com_position == forward.binary_com_position
+    @test reverse.binary_com_velocity == forward.binary_com_velocity
+    @test from_pair_coordinates(system, reverse) ≈ u rtol=8eps(eltype(u)) atol=8eps(eltype(u))
+
+    mixed_system = ThreeBodySystem((big"2.0", 3, 5f0))
+    big_u = BigFloat.(u)
+    big_coordinates = to_pair_coordinates(mixed_system, big_u, (1, 3))
+    @test eltype(big_coordinates.relative_position) === BigFloat
+    @test from_pair_coordinates(mixed_system, big_coordinates) ≈ big_u rtol=8eps(BigFloat) atol=8eps(BigFloat)
+
+    @test_throws ArgumentError to_pair_coordinates(system, u, (1, 1))
+    @test_throws ArgumentError to_pair_coordinates(system, u, (0, 2))
+    @test_throws ArgumentError to_pair_coordinates(system, u, (1, 4))
+end

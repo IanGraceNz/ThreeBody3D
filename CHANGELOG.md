@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.0-DEV
+
+- Added reversible mass-weighted pair-centred coordinates as the first regularization building block.
+- Added ordered-pair orientation, third-body metadata, Float64/BigFloat round-trip tests, and the v0.4 regularization design specification.
+- No integration equations or existing simulation behaviour changed in Stage 1.
+
 ## 0.3.0-DEV
 
 - Added named `:fast`, `:accurate`, and `:extreme` integration profiles.

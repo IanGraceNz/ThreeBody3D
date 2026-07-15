@@ -7,6 +7,7 @@ using SciMLBase
 
 include("Types.jl")
 include("StateVector.jl")
+include("Regularization/Regularization.jl")
 include("Physics.jl")
 include("Integrator.jl")
 include("Diagnostics.jl")
@@ -15,6 +16,7 @@ include("Visualization.jl")
 
 export ThreeBodySystem,
        STATE_SIZE, statevector, body_position, velocity,
+       PairCoordinates, to_pair_coordinates, from_pair_coordinates,
        AccuracyProfile, accuracy_profile,
        CloseApproachEvent, SimulationResult, simulate,
        terminated_by_close_approach,

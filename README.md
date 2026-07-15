@@ -203,3 +203,21 @@ See `examples/high_precision_reference.jl` for a complete example. Very tight
 local tolerances do not prove equally small global trajectory error, especially
 for chaotic trajectories, close encounters, interpolation, or truncated
 initial data.
+
+
+## Experimental v0.4 pair coordinates
+
+Stage 1 of the regularization roadmap adds an algebraic, exactly reversible
+pair-centred decomposition without changing the integrator:
+
+```julia
+coordinates = to_pair_coordinates(system, u0, (1, 2))
+reconstructed = from_pair_coordinates(system, coordinates)
+```
+
+For an ordered pair `(i, j)`, the relative vectors are `rᵢ-rⱼ` and `vᵢ-vⱼ`.
+The remaining fields contain the binary centre-of-mass state and the third-body
+state. Reversing the pair reverses the relative-vector orientation but reconstructs
+the same physical state. This is infrastructure for future Levi–Civita and KS
+regularization; it does not itself remove the Newtonian singularity. See
+`REGULARIZATION_DESIGN.md`.
