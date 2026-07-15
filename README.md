@@ -221,3 +221,18 @@ state. Reversing the pair reverses the relative-vector orientation but reconstru
 the same physical state. This is infrastructure for future Levi–Civita and KS
 regularization; it does not itself remove the Newtonian singularity. See
 `REGULARIZATION_DESIGN.md`.
+
+## Analytic Kepler validation (v0.4 development)
+
+The regularization validation layer includes a universal-variable two-body
+reference propagator covering elliptic, near-parabolic, hyperbolic, and radial
+motion:
+
+```julia
+reference = KeplerReference(1.0, [1.0, 0.0, 0.0], [0.0, 1.0, 0.0])
+r, v = kepler_state(reference, π / 2)
+```
+
+These functions are validation tools for forthcoming Levi–Civita and KS
+implementations. They do not replace or modify the production three-body
+integrator. See `examples/analytic_kepler_validation.jl`.

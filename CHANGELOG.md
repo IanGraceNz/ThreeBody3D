@@ -49,3 +49,11 @@
   and `Feagin14` on future problems and SciML versions.
 - Added `examples/high_precision_reference.jl` and regression tests for the
   arbitrary-precision path.
+
+## 0.4.0-DEV — Stage 2
+
+- Added a type-generic analytic Kepler reference harness based on universal variables.
+- Added elliptic, near-parabolic, hyperbolic, and radial reference propagation.
+- Added an independent exact radial free-fall solution and collision-time formula.
+- Added Float64 and 256-bit BigFloat validation tests.
+- Added `examples/analytic_kepler_validation.jl`.

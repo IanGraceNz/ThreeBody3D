@@ -1,2 +1,4 @@
-# Shared coordinate decompositions for future regularized integrators.
+# Shared coordinate decompositions and analytic references for future
+# regularized integrators.
 include("PairCoordinates.jl")
+include("KeplerValidation.jl")

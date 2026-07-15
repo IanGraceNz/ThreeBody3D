@@ -314,3 +314,73 @@ end
     @test_throws ArgumentError to_pair_coordinates(system, u, (0, 2))
     @test_throws ArgumentError to_pair_coordinates(system, u, (1, 4))
 end
+
+@testset "Analytic Kepler validation harness" begin
+    μ = 1.0
+
+    circular = KeplerReference(μ, [1.0, 0.0, 0.0], [0.0, 1.0, 0.0])
+    r_quarter, v_quarter = kepler_state(circular, π / 2)
+    @test r_quarter ≈ SVector(0.0, 1.0, 0.0) atol=2e-12 rtol=2e-12
+    @test v_quarter ≈ SVector(-1.0, 0.0, 0.0) atol=2e-12 rtol=2e-12
+    @test kepler_specific_energy(μ, r_quarter, v_quarter) ≈ -0.5 atol=2e-13
+    @test kepler_angular_momentum(r_quarter, v_quarter) ≈ SVector(0.0, 0.0, 1.0) atol=2e-13
+
+    eccentricity = 0.5
+    semimajor_axis = 2.0
+    periapsis = semimajor_axis * (1 - eccentricity)
+    periapsis_speed = sqrt(μ * (1 + eccentricity) /
+                            (semimajor_axis * (1 - eccentricity)))
+    ellipse = KeplerReference(μ, [periapsis, 0.0, 0.0],
+                              [0.0, periapsis_speed, 0.0])
+    orbital_period = 2π * sqrt(semimajor_axis^3 / μ)
+    r_period, v_period = kepler_state(ellipse, orbital_period)
+    @test r_period ≈ ellipse.r0 atol=2e-11 rtol=2e-11
+    @test v_period ≈ ellipse.v0 atol=2e-11 rtol=2e-11
+
+    near_parabolic = KeplerReference(
+        μ, [1.0, 0.0, 0.0], [0.0, sqrt(2.0) * (1 - 1e-8), 0.0]
+    )
+    rp, vp = kepler_state(near_parabolic, 0.2)
+    @test kepler_specific_energy(μ, rp, vp) ≈
+          kepler_specific_energy(μ, near_parabolic.r0, near_parabolic.v0) atol=2e-12
+    @test kepler_angular_momentum(rp, vp) ≈
+          kepler_angular_momentum(near_parabolic.r0, near_parabolic.v0) atol=2e-12
+
+    hyperbolic = KeplerReference(μ, [1.0, 0.0, 0.0], [0.0, 2.0, 0.0])
+    rh, vh = kepler_state(hyperbolic, 0.3)
+    @test kepler_specific_energy(μ, rh, vh) > 0
+    @test kepler_specific_energy(μ, rh, vh) ≈
+          kepler_specific_energy(μ, hyperbolic.r0, hyperbolic.v0) atol=2e-12
+    @test kepler_angular_momentum(rh, vh) ≈
+          kepler_angular_momentum(hyperbolic.r0, hyperbolic.v0) atol=2e-12
+
+    radial_position = SVector(2.0, 0.0, 0.0)
+    collision_time = radial_free_fall_time(μ, norm(radial_position))
+    comparison_time = collision_time / 2
+    radial_reference = KeplerReference(μ, radial_position, zeros(3))
+    r_universal, v_universal = kepler_state(radial_reference, comparison_time)
+    r_exact, v_exact = radial_free_fall_state(μ, radial_position, comparison_time)
+    @test r_universal ≈ r_exact atol=3e-12 rtol=3e-12
+    @test v_universal ≈ v_exact atol=3e-12 rtol=3e-12
+    @test radial_free_fall_state(μ, radial_position, 0.0) ==
+          (radial_position, zero(radial_position))
+
+    setprecision(BigFloat, 256) do
+        big_circular = KeplerReference(
+            big"1.0",
+            BigFloat[big"1.0", big"0.0", big"0.0"],
+            BigFloat[big"0.0", big"1.0", big"0.0"],
+        )
+        rb, vb = kepler_state(big_circular, BigFloat(pi) / 2; tolerance=big"1e-70")
+        tolerance = big"1e-60"
+        @test norm(rb - SVector(big"0.0", big"1.0", big"0.0")) < tolerance
+        @test norm(vb - SVector(big"-1.0", big"0.0", big"0.0")) < tolerance
+        @test abs(kepler_specific_energy(big"1.0", rb, vb) + big"0.5") < tolerance
+    end
+
+    @test_throws ArgumentError KeplerReference(0.0, [1.0, 0.0, 0.0], zeros(3))
+    @test_throws ArgumentError KeplerReference(1.0, zeros(3), zeros(3))
+    @test_throws ArgumentError kepler_state(circular, 1.0; tolerance=0.0)
+    @test_throws ArgumentError radial_free_fall_time(1.0, 0.0)
+    @test_throws ArgumentError radial_free_fall_state(1.0, radial_position, collision_time)
+end
