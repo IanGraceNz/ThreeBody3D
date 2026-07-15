@@ -292,3 +292,21 @@ state = perturbed_levi_civita_state(regularized, 0.5)
 This integrates over fixed fictitious time. It does not automatically select a
 pair, switch from the production Cartesian solver, or target a requested
 physical end time. All input positions and velocities must be planar.
+
+### Targeting physical time in the perturbed planar solver
+
+The experimental selected-pair planar regularization can now be evaluated at a
+requested absolute physical time without callbacks:
+
+```julia
+state = perturbed_levi_civita_state_at_time(
+    problem,
+    0.5;
+    initial_step=0.5,
+    tolerance=1e-11,
+)
+```
+
+The implementation expands a fictitious-time bracket, integrates once over the
+final bracket, and bisects the dense physical-time state. It still performs no
+automatic pair selection or switching.

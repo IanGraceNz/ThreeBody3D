@@ -244,3 +244,163 @@ function perturbed_levi_civita_state(result::PerturbedLeviCivitaResult, s::Real)
         physical_state=physical_state,
     )
 end
+
+"""
+    perturbed_levi_civita_fictitious_time(problem, target_time; kwargs...)
+
+Locate the fictitious time corresponding to the absolute physical time
+`target_time` for an explicit [`PerturbedLeviCivitaProblem`](@ref).
+
+The routine first expands a fictitious-time interval from `s=0` until the
+integrated physical-time state brackets the target. It then bisects the dense
+numerical solution. No callback is used. Both forward and backward physical
+queries are supported.
+
+Keyword arguments:
+
+- `initial_step`: positive magnitude of the first fictitious-time bracket.
+- `tolerance`: relative/absolute scale used for both physical-time residual
+  and fictitious-time bracket convergence.
+- `max_iterations`: maximum number of bracket expansions and bisection steps.
+- `algorithm`, `reltol`, `abstol`, and remaining keywords are forwarded to
+  [`integrate_perturbed_levi_civita`](@ref).
+
+Returns `(s, result)`, where `result` is the numerical integration covering the
+root bracket. Near an exact binary collision the inverse physical-time map is
+ill-conditioned because `dt/ds = |u|²` vanishes; physical-time accuracy is then
+more meaningful than fictitious-time accuracy.
+"""
+function perturbed_levi_civita_fictitious_time(
+    problem::PerturbedLeviCivitaProblem{T},
+    target_time::Real;
+    initial_step::Real=one(T),
+    tolerance=nothing,
+    max_iterations::Integer=256,
+    algorithm=Vern9(),
+    reltol=nothing,
+    abstol=nothing,
+    kwargs...,
+) where {T}
+    target = T(target_time)
+    isfinite(target) || throw(ArgumentError("target_time must be finite."))
+    step = abs(T(initial_step))
+    isfinite(step) && step > zero(T) ||
+        throw(ArgumentError("initial_step must be finite and positive."))
+    max_iterations > 0 || throw(ArgumentError("max_iterations must be positive."))
+
+    tol = isnothing(tolerance) ? sqrt(eps(T)) : T(tolerance)
+    isfinite(tol) && tol > zero(T) ||
+        throw(ArgumentError("tolerance must be finite and positive."))
+
+    t0 = problem.initial_time
+    target == t0 && return (zero(T), nothing)
+    direction = target > t0 ? one(T) : -one(T)
+
+    bracket_s = direction * step
+    bracket_result = nothing
+    bracket_t = t0
+    bracketed = false
+
+    for _ in 1:max_iterations
+        bracket_result = integrate_perturbed_levi_civita(
+            problem, (zero(T), bracket_s);
+            algorithm=algorithm, reltol=reltol, abstol=abstol, kwargs...,
+        )
+        bracket_t = bracket_result.solution(bracket_s)[14]
+        bracketed = direction > zero(T) ? bracket_t >= target : bracket_t <= target
+        bracketed && break
+        bracket_s *= T(2)
+        isfinite(bracket_s) ||
+            throw(ErrorException("Fictitious-time bracket overflowed before reaching target_time."))
+    end
+
+    bracketed || throw(ErrorException(
+        "Unable to bracket target physical time within max_iterations expansions.",
+    ))
+
+    left_s = zero(T)
+    right_s = bracket_s
+    left_value = t0 - target
+    right_value = bracket_t - target
+
+    for _ in 1:max_iterations
+        midpoint_s = (left_s + right_s) / T(2)
+        midpoint_time = bracket_result.solution(midpoint_s)[14]
+        midpoint_value = midpoint_time - target
+
+        time_scale = max(one(T), abs(target))
+        s_scale = max(one(T), abs(midpoint_s), abs(left_s), abs(right_s))
+        time_converged = abs(midpoint_value) <= tol * time_scale
+        bracket_converged = abs(right_s - left_s) <= tol * s_scale
+        if time_converged && bracket_converged
+            return (midpoint_s, bracket_result)
+        end
+
+        if iszero(midpoint_value)
+            return (midpoint_s, bracket_result)
+        elseif signbit(midpoint_value) == signbit(left_value)
+            left_s = midpoint_s
+            left_value = midpoint_value
+        else
+            right_s = midpoint_s
+            right_value = midpoint_value
+        end
+    end
+
+    midpoint_s = (left_s + right_s) / T(2)
+    midpoint_time = bracket_result.solution(midpoint_s)[14]
+    abs(midpoint_time - target) <= tol * max(one(T), abs(target)) ||
+        throw(ErrorException("Physical-time inversion did not converge within max_iterations."))
+    return (midpoint_s, bracket_result)
+end
+
+"""
+    perturbed_levi_civita_state_at_time(problem, target_time; kwargs...)
+
+Return the reconstructed perturbed planar Levi-Civita state at the absolute
+physical time `target_time`.
+
+The physical-time target is located by
+[`perturbed_levi_civita_fictitious_time`](@ref), using bracket expansion and
+bisection without callbacks. The returned named tuple contains
+`fictitious_time` together with the fields returned by
+[`perturbed_levi_civita_state`](@ref).
+"""
+function perturbed_levi_civita_state_at_time(
+    problem::PerturbedLeviCivitaProblem,
+    target_time::Real;
+    kwargs...,
+)
+    T = eltype(problem.u0)
+    target = T(target_time)
+    if target == problem.initial_time
+        radius = dot(problem.u0, problem.u0)
+        q = levi_civita_position(problem.u0)
+        qdot = levi_civita_velocity(problem.u0, problem.uprime0 / radius)
+        pair_coordinates = PairCoordinates{T}(
+            SVector{3,T}(q[1], q[2], zero(T)),
+            SVector{3,T}(qdot[1], qdot[2], zero(T)),
+            SVector{3,T}(problem.binary_com_position0[1], problem.binary_com_position0[2], zero(T)),
+            SVector{3,T}(problem.binary_com_velocity0[1], problem.binary_com_velocity0[2], zero(T)),
+            SVector{3,T}(problem.third_position0[1], problem.third_position0[2], zero(T)),
+            SVector{3,T}(problem.third_velocity0[1], problem.third_velocity0[2], zero(T)),
+            problem.pair,
+            problem.third,
+        )
+        physical_state = from_pair_coordinates(problem.system, pair_coordinates)
+        return (
+            fictitious_time=zero(T),
+            physical_time=problem.initial_time,
+            regularized_position=problem.u0,
+            regularized_derivative=problem.uprime0,
+            binary_specific_energy=problem.binary_specific_energy0,
+            physical_state=physical_state,
+        )
+    end
+
+    fictitious_time, result = perturbed_levi_civita_fictitious_time(
+        problem, target; kwargs...,
+    )
+    state = perturbed_levi_civita_state(result, fictitious_time)
+    return (; fictitious_time=fictitious_time, state...)
+end

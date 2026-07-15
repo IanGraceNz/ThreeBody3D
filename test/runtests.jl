@@ -799,3 +799,95 @@ end
     @test_throws ArgumentError integrate_perturbed_levi_civita(problem, (0.1, 0.2))
     @test_throws ArgumentError integrate_perturbed_levi_civita(problem, (0.0, 0.0))
 end
+
+@testset "Perturbed Levi-Civita physical-time targeting" begin
+    system = ThreeBodySystem((1.0, 1.0, 0.01))
+    relative_speed = sqrt(2.0)
+    u0 = statevector(
+        [0.5, 0.0, 0.0], [0.0, relative_speed / 2, 0.0],
+        [-0.5, 0.0, 0.0], [0.0, -relative_speed / 2, 0.0],
+        [8.0, 0.5, 0.0], [0.0, 0.35, 0.0],
+    )
+    problem = PerturbedLeviCivitaProblem(system, u0, (1, 2))
+
+    initial = perturbed_levi_civita_state_at_time(
+        problem, 0.0; reltol=1e-13, abstol=1e-13,
+    )
+    @test initial.fictitious_time == 0.0
+    @test initial.physical_time == 0.0
+    @test initial.physical_state ≈ u0 atol=2e-14 rtol=2e-14
+
+    for target in (0.1, 0.5)
+        targeted = perturbed_levi_civita_state_at_time(
+            problem, target;
+            initial_step=0.5, tolerance=1e-11,
+            reltol=1e-13, abstol=1e-13,
+        )
+        @test targeted.physical_time ≈ target atol=2e-11 rtol=2e-11
+        @test targeted.fictitious_time > 0.0
+        cartesian = simulate(
+            system, u0, (0.0, target);
+            solver=:accurate, reltol=1e-13, abstol=1e-13,
+        )
+        @test targeted.physical_state ≈ cartesian.solution(target) atol=5e-10 rtol=5e-10
+    end
+
+    backward = perturbed_levi_civita_state_at_time(
+        problem, -0.1;
+        initial_step=0.2, tolerance=1e-11,
+        reltol=1e-13, abstol=1e-13,
+    )
+    @test backward.physical_time ≈ -0.1 atol=2e-11 rtol=2e-11
+    @test backward.fictitious_time < 0.0
+    # The production Cartesian solver intentionally accepts only increasing
+    # physical-time spans. Validate the backward regularized target by
+    # integrating its reconstructed physical state forward from -0.1 to 0.0.
+    backward_cartesian = simulate(
+        system, backward.physical_state, (-0.1, 0.0);
+        solver=:accurate, reltol=1e-13, abstol=1e-13,
+    )
+    @test backward_cartesian.solution(0.0) ≈ u0 atol=5e-10 rtol=5e-10
+
+    reverse_problem = PerturbedLeviCivitaProblem(system, u0, (2, 1); branch=-1)
+    reverse_target = perturbed_levi_civita_state_at_time(
+        reverse_problem, 0.1;
+        initial_step=0.2, tolerance=1e-11,
+        reltol=1e-13, abstol=1e-13,
+    )
+    forward_target = perturbed_levi_civita_state_at_time(
+        problem, 0.1;
+        initial_step=0.2, tolerance=1e-11,
+        reltol=1e-13, abstol=1e-13,
+    )
+    @test reverse_target.physical_state ≈ forward_target.physical_state atol=5e-10 rtol=5e-10
+
+    setprecision(BigFloat, 256) do
+        big_system = ThreeBodySystem(
+            (big"1.0", big"1.0", big"0.01"); G=big"1.0",
+        )
+        big_relative_speed = sqrt(big"2.0")
+        big_u0 = statevector(
+            BigFloat[big"0.5", big"0.0", big"0.0"],
+            BigFloat[big"0.0", big_relative_speed / 2, big"0.0"],
+            BigFloat[big"-0.5", big"0.0", big"0.0"],
+            BigFloat[big"0.0", -big_relative_speed / 2, big"0.0"],
+            BigFloat[big"8.0", big"0.5", big"0.0"],
+            BigFloat[big"0.0", big"0.35", big"0.0"],
+        )
+        big_problem = PerturbedLeviCivitaProblem(big_system, big_u0, (1, 2))
+        target = big"0.03"
+        big_targeted = perturbed_levi_civita_state_at_time(
+            big_problem, target;
+            initial_step=big"0.05", tolerance=big"1e-28",
+            reltol=big"1e-35", abstol=big"1e-35",
+        )
+        @test eltype(big_targeted.physical_state) === BigFloat
+        @test abs(big_targeted.physical_time - target) < big"1e-27"
+        @test all(isfinite, big_targeted.physical_state)
+    end
+
+    @test_throws ArgumentError perturbed_levi_civita_fictitious_time(problem, Inf)
+    @test_throws ArgumentError perturbed_levi_civita_fictitious_time(problem, 0.1; initial_step=0.0)
+    @test_throws ArgumentError perturbed_levi_civita_fictitious_time(problem, 0.1; tolerance=0.0)
+    @test_throws ArgumentError perturbed_levi_civita_fictitious_time(problem, 0.1; max_iterations=0)
+end

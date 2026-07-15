@@ -91,3 +91,11 @@
 - Added reconstruction to the ordinary 18-element physical state.
 - Added short-interval Cartesian cross-validation, collision-regularity checks, BigFloat coverage, and a complete example.
 - Automatic pair selection, physical-time targeting, and switching remain intentionally out of scope.
+
+### Stage 6: perturbed planar binary physical-time targeting
+
+- Added callback-free bracket expansion and bisection for locating fictitious
+  time from an absolute physical-time target in the perturbed planar
+  Levi-Civita solver.
+- Added forward, backward, reversed-pair, and BigFloat validation against the
+  independent Cartesian three-body solver.
