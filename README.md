@@ -236,3 +236,17 @@ r, v = kepler_state(reference, π / 2)
 These functions are validation tools for forthcoming Levi–Civita and KS
 implementations. They do not replace or modify the production three-body
 integrator. See `examples/analytic_kepler_validation.jl`.
+
+## Experimental planar Levi-Civita maps
+
+The v0.4 development API includes algebraic planar Levi-Civita maps for future
+binary-collision regularization:
+
+```julia
+lc = to_levi_civita([1.0, 0.2], [0.0, 1.0])
+q, qdot = from_levi_civita(lc)
+```
+
+The two branches selected by `branch=1` and `branch=-1` are gauge-equivalent.
+These functions do not yet integrate Levi-Civita equations or introduce a
+Sundman time transformation.

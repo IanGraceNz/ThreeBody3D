@@ -384,3 +384,68 @@ end
     @test_throws ArgumentError radial_free_fall_time(1.0, 0.0)
     @test_throws ArgumentError radial_free_fall_state(1.0, radial_position, collision_time)
 end
+
+@testset "Planar Levi-Civita coordinate maps" begin
+    u = SVector(1.2, -0.7)
+    udot = SVector(0.3, 0.4)
+    coordinates = LeviCivitaCoordinates(u, udot)
+    q, qdot = from_levi_civita(coordinates)
+
+    @test q ≈ SVector(0.95, -1.68) atol=8eps(Float64) rtol=8eps(Float64)
+    @test qdot ≈ SVector(1.28, 0.54) atol=8eps(Float64) rtol=8eps(Float64)
+    @test levi_civita_position(-u) == q
+    @test levi_civita_velocity(-u, -udot) == qdot
+
+    for branch in (-1, 1)
+        recovered = to_levi_civita(q, qdot; branch=branch)
+        qr, qdotr = from_levi_civita(recovered)
+        @test qr ≈ q atol=16eps(Float64) rtol=16eps(Float64)
+        @test qdotr ≈ qdot atol=16eps(Float64) rtol=16eps(Float64)
+        @test sign(recovered.u[1] == 0 ? recovered.u[2] : recovered.u[1]) == branch *
+              sign(to_levi_civita(q, qdot; branch=1).u[1] == 0 ?
+                   to_levi_civita(q, qdot; branch=1).u[2] :
+                   to_levi_civita(q, qdot; branch=1).u[1])
+    end
+
+    positive = to_levi_civita(q, qdot; branch=1)
+    negative = to_levi_civita(q, qdot; branch=-1)
+    @test negative.u == -positive.u
+    @test negative.udot == -positive.udot
+
+    quadrant_cases = (
+        (SVector(2.0, 1.0), SVector(-0.2, 0.5)),
+        (SVector(-2.0, 1.0), SVector(0.7, -0.4)),
+        (SVector(-2.0, -1.0), SVector(-0.6, -0.3)),
+        (SVector(2.0, -1.0), SVector(0.1, 0.9)),
+        (SVector(-2.0, 0.0), SVector(0.4, -0.8)),
+    )
+    for (position, velocity_value) in quadrant_cases
+        lc = to_levi_civita(position, velocity_value)
+        reconstructed_position, reconstructed_velocity = from_levi_civita(lc)
+        @test reconstructed_position ≈ position atol=16eps(Float64) rtol=16eps(Float64)
+        @test reconstructed_velocity ≈ velocity_value atol=16eps(Float64) rtol=16eps(Float64)
+    end
+
+    collision = LeviCivitaCoordinates(zeros(2), [3.0, -4.0])
+    collision_position, collision_velocity = from_levi_civita(collision)
+    @test iszero(collision_position)
+    @test iszero(collision_velocity)
+    @test_throws DomainError to_levi_civita(zeros(2), zeros(2))
+
+    setprecision(BigFloat, 256) do
+        qb = SVector(big"-1.75", big"0.625")
+        qdotb = SVector(big"0.125", big"-0.875")
+        lcb = to_levi_civita(qb, qdotb; branch=-1)
+        rb, vb = from_levi_civita(lcb)
+        tolerance = big"1e-70"
+        @test eltype(lcb.u) === BigFloat
+        @test norm(rb - qb) < tolerance
+        @test norm(vb - qdotb) < tolerance
+    end
+
+    @test_throws ArgumentError LeviCivitaCoordinates([1.0], [0.0, 0.0])
+    @test_throws ArgumentError levi_civita_position([1.0])
+    @test_throws ArgumentError levi_civita_velocity([1.0, 0.0], [1.0])
+    @test_throws ArgumentError to_levi_civita([1.0, 0.0], [0.0, 0.0]; branch=0)
+    @test_throws ArgumentError to_levi_civita([Inf, 0.0], [0.0, 0.0])
+end

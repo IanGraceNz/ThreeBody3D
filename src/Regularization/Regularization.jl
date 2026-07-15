@@ -2,3 +2,4 @@
 # regularized integrators.
 include("PairCoordinates.jl")
 include("KeplerValidation.jl")
+include("LeviCivita.jl")

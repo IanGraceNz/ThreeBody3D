@@ -57,3 +57,10 @@
 - Added an independent exact radial free-fall solution and collision-time formula.
 - Added Float64 and 256-bit BigFloat validation tests.
 - Added `examples/analytic_kepler_validation.jl`.
+
+### v0.4 Stage 3 — Planar Levi-Civita coordinate maps
+
+- Added the quadratic planar Levi-Civita position map and its physical-time velocity Jacobian.
+- Added inverse initialization with explicit `±` gauge selection.
+- Added collision-limit, sign-equivalence, Float64, and BigFloat tests.
+- No regularized equations or integrator switching are introduced in this stage.

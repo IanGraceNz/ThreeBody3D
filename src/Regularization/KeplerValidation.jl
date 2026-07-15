@@ -131,7 +131,6 @@ function kepler_state(reference::KeplerReference{T}, Δt::Real;
     iszero(t) && return reference.r0, reference.v0
 
     tol = isnothing(tolerance) ? T(16) * eps(T) : T(tolerance)
-
     isfinite(tol) && tol > zero(T) || throw(ArgumentError("tolerance must be finite and positive."))
 
     χ = _initial_universal_anomaly(reference, t)
@@ -225,7 +224,6 @@ function radial_free_fall_state(μ::Real, initial_position::AbstractVector{<:Rea
     iszero(time) && return r0vec, zero(r0vec)
 
     tol = isnothing(tolerance) ? T(16) * eps(T) : T(tolerance)
-
     tol > zero(T) || throw(ArgumentError("tolerance must be positive."))
     scale = sqrt(r0^3 / (T(8) * μT))
     τ = time / scale

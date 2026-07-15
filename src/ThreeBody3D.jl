@@ -17,6 +17,8 @@ include("Visualization.jl")
 export ThreeBodySystem,
        STATE_SIZE, statevector, body_position, velocity,
        PairCoordinates, to_pair_coordinates, from_pair_coordinates,
+       LeviCivitaCoordinates, levi_civita_position,
+       levi_civita_velocity, to_levi_civita, from_levi_civita,
        KeplerReference, kepler_state, kepler_specific_energy,
        kepler_angular_momentum, radial_free_fall_time,
        radial_free_fall_state,
