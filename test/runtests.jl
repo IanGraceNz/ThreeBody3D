@@ -703,3 +703,99 @@ end
     @test_throws ArgumentError levi_civita_fictitious_time(circular, 1.0; tolerance=0.0)
     @test_throws ArgumentError levi_civita_fictitious_time(circular, 1.0; max_iterations=0)
 end
+
+@testset "Perturbed planar Levi-Civita binary" begin
+    system = ThreeBodySystem((1.0, 1.0, 0.01))
+    relative_speed = sqrt(2.0)
+    u0 = statevector(
+        [0.5, 0.0, 0.0], [0.0, relative_speed / 2, 0.0],
+        [-0.5, 0.0, 0.0], [0.0, -relative_speed / 2, 0.0],
+        [8.0, 0.5, 0.0], [0.0, 0.35, 0.0],
+    )
+
+    problem = PerturbedLeviCivitaProblem(system, u0, (1, 2))
+    @test problem.pair == (1, 2)
+    @test problem.third == 3
+    @test problem.initial_time == 0.0
+
+    # Initial reconstruction is algebraically identical to the Cartesian state.
+    result = integrate_perturbed_levi_civita(
+        problem, (0.0, 0.15); reltol=1e-13, abstol=1e-13,
+    )
+    initial = perturbed_levi_civita_state(result, 0.0)
+    @test initial.physical_time == 0.0
+    @test initial.physical_state ≈ u0 atol=2e-14 rtol=2e-14
+
+    # Compare the regularized integration with the independent Cartesian
+    # three-body integrator at the same reconstructed physical time.
+    final = perturbed_levi_civita_state(result, 0.15)
+    @test final.physical_time > 0.0
+    cartesian = simulate(
+        system, u0, (0.0, final.physical_time);
+        solver=:accurate, reltol=1e-13, abstol=1e-13,
+    )
+    cartesian_final = cartesian.solution(final.physical_time)
+    @test final.physical_state ≈ cartesian_final atol=3e-10 rtol=3e-10
+
+    # The evolved energy variable agrees with the selected binary's physical
+    # osculating Kepler energy reconstructed from the regularized state.
+    pair_final = to_pair_coordinates(system, final.physical_state, (1, 2))
+    q = pair_final.relative_position
+    qdot = pair_final.relative_velocity
+    μ = system.G * (system.masses[1] + system.masses[2])
+    physical_binary_energy = dot(qdot, qdot) / 2 - μ / norm(q)
+    @test final.binary_specific_energy ≈ physical_binary_energy atol=2e-10 rtol=2e-10
+
+    # Reversing the ordered pair changes the regularized orientation but not
+    # the reconstructed initial physical state.
+    reverse_problem = PerturbedLeviCivitaProblem(system, u0, (2, 1); branch=-1)
+    reverse_result = integrate_perturbed_levi_civita(
+        reverse_problem, (0.0, 0.05); reltol=1e-13, abstol=1e-13,
+    )
+    @test perturbed_levi_civita_state(reverse_result, 0.0).physical_state ≈
+          u0 atol=2e-14 rtol=2e-14
+
+    # The regularized right-hand side remains finite at a selected binary
+    # collision when the third body is distinct from the binary centre.
+    collision_state = SVector{14,Float64}(
+        0.0, 0.0, 0.4, 0.0,
+        0.0, 0.0, 0.0, 0.0,
+        8.0, 0.5, 0.0, 0.35,
+        -1.0, 0.0,
+    )
+    collision_derivative = ThreeBody3D._perturbed_lc_rhs(collision_state, problem, 0.0)
+    @test all(isfinite, collision_derivative)
+    @test collision_derivative[14] == 0.0
+
+    setprecision(BigFloat, 256) do
+        big_system = ThreeBodySystem(
+            (big"1.0", big"1.0", big"0.01"); G=big"1.0",
+        )
+        big_relative_speed = sqrt(big"2.0")
+        big_u0 = statevector(
+            BigFloat[big"0.5", big"0.0", big"0.0"],
+            BigFloat[big"0.0", big_relative_speed / 2, big"0.0"],
+            BigFloat[big"-0.5", big"0.0", big"0.0"],
+            BigFloat[big"0.0", -big_relative_speed / 2, big"0.0"],
+            BigFloat[big"8.0", big"0.5", big"0.0"],
+            BigFloat[big"0.0", big"0.35", big"0.0"],
+        )
+        big_problem = PerturbedLeviCivitaProblem(big_system, big_u0, (1, 2))
+        big_result = integrate_perturbed_levi_civita(
+            big_problem, (big"0.0", big"0.03");
+            reltol=big"1e-35", abstol=big"1e-35",
+        )
+        big_final = perturbed_levi_civita_state(big_result, big"0.03")
+        @test eltype(big_final.physical_state) === BigFloat
+        @test big_final.physical_time > zero(BigFloat)
+        @test all(isfinite, big_final.physical_state)
+    end
+
+    nonplanar = copy(u0)
+    nonplanar[3] = 1e-3
+    @test_throws ArgumentError PerturbedLeviCivitaProblem(system, nonplanar, (1, 2))
+    @test_throws ArgumentError PerturbedLeviCivitaProblem(system, u0, (1, 1))
+    @test_throws ArgumentError PerturbedLeviCivitaProblem(system, u0, (1, 2); branch=0)
+    @test_throws ArgumentError integrate_perturbed_levi_civita(problem, (0.1, 0.2))
+    @test_throws ArgumentError integrate_perturbed_levi_civita(problem, (0.0, 0.0))
+end

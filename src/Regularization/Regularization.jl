@@ -7,3 +7,5 @@ include("LeviCivita.jl")
 include("LeviCivitaOscillator.jl")
 
 include("SundmanTime.jl")
+
+include("PerturbedLeviCivita.jl")

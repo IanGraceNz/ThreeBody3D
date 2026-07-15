@@ -278,3 +278,17 @@ This remains a research validation path and does not alter `simulate`.
 ```julia
 state = levi_civita_state_at_time(oscillator, 0.75)
 ```
+
+### Experimental perturbed planar binary
+
+Version 0.4 development includes an explicit selected-pair planar research path:
+
+```julia
+problem = PerturbedLeviCivitaProblem(system, u0, (1, 2))
+regularized = integrate_perturbed_levi_civita(problem, (0.0, 0.5))
+state = perturbed_levi_civita_state(regularized, 0.5)
+```
+
+This integrates over fixed fictitious time. It does not automatically select a
+pair, switch from the production Cartesian solver, or target a requested
+physical end time. All input positions and velocities must be planar.

@@ -83,3 +83,11 @@
 - Added bounded inversion of the exact Sundman map from physical time to fictitious time.
 - Added exact physical-time state queries without ODE callbacks.
 - Added forward, backward, radial-collision, and BigFloat validation.
+
+## v0.4 Stage 5
+
+- Added fixed-fictitious-time perturbed planar Levi-Civita integration for one explicitly selected binary pair.
+- Evolved the binary energy variable, binary centre of mass, third body, and physical time together with the regularized pair.
+- Added reconstruction to the ordinary 18-element physical state.
+- Added short-interval Cartesian cross-validation, collision-regularity checks, BigFloat coverage, and a complete example.
+- Automatic pair selection, physical-time targeting, and switching remain intentionally out of scope.
