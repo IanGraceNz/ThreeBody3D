@@ -13,3 +13,5 @@ include("PerturbedLeviCivita.jl")
 include("SegmentHandoff.jl")
 
 include("SegmentComposition.jl")
+
+include("AutomaticSwitching.jl")

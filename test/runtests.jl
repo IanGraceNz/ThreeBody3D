@@ -1119,3 +1119,107 @@ end
     @test_throws ArgumentError composed_regularized_state(composed, -0.1)
     @test_throws ArgumentError composed_regularized_state(composed, 0.3; tolerance=0.0)
 end
+
+@testset "Experimental automatic-switching foundations" begin
+    cartesian_mode = CartesianSwitchingMode()
+    @test cartesian_mode isa ExperimentalSwitchingMode
+
+    regularized_mode = RegularizedSwitchingMode((2, 1))
+    @test regularized_mode isa ExperimentalSwitchingMode
+    @test regularized_mode.pair == (2, 1)
+    @test_throws ArgumentError RegularizedSwitchingMode((1, 1))
+    @test_throws ArgumentError RegularizedSwitchingMode((0, 2))
+
+    parameters = AutomaticSwitchingParameters(
+        enter_threshold=0.1,
+        exit_threshold=0.2,
+    )
+    @test parameters.enter_threshold == 0.1
+    @test parameters.exit_threshold == 0.2
+    @test parameters.ambiguity_threshold == 0.2
+    @test parameters.minimum_separation_ratio == 2.0
+    @test parameters.maximum_switches == 100
+    @test parameters.minimum_time_progress > 0
+
+    promoted = AutomaticSwitchingParameters(
+        enter_threshold=big"0.1",
+        exit_threshold=big"0.2",
+        ambiguity_threshold=big"0.15",
+        minimum_separation_ratio=big"3.0",
+        maximum_switches=8,
+        minimum_time_progress=big"1e-30",
+    )
+    @test promoted isa AutomaticSwitchingParameters{BigFloat}
+    @test promoted.maximum_switches == 8
+
+    @test_throws ArgumentError AutomaticSwitchingParameters(
+        enter_threshold=0.0, exit_threshold=0.2,
+    )
+    @test_throws ArgumentError AutomaticSwitchingParameters(
+        enter_threshold=0.2, exit_threshold=0.2,
+    )
+    @test_throws ArgumentError AutomaticSwitchingParameters(
+        enter_threshold=0.2, exit_threshold=0.1,
+    )
+    @test_throws ArgumentError AutomaticSwitchingParameters(
+        enter_threshold=0.1, exit_threshold=0.2, ambiguity_threshold=0.05,
+    )
+    @test_throws ArgumentError AutomaticSwitchingParameters(
+        enter_threshold=0.1, exit_threshold=0.2, minimum_separation_ratio=1.0,
+    )
+    @test_throws ArgumentError AutomaticSwitchingParameters(
+        enter_threshold=0.1, exit_threshold=0.2, maximum_switches=0,
+    )
+    @test_throws ArgumentError AutomaticSwitchingParameters(
+        enter_threshold=0.1, exit_threshold=0.2, minimum_time_progress=0.0,
+    )
+
+    failure = AutomaticSwitchingFailure(
+        0.25,
+        :insufficient_pair_isolation,
+        "Two pairs are simultaneously close.";
+        pair=(1, 3),
+    )
+    @test failure.physical_time == 0.25
+    @test failure.reason == :insufficient_pair_isolation
+    @test failure.pair == (1, 3)
+    @test_throws ArgumentError AutomaticSwitchingFailure(
+        0.0, :invalid, "";
+    )
+    @test_throws ArgumentError AutomaticSwitchingFailure(
+        0.0, :invalid, "invalid pair"; pair=(2, 2),
+    )
+
+    system = ThreeBodySystem((1.0, 1.0, 1.0); G=1.0)
+    state = statevector(
+        [-1.0, 0.0, 0.0], [0.0, 0.1, 0.0],
+        [1.0, 0.0, 0.0], [0.0, -0.1, 0.0],
+        [0.0, 3.0, 0.0], [0.0, 0.0, 0.0],
+    )
+    diagnostics = ThreeBody3D._transition_diagnostics(
+        system, state, copy(state), 0.0, (1, 2),
+    )
+    event = RegularizationSwitchEvent(
+        0.0,
+        :entry,
+        (1, 2),
+        (0.1, 2.0, 2.1),
+        (-0.2, 0.1, 0.2),
+        20.0,
+        diagnostics,
+    )
+    @test event.kind == :entry
+    @test event.pair == (1, 2)
+    @test event.isolation_ratio == 20.0
+    @test event.transition_diagnostics === diagnostics
+
+    @test_throws ArgumentError RegularizationSwitchEvent(
+        0.0, :unknown, (1, 2), (0.1, 2.0, 2.1), (-0.2, 0.1, 0.2), 20.0, diagnostics,
+    )
+    @test_throws ArgumentError RegularizationSwitchEvent(
+        0.0, :entry, (1, 2), (0.0, 2.0, 2.1), (-0.2, 0.1, 0.2), 20.0, diagnostics,
+    )
+    @test_throws ArgumentError RegularizationSwitchEvent(
+        0.0, :entry, (1, 2), (0.1, 2.0, 2.1), (-0.2, 0.1, 0.2), 0.5, diagnostics,
+    )
+end
