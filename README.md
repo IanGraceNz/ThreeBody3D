@@ -327,3 +327,13 @@ println(segment.exit_diagnostics)
 This performs one explicitly selected planar Cartesian → Levi-Civita →
 Cartesian segment. It records coordinate-reconstruction residuals and invariant
 jumps at both boundaries. It does not select pairs or switch automatically.
+
+### Manual multi-segment regularization
+
+`compose_regularized_trajectory` composes a Cartesian segment, one explicitly
+selected planar Levi-Civita interval, and a final Cartesian segment. The result
+retains every underlying solve, transition diagnostics, solver statistics, and
+one unified physical trajectory. This is a manual research workflow; it does
+not perform automatic threshold switching.
+
+See `examples/manual_regularized_composition.jl`.

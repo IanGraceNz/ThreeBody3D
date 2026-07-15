@@ -3,6 +3,7 @@ using LinearAlgebra
 using Logging
 using StaticArrays
 using SciMLBase
+import OrdinaryDiffEq
 using ThreeBody3D
 
 const FIG8_POS = 0.97000436
@@ -994,4 +995,127 @@ end
     @test_throws ArgumentError propagate_regularized_segment(system, u0, (1, 1), 0.0, 0.5)
     @test_throws ArgumentError propagate_regularized_segment(system, u0, (1, 2), 0.0, 0.0)
     @test_throws ArgumentError propagate_regularized_segment(system, u0, (1, 2), NaN, 0.5)
+end
+
+@testset "Manual multi-segment regularized composition" begin
+    system = ThreeBodySystem((1.0, 1.0, 0.01))
+    relative_speed = sqrt(2.0)
+    u0 = statevector(
+        [0.5, 0.0, 0.0], [0.0, relative_speed / 2, 0.0],
+        [-0.5, 0.0, 0.0], [0.0, -relative_speed / 2, 0.0],
+        [8.0, 0.5, 0.0], [0.0, 0.35, 0.0],
+    )
+
+    composed = compose_regularized_trajectory(
+        system, u0, (0.0, 0.8), (1, 2), (0.2, 0.5);
+        saveat=0.1,
+        cartesian_reltol=1e-13,
+        cartesian_abstol=1e-13,
+        regularized_initial_step=0.4,
+        regularized_tolerance=1e-11,
+        regularized_reltol=1e-13,
+        regularized_abstol=1e-13,
+    )
+
+    @test composed.pair == (1, 2)
+    @test composed.tspan == (0.0, 0.8)
+    @test composed.regularized_interval == (0.2, 0.5)
+    @test first(composed.times) == 0.0
+    @test last(composed.times) == 0.8
+    @test length(composed.states) == length(composed.times)
+    @test composed(0.2) ≈ composed.regularized_segment.entry_state atol=0 rtol=0
+    @test composed(0.5) ≈ composed.regularized_segment.exit_state atol=0 rtol=0
+
+    for diagnostics in (composed.entry_continuity, composed.exit_continuity)
+        @test diagnostics.state_residual ≤ 5e-15
+        @test diagnostics.position_residual ≤ 5e-15
+        @test diagnostics.velocity_residual ≤ 5e-15
+        @test diagnostics.energy_jump ≤ 5e-14
+        @test diagnostics.momentum_jump ≤ 5e-14
+        @test diagnostics.angular_momentum_jump ≤ 5e-14
+        @test diagnostics.center_of_mass_jump ≤ 5e-15
+        @test diagnostics.center_of_mass_velocity_jump ≤ 5e-15
+    end
+
+    @test length(composed.solver_statistics) == 3
+    @test all(statistics -> statistics.saved_states ≥ 2, composed.solver_statistics)
+    @test all(statistics -> statistics.accepted_steps > 0, composed.solver_statistics)
+    @test all(statistics -> statistics.rhs_evaluations > 0, composed.solver_statistics)
+
+    reference = simulate(
+        system, u0, (0.0, 0.8);
+        solver=:accurate, reltol=1e-13, abstol=1e-13,
+    )
+    for time in (0.1, 0.2, 0.35, 0.5, 0.7, 0.8)
+        @test composed(time) ≈ reference.solution(time) atol=1.5e-9 rtol=1.5e-9
+    end
+
+    sparse = compose_regularized_trajectory(
+        system, u0, (0.0, 0.8), (1, 2), (0.2, 0.5);
+        saveat=0.2,
+        cartesian_reltol=1e-13, cartesian_abstol=1e-13,
+        regularized_initial_step=0.4, regularized_tolerance=1e-11,
+        regularized_reltol=1e-13, regularized_abstol=1e-13,
+    )
+    dense = compose_regularized_trajectory(
+        system, u0, (0.0, 0.8), (1, 2), (0.2, 0.5);
+        saveat=0.02,
+        cartesian_reltol=1e-13, cartesian_abstol=1e-13,
+        regularized_initial_step=0.4, regularized_tolerance=1e-11,
+        regularized_reltol=1e-13, regularized_abstol=1e-13,
+    )
+    @test sparse(0.2) ≈ dense(0.2) atol=2e-11 rtol=2e-11
+    @test sparse(0.5) ≈ dense(0.5) atol=2e-11 rtol=2e-11
+    @test sparse(0.8) ≈ dense(0.8) atol=2e-11 rtol=2e-11
+
+    reversed = compose_regularized_trajectory(
+        system, u0, (0.0, 0.8), (2, 1), (0.2, 0.5);
+        branch=-1, saveat=0.1,
+        cartesian_reltol=1e-13, cartesian_abstol=1e-13,
+        regularized_initial_step=0.4, regularized_tolerance=1e-11,
+        regularized_reltol=1e-13, regularized_abstol=1e-13,
+    )
+    @test reversed(0.8) ≈ composed(0.8) atol=2e-9 rtol=2e-9
+
+    setprecision(BigFloat, 256) do
+        big_system = ThreeBodySystem(
+            (big"1.0", big"1.0", big"0.01"); G=big"1.0",
+        )
+        speed = sqrt(big"2.0")
+        big_u0 = statevector(
+            BigFloat[big"0.5", big"0.0", big"0.0"],
+            BigFloat[big"0.0", speed / 2, big"0.0"],
+            BigFloat[big"-0.5", big"0.0", big"0.0"],
+            BigFloat[big"0.0", -speed / 2, big"0.0"],
+            BigFloat[big"8.0", big"0.5", big"0.0"],
+            BigFloat[big"0.0", big"0.35", big"0.0"],
+        )
+        big_composed = compose_regularized_trajectory(
+            big_system, big_u0, (big"0.0", big"0.06"), (1, 2),
+            (big"0.02", big"0.04");
+            saveat=big"0.02",
+            cartesian_solver=OrdinaryDiffEq.Vern9(),
+            cartesian_reltol=big"1e-32", cartesian_abstol=big"1e-32",
+            regularized_algorithm=OrdinaryDiffEq.Vern9(),
+            regularized_initial_step=big"0.03",
+            regularized_tolerance=big"1e-28",
+            regularized_reltol=big"1e-32", regularized_abstol=big"1e-32",
+        )
+        @test eltype(big_composed.states[1]) === BigFloat
+        @test big_composed.entry_continuity.state_residual < big"1e-70"
+        @test big_composed.exit_continuity.state_residual < big"1e-70"
+        @test all(isfinite, big_composed(big"0.03"))
+    end
+
+    @test_throws ArgumentError compose_regularized_trajectory(
+        system, u0, (0.0, 0.8), (1, 2), (0.0, 0.5),
+    )
+    @test_throws ArgumentError compose_regularized_trajectory(
+        system, u0, (0.0, 0.8), (1, 2), (0.5, 0.5),
+    )
+    @test_throws ArgumentError compose_regularized_trajectory(
+        system, u0, (0.0, 0.8), (1, 1), (0.2, 0.5),
+    )
+    @test_throws ArgumentError composed_regularized_state(composed, -0.1)
+    @test_throws ArgumentError composed_regularized_state(composed, 0.3; tolerance=0.0)
 end

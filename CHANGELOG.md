@@ -106,3 +106,13 @@
 - Added transition diagnostics for state reconstruction and invariant jumps.
 - Added segment metadata retaining the regularized problem and solution.
 - Added Float64, BigFloat, reversed-pair, shifted-epoch, and save-grid-independence tests.
+
+## v0.4 development — manual multi-segment composition
+
+- Added an explicit Cartesian → Levi-Civita → Cartesian composed trajectory.
+- Added unified physical-time sampling and evaluation across all three segments.
+- Added transition continuity diagnostics and per-segment solver statistics.
+- Automatic threshold switching remains intentionally out of scope.
+
+- Fixed manual-composition sampling so dense physical-time interpolation is accepted when the fictitious-time bisection bracket has converged; this avoids false failures from demanding machine-epsilon accuracy of the interpolated Sundman time component.
+- Removed an unused duplicate composition source file.
