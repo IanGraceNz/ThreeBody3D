@@ -546,3 +546,88 @@ end
     @test_throws ArgumentError integrate_levi_civita_fictitious(circular, (0.0, 0.0))
     @test_throws ArgumentError integrate_levi_civita_fictitious(circular, (0.0, 1.0); reltol=0.0)
 end
+
+@testset "Levi-Civita Sundman physical-time reconstruction" begin
+    circular = LeviCivitaOscillator(1.0, [1.0, 0.0], [0.0, 1.0])
+    @test levi_civita_physical_time(circular, 0.0) == 0.0
+    @test levi_civita_physical_time(circular, π / 2) ≈ π / 2 atol=4e-15
+    @test levi_civita_physical_time(circular, -π / 2) ≈ -π / 2 atol=4e-15
+    @test levi_civita_physical_time(circular, π / 2; initial_time=3.0) ≈ 3.0 + π / 2 atol=4e-15
+
+    result = integrate_levi_civita_sundman(
+        circular, (0.0, π); saveat=π / 32, reltol=1e-13, abstol=1e-13,
+    )
+    @test length(result.solution.t) == 33
+    for s in range(0.0, π; length=17)
+        u_num, w_num, t_num = levi_civita_sundman_state(result, s)
+        u_exact, w_exact = levi_civita_fictitious_state(circular, s)
+        t_exact = levi_civita_physical_time(circular, s)
+        @test u_num ≈ u_exact atol=3e-12 rtol=3e-12
+        @test w_num ≈ w_exact atol=3e-12 rtol=3e-12
+        @test t_num ≈ t_exact atol=3e-12 rtol=3e-12
+    end
+
+    sampled_times = [levi_civita_sundman_state(result, s)[3] for s in range(0.0, π; length=65)]
+    @test all(diff(sampled_times) .>= -32eps(Float64))
+    @test sampled_times[end] > sampled_times[1]
+
+    # Circular motion: matched physical time agrees with the independent
+    # universal-variable Kepler reference.
+    s_match = π / 2
+    t_match = levi_civita_physical_time(circular, s_match)
+    q_lc, v_lc = levi_civita_cartesian_state(result, s_match)
+    reference = KeplerReference(1.0, [1.0, 0.0, 0.0], [0.0, 1.0, 0.0])
+    r_kepler, v_kepler = kepler_state(reference, t_match)
+    @test q_lc ≈ r_kepler[1:2] atol=5e-12 rtol=5e-12
+    @test v_lc ≈ v_kepler[1:2] atol=5e-12 rtol=5e-12
+
+    # Eccentric motion exercises a non-constant Sundman rate.
+    eccentric = LeviCivitaOscillator(1.0, [1.0, 0.0], [0.0, 0.5])
+    s_ecc = 0.8
+    eccentric_result = integrate_levi_civita_sundman(
+        eccentric, (0.0, s_ecc); reltol=1e-13, abstol=1e-13,
+    )
+    _, _, t_ecc_num = levi_civita_sundman_state(eccentric_result, s_ecc)
+    t_ecc_exact = levi_civita_physical_time(eccentric, s_ecc)
+    @test t_ecc_num ≈ t_ecc_exact atol=4e-12 rtol=4e-12
+    q_ecc, v_ecc = levi_civita_cartesian_state(eccentric_result, s_ecc)
+    eccentric_reference = KeplerReference(
+        1.0, [1.0, 0.0, 0.0], [0.0, 0.5, 0.0],
+    )
+    r_ecc, v_ecc_reference = kepler_state(eccentric_reference, t_ecc_exact)
+    @test q_ecc ≈ r_ecc[1:2] atol=8e-12 rtol=8e-12
+    @test v_ecc ≈ v_ecc_reference[1:2] atol=8e-12 rtol=8e-12
+
+    # Physical time remains monotone through a regularized radial collision;
+    # its derivative reaches zero at collision but never becomes negative.
+    radial = LeviCivitaOscillator(1.0, [2.0, 0.0], [0.0, 0.0])
+    radial_result = integrate_levi_civita_sundman(
+        radial, (0.0, 3π / 2); saveat=range(0.0, 3π / 2; length=97),
+        reltol=1e-13, abstol=1e-13,
+    )
+    radial_times = [state[5] for state in radial_result.solution.u]
+    @test all(diff(radial_times) .>= -64eps(Float64))
+    @test levi_civita_physical_time(radial, π) ≈ radial_free_fall_time(1.0, 2.0) atol=8e-14
+    _, _, collision_time_num = levi_civita_sundman_state(radial_result, π)
+    @test collision_time_num ≈ radial_free_fall_time(1.0, 2.0) atol=5e-12 rtol=5e-12
+
+    setprecision(BigFloat, 256) do
+        big_eccentric = LeviCivitaOscillator(
+            big"1.0", BigFloat[big"1.0", big"0.0"],
+            BigFloat[big"0.0", big"0.5"],
+        )
+        sb = big"0.75"
+        big_result = integrate_levi_civita_sundman(
+            big_eccentric, (big"0.0", sb);
+            reltol=big"1e-40", abstol=big"1e-40",
+        )
+        _, _, tb_num = levi_civita_sundman_state(big_result, sb)
+        tb_exact = levi_civita_physical_time(big_eccentric, sb)
+        @test abs(tb_num - tb_exact) < big"1e-35"
+    end
+
+    @test_throws ArgumentError integrate_levi_civita_sundman(circular, (0.1, 1.0))
+    @test_throws ArgumentError integrate_levi_civita_sundman(circular, (0.0, 0.0))
+    @test_throws ArgumentError integrate_levi_civita_sundman(circular, (0.0, 1.0); initial_time=Inf)
+    @test_throws ArgumentError levi_civita_physical_time(circular, Inf)
+end

@@ -257,3 +257,16 @@ Stage 4A provides `LeviCivitaOscillator` and
 `integrate_levi_civita_fictitious` for the isolated planar Kepler problem.
 This experimental layer integrates only fictitious time; physical-time
 reconstruction and stopping are intentionally deferred to Stage 4B.
+
+### Fixed-fictitious-time Sundman validation
+
+Stage 4B can integrate physical time alongside the isolated Levi-Civita
+oscillator without stopping on physical time:
+
+```julia
+oscillator = LeviCivitaOscillator(1.0, [1.0, 0.0], [0.0, 0.5])
+result = integrate_levi_civita_sundman(oscillator, (0.0, 0.8))
+u, uprime, physical_time = levi_civita_sundman_state(result, 0.8)
+```
+
+This remains a research validation path and does not alter `simulate`.

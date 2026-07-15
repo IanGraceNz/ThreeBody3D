@@ -70,3 +70,10 @@
 - Added exact elliptic, parabolic, and hyperbolic regularized-state propagation.
 - Added collision-passage, gauge, Float64, and BigFloat validation.
 - Physical-time integration and stopping remain deferred to Stage 4B.
+
+### Stage 4B — Sundman physical-time reconstruction
+
+- Added the exact isolated Levi-Civita physical-time integral.
+- Added fixed-fictitious-time numerical integration of `dt/ds = |u|²`.
+- Added monotonicity, radial-collision, Kepler-reference, and BigFloat tests.
+- No callback or physical-time stopping is included in this stage.
