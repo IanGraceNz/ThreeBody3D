@@ -9,3 +9,5 @@ include("LeviCivitaOscillator.jl")
 include("SundmanTime.jl")
 
 include("PerturbedLeviCivita.jl")
+
+include("SegmentHandoff.jl")

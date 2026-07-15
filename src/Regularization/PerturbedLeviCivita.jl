@@ -252,8 +252,9 @@ Locate the fictitious time corresponding to the absolute physical time
 `target_time` for an explicit [`PerturbedLeviCivitaProblem`](@ref).
 
 The routine first expands a fictitious-time interval from `s=0` until the
-integrated physical-time state brackets the target. It then bisects the dense
-numerical solution. No callback is used. Both forward and backward physical
+integrated physical-time state brackets the target. It then bisects an internal
+dense numerical solution and performs a final integration ending exactly at the
+located fictitious time. No callback is used. Both forward and backward physical
 queries are supported.
 
 Keyword arguments:
@@ -262,11 +263,13 @@ Keyword arguments:
 - `tolerance`: relative/absolute scale used for both physical-time residual
   and fictitious-time bracket convergence.
 - `max_iterations`: maximum number of bracket expansions and bisection steps.
+- `saveat` controls only the stored output of the final endpoint solve; it does
+  not affect root location.
 - `algorithm`, `reltol`, `abstol`, and remaining keywords are forwarded to
   [`integrate_perturbed_levi_civita`](@ref).
 
-Returns `(s, result)`, where `result` is the numerical integration covering the
-root bracket. Near an exact binary collision the inverse physical-time map is
+Returns `(s, result)`, where `result` is a final numerical integration whose
+endpoint is exactly `s`. Near an exact binary collision the inverse physical-time map is
 ill-conditioned because `dt/ds = |u|²` vanishes; physical-time accuracy is then
 more meaningful than fictitious-time accuracy.
 """
@@ -279,6 +282,7 @@ function perturbed_levi_civita_fictitious_time(
     algorithm=Vern9(),
     reltol=nothing,
     abstol=nothing,
+    saveat=nothing,
     kwargs...,
 ) where {T}
     target = T(target_time)
@@ -304,7 +308,8 @@ function perturbed_levi_civita_fictitious_time(
     for _ in 1:max_iterations
         bracket_result = integrate_perturbed_levi_civita(
             problem, (zero(T), bracket_s);
-            algorithm=algorithm, reltol=reltol, abstol=abstol, kwargs...,
+            algorithm=algorithm, reltol=reltol, abstol=abstol,
+            dense=true, save_everystep=true, kwargs...,
         )
         bracket_t = bracket_result.solution(bracket_s)[14]
         bracketed = direction > zero(T) ? bracket_t >= target : bracket_t <= target
@@ -323,6 +328,22 @@ function perturbed_levi_civita_fictitious_time(
     left_value = t0 - target
     right_value = bracket_t - target
 
+    function finalize_target(root_s::T)
+        final_result = if isnothing(saveat)
+            integrate_perturbed_levi_civita(
+                problem, (zero(T), root_s);
+                algorithm=algorithm, reltol=reltol, abstol=abstol, kwargs...,
+            )
+        else
+            integrate_perturbed_levi_civita(
+                problem, (zero(T), root_s);
+                algorithm=algorithm, reltol=reltol, abstol=abstol,
+                saveat=saveat, kwargs...,
+            )
+        end
+        return (root_s, final_result)
+    end
+
     for _ in 1:max_iterations
         midpoint_s = (left_s + right_s) / T(2)
         midpoint_time = bracket_result.solution(midpoint_s)[14]
@@ -333,11 +354,11 @@ function perturbed_levi_civita_fictitious_time(
         time_converged = abs(midpoint_value) <= tol * time_scale
         bracket_converged = abs(right_s - left_s) <= tol * s_scale
         if time_converged && bracket_converged
-            return (midpoint_s, bracket_result)
+            return finalize_target(midpoint_s)
         end
 
         if iszero(midpoint_value)
-            return (midpoint_s, bracket_result)
+            return finalize_target(midpoint_s)
         elseif signbit(midpoint_value) == signbit(left_value)
             left_s = midpoint_s
             left_value = midpoint_value
@@ -351,7 +372,7 @@ function perturbed_levi_civita_fictitious_time(
     midpoint_time = bracket_result.solution(midpoint_s)[14]
     abs(midpoint_time - target) <= tol * max(one(T), abs(target)) ||
         throw(ErrorException("Physical-time inversion did not converge within max_iterations."))
-    return (midpoint_s, bracket_result)
+    return finalize_target(midpoint_s)
 end
 
 """

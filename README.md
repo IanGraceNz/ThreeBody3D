@@ -310,3 +310,20 @@ state = perturbed_levi_civita_state_at_time(
 The implementation expands a fictitious-time bracket, integrates once over the
 final bracket, and bisects the dense physical-time state. It still performs no
 automatic pair selection or switching.
+
+### Explicit regularized segment handoff (experimental)
+
+```julia
+segment = propagate_regularized_segment(
+    system, u0, (1, 2), 0.0, 0.5;
+    initial_step=0.5,
+    tolerance=1e-11,
+)
+
+println(segment.entry_diagnostics)
+println(segment.exit_diagnostics)
+```
+
+This performs one explicitly selected planar Cartesian → Levi-Civita →
+Cartesian segment. It records coordinate-reconstruction residuals and invariant
+jumps at both boundaries. It does not select pairs or switch automatically.

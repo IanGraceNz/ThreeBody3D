@@ -891,3 +891,107 @@ end
     @test_throws ArgumentError perturbed_levi_civita_fictitious_time(problem, 0.1; tolerance=0.0)
     @test_throws ArgumentError perturbed_levi_civita_fictitious_time(problem, 0.1; max_iterations=0)
 end
+
+@testset "Explicit regularized segment handoff" begin
+    system = ThreeBodySystem((1.0, 1.0, 0.01))
+    relative_speed = sqrt(2.0)
+    u0 = statevector(
+        [0.5, 0.0, 0.0], [0.0, relative_speed / 2, 0.0],
+        [-0.5, 0.0, 0.0], [0.0, -relative_speed / 2, 0.0],
+        [8.0, 0.5, 0.0], [0.0, 0.35, 0.0],
+    )
+
+    segment = propagate_regularized_segment(
+        system, u0, (1, 2), 0.0, 0.5;
+        initial_step=0.5, tolerance=1e-11,
+        reltol=1e-13, abstol=1e-13,
+    )
+    @test segment.pair == (1, 2)
+    @test segment.entry_time == 0.0
+    @test segment.exit_time == 0.5
+    @test segment.exit_fictitious_time > 0.0
+    @test segment.entry_state ≈ u0 atol=0 rtol=0
+
+    for diagnostics in (segment.entry_diagnostics, segment.exit_diagnostics)
+        @test diagnostics.state_residual ≤ 5e-15
+        @test diagnostics.position_residual ≤ 5e-15
+        @test diagnostics.velocity_residual ≤ 5e-15
+        @test diagnostics.energy_jump ≤ 5e-14
+        @test diagnostics.momentum_jump ≤ 5e-14
+        @test diagnostics.angular_momentum_jump ≤ 5e-14
+        @test diagnostics.center_of_mass_jump ≤ 5e-15
+        @test diagnostics.center_of_mass_velocity_jump ≤ 5e-15
+    end
+
+    cartesian = simulate(
+        system, u0, (0.0, 0.5);
+        solver=:accurate, reltol=1e-13, abstol=1e-13,
+    )
+    @test segment.exit_state ≈ cartesian.solution(0.5) atol=6e-10 rtol=6e-10
+
+    # Dense-output targeting is independent of the stored save grid.
+    sparse = propagate_regularized_segment(
+        system, u0, (1, 2), 0.0, 0.5;
+        initial_step=0.5, tolerance=1e-11,
+        reltol=1e-13, abstol=1e-13, saveat=0.2,
+    )
+    dense = propagate_regularized_segment(
+        system, u0, (1, 2), 0.0, 0.5;
+        initial_step=0.5, tolerance=1e-11,
+        reltol=1e-13, abstol=1e-13, saveat=0.01,
+    )
+    @test sparse.exit_state ≈ dense.exit_state atol=2e-11 rtol=2e-11
+    @test sparse.exit_fictitious_time ≈ dense.exit_fictitious_time atol=2e-11 rtol=2e-11
+
+    reverse = propagate_regularized_segment(
+        system, u0, (2, 1), 0.0, 0.5;
+        branch=-1, initial_step=0.5, tolerance=1e-11,
+        reltol=1e-13, abstol=1e-13,
+    )
+    @test reverse.exit_state ≈ segment.exit_state atol=8e-10 rtol=8e-10
+
+    # A regularized segment can begin at a nonzero physical epoch.
+    entry_at_one = simulate(
+        system, u0, (0.0, 0.1);
+        solver=:accurate, reltol=1e-13, abstol=1e-13,
+    ).solution(0.1)
+    shifted = propagate_regularized_segment(
+        system, entry_at_one, (1, 2), 0.1, 0.2;
+        initial_step=0.2, tolerance=1e-11,
+        reltol=1e-13, abstol=1e-13,
+    )
+    reference_shifted = simulate(
+        system, entry_at_one, (0.1, 0.2);
+        solver=:accurate, reltol=1e-13, abstol=1e-13,
+    )
+    @test shifted.exit_state ≈ reference_shifted.solution(0.2) atol=5e-10 rtol=5e-10
+
+    setprecision(BigFloat, 256) do
+        big_system = ThreeBodySystem(
+            (big"1.0", big"1.0", big"0.01"); G=big"1.0",
+        )
+        big_relative_speed = sqrt(big"2.0")
+        big_u0 = statevector(
+            BigFloat[big"0.5", big"0.0", big"0.0"],
+            BigFloat[big"0.0", big_relative_speed / 2, big"0.0"],
+            BigFloat[big"-0.5", big"0.0", big"0.0"],
+            BigFloat[big"0.0", -big_relative_speed / 2, big"0.0"],
+            BigFloat[big"8.0", big"0.5", big"0.0"],
+            BigFloat[big"0.0", big"0.35", big"0.0"],
+        )
+        big_segment = propagate_regularized_segment(
+            big_system, big_u0, (1, 2), big"0.0", big"0.03";
+            initial_step=big"0.05", tolerance=big"1e-28",
+            reltol=big"1e-35", abstol=big"1e-35",
+        )
+        @test eltype(big_segment.exit_state) === BigFloat
+        @test big_segment.entry_diagnostics.state_residual < big"1e-70"
+        @test big_segment.exit_diagnostics.state_residual < big"1e-70"
+        @test big_segment.entry_diagnostics.energy_jump < big"1e-65"
+        @test big_segment.exit_diagnostics.energy_jump < big"1e-65"
+    end
+
+    @test_throws ArgumentError propagate_regularized_segment(system, u0, (1, 1), 0.0, 0.5)
+    @test_throws ArgumentError propagate_regularized_segment(system, u0, (1, 2), 0.0, 0.0)
+    @test_throws ArgumentError propagate_regularized_segment(system, u0, (1, 2), NaN, 0.5)
+end

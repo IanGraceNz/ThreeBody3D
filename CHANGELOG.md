@@ -99,3 +99,10 @@
   Levi-Civita solver.
 - Added forward, backward, reversed-pair, and BigFloat validation against the
   independent Cartesian three-body solver.
+
+### v0.4 Stage 7
+
+- Added explicit Cartesian → perturbed Levi-Civita → Cartesian segments.
+- Added transition diagnostics for state reconstruction and invariant jumps.
+- Added segment metadata retaining the regularized problem and solution.
+- Added Float64, BigFloat, reversed-pair, shifted-epoch, and save-grid-independence tests.
