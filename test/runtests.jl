@@ -1223,3 +1223,91 @@ end
         0.0, :entry, (1, 2), (0.1, 2.0, 2.1), (-0.2, 0.1, 0.2), 0.5, diagnostics,
     )
 end
+
+@testset "Automatic switching pair observables" begin
+    u = statevector(
+        [0.0, 0.0, 0.0], [1.0, 0.0, 0.0],
+        [3.0, 0.0, 0.0], [0.0, 0.0, 0.0],
+        [0.0, 4.0, 0.0], [0.0, -2.0, 0.0],
+    )
+    observables = pair_observables(u)
+
+    @test observables isa PairObservables{Float64}
+    @test all(isapprox.(observables.separations, (3.0, 4.0, 5.0)))
+    @test all(isapprox.(observables.radial_rates, (-1.0, -2.0, -1.6)))
+    @test observables.collisions == (false, false, false)
+    @test observables.order == (1, 2, 3)
+    @test observables.closest_pair == (1, 2)
+    @test observables.second_closest_pair == (1, 3)
+    @test observables.isolation_ratio ≈ 4 / 3
+    @test pair_separations(u) == observables.separations
+    @test pair_radial_rates(u) == observables.radial_rates
+
+    receding = statevector(
+        [0.0, 0.0, 0.0], [-1.0, 0.0, 0.0],
+        [3.0, 0.0, 0.0], [0.0, 0.0, 0.0],
+        [0.0, 4.0, 0.0], [0.0, 2.0, 0.0],
+    )
+    @test all(isapprox.(pair_radial_rates(receding), (1.0, 2.0, 1.6)))
+
+    tied = statevector(
+        [0.0, 0.0, 0.0], [0.0, 0.0, 0.0],
+        [1.0, 0.0, 0.0], [0.0, 0.0, 0.0],
+        [-1.0, 0.0, 0.0], [0.0, 0.0, 0.0],
+    )
+    tied_observables = pair_observables(tied)
+    @test tied_observables.separations == (1.0, 1.0, 2.0)
+    @test tied_observables.order == (1, 2, 3)
+    @test tied_observables.closest_pair == (1, 2)
+    @test tied_observables.second_closest_pair == (1, 3)
+    @test tied_observables.isolation_ratio == 1.0
+
+    collision = statevector(
+        [0.0, 0.0, 0.0], [1.0, 0.0, 0.0],
+        [0.0, 0.0, 0.0], [-1.0, 0.0, 0.0],
+        [2.0, 0.0, 0.0], [0.0, 0.0, 0.0],
+    )
+    collision_observables = pair_observables(collision)
+    @test collision_observables.collisions == (true, false, false)
+    @test collision_observables.radial_rates[1] == 0.0
+    @test collision_observables.closest_pair == (1, 2)
+    @test isinf(collision_observables.isolation_ratio)
+    @test all(isfinite, collision_observables.radial_rates)
+
+    triple_collision = statevector(
+        zeros(3), zeros(3), zeros(3), zeros(3), zeros(3), zeros(3),
+    )
+    triple_observables = pair_observables(triple_collision)
+    @test triple_observables.collisions == (true, true, true)
+    @test triple_observables.order == (1, 2, 3)
+    @test triple_observables.isolation_ratio == 1.0
+
+    permuted = statevector(
+        [0.0, 4.0, 0.0], [0.0, -2.0, 0.0],
+        [0.0, 0.0, 0.0], [1.0, 0.0, 0.0],
+        [3.0, 0.0, 0.0], [0.0, 0.0, 0.0],
+    )
+    permuted_observables = pair_observables(permuted)
+    @test all(isapprox.(permuted_observables.separations, (4.0, 5.0, 3.0)))
+    @test all(isapprox.(permuted_observables.radial_rates, (-2.0, -1.6, -1.0)))
+    @test permuted_observables.closest_pair == (2, 3)
+    @test permuted_observables.second_closest_pair == (1, 2)
+    @test permuted_observables.isolation_ratio ≈ 4 / 3
+
+    setprecision(BigFloat, 256) do
+        big_u = statevector(
+            BigFloat[0, 0, 0], BigFloat[1, 0, 0],
+            BigFloat[3, 0, 0], BigFloat[0, 0, 0],
+            BigFloat[0, 4, 0], BigFloat[0, -2, 0],
+        )
+        big_observables = pair_observables(big_u)
+        @test big_observables isa PairObservables{BigFloat}
+        @test big_observables.separations == (big"3", big"4", big"5")
+        @test big_observables.radial_rates ==
+              (BigFloat(-1), BigFloat(-2), BigFloat(-8) / BigFloat(5))
+        @test big_observables.isolation_ratio == big"4" / big"3"
+    end
+
+    @test_throws ArgumentError pair_observables(zeros(17))
+    @test_throws ArgumentError pair_observables(fill(NaN, 18))
+end

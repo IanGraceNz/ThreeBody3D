@@ -229,3 +229,98 @@ function RegularizationSwitchEvent(
         transition_diagnostics,
     )
 end
+
+const _CANONICAL_BINARY_PAIRS = ((1, 2), (1, 3), (2, 3))
+
+"""
+    PairObservables
+
+Solver-independent geometric observables for the three unordered binary pairs
+in the canonical order `(1,2)`, `(1,3)`, `(2,3)`.
+
+`separations` contains the three pair distances. `radial_rates` contains
+`dot(rᵢ-rⱼ, vᵢ-vⱼ) / separation` away from exact collision. At an exact
+collision the corresponding radial rate is stored as zero and the matching
+entry of `collisions` is `true`; callers must inspect that flag rather than
+interpreting the zero as a physical radial rate.
+
+`order` contains the canonical pair indices sorted by increasing separation,
+with canonical pair order used to break exact ties. `isolation_ratio` is the
+second-smallest separation divided by the smallest. It is infinite for one
+exactly colliding isolated pair and one when the two smallest separations are
+both zero.
+"""
+struct PairObservables{T<:AbstractFloat}
+    separations::NTuple{3,T}
+    radial_rates::NTuple{3,T}
+    collisions::NTuple{3,Bool}
+    order::NTuple{3,Int}
+    closest_pair::Tuple{Int,Int}
+    second_closest_pair::Tuple{Int,Int}
+    isolation_ratio::T
+end
+
+@inline function _pair_separation_and_radial_rate(
+    u::AbstractVector{T},
+    pair::Tuple{Int,Int},
+) where {T<:AbstractFloat}
+    i, j = pair
+    relative_position = body_position(u, i) - body_position(u, j)
+    relative_velocity = velocity(u, i) - velocity(u, j)
+    separation = norm(relative_position)
+    collision = iszero(separation)
+    radial_rate = collision ? zero(T) : dot(relative_position, relative_velocity) / separation
+    separation, radial_rate, collision
+end
+
+"""
+    pair_observables(u)
+
+Compute separation, radial separation rate, collision flags, deterministic
+separation ordering, and pair-isolation ratio for all three unordered binary
+pairs in solver state `u`.
+
+This function is algebraic and independent of ODE solvers, save grids, masses,
+and the gravitational constant. Exact collisions are represented safely using
+`collisions`; no division by zero is performed.
+"""
+function pair_observables(u::AbstractVector{T}) where {T<:AbstractFloat}
+    validate_state(u)
+
+    first = _pair_separation_and_radial_rate(u, _CANONICAL_BINARY_PAIRS[1])
+    second = _pair_separation_and_radial_rate(u, _CANONICAL_BINARY_PAIRS[2])
+    third = _pair_separation_and_radial_rate(u, _CANONICAL_BINARY_PAIRS[3])
+
+    separations = (first[1], second[1], third[1])
+    radial_rates = (first[2], second[2], third[2])
+    collisions = (first[3], second[3], third[3])
+
+    ordered = sortperm(1:3; by=index -> (separations[index], index))
+    order = (ordered[1], ordered[2], ordered[3])
+    smallest = separations[order[1]]
+    second_smallest = separations[order[2]]
+    isolation_ratio = if iszero(smallest)
+        iszero(second_smallest) ? one(T) : T(Inf)
+    else
+        second_smallest / smallest
+    end
+
+    PairObservables{T}(
+        separations,
+        radial_rates,
+        collisions,
+        order,
+        _CANONICAL_BINARY_PAIRS[order[1]],
+        _CANONICAL_BINARY_PAIRS[order[2]],
+        isolation_ratio,
+    )
+end
+
+"""Return pair separations in canonical order `(1,2)`, `(1,3)`, `(2,3)`."""
+pair_separations(u::AbstractVector{<:AbstractFloat}) = pair_observables(u).separations
+
+"""
+Return pair radial separation rates in canonical order `(1,2)`, `(1,3)`,
+`(2,3)`. Use [`pair_observables`](@ref) when exact-collision flags are needed.
+"""
+pair_radial_rates(u::AbstractVector{<:AbstractFloat}) = pair_observables(u).radial_rates
