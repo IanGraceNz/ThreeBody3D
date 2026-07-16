@@ -111,11 +111,13 @@ end
     animate(result; fps=30, duration=10, markersize=18,
             bodycolors=(:red,:green,:blue), margin=0.05)
 
-Display an interactive real-time animation compressed into `duration` seconds.
-The simulation's physical time span does not determine playback duration.
-Returns the Makie `Figure` after playback.
+Display an interactive real-time animation of a Cartesian
+[`SimulationResult`](@ref) or an [`ExperimentalSwitchingTrajectory`](@ref),
+compressed into `duration` seconds. The physical time span does not determine
+playback duration. Returns the Makie `Figure` after playback.
 """
-function animate(result::SimulationResult; fps::Integer=30, duration::Real=10,
+function animate(result::Union{SimulationResult,ExperimentalSwitchingTrajectory};
+                 fps::Integer=30, duration::Real=10,
                  markersize::Real=18, bodycolors=(:red,:green,:blue),
                  margin::Real=0.05)
     fig, index, nframes = _animation_scene(result; fps, duration, markersize,
@@ -132,10 +134,13 @@ end
     record_animation(result, filename; fps=30, duration=10, markersize=18,
                      bodycolors=(:red,:green,:blue), margin=0.05)
 
-Record an MP4 animation and return its absolute path. The output directory must
-exist and the filename must end in `.mp4`.
+Record a Cartesian or experimental automatic-switching trajectory as an MP4
+animation and return its absolute path. The output directory must exist and the
+filename must end in `.mp4`.
 """
-function record_animation(result::SimulationResult, filename::AbstractString;
+function record_animation(
+    result::Union{SimulationResult,ExperimentalSwitchingTrajectory},
+    filename::AbstractString;
                           fps::Integer=30, duration::Real=10,
                           markersize::Real=18,
                           bodycolors=(:red,:green,:blue), margin::Real=0.05)

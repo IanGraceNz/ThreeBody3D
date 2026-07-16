@@ -1940,4 +1940,26 @@ end
         show=false,
         npoints=1,
     )
+
+    animation_figure, animation_index, animation_frames =
+        ThreeBody3D._animation_scene(
+            trajectory;
+            fps=10,
+            duration=0.1,
+            markersize=12,
+            bodycolors=(:red, :green, :blue),
+            margin=0.05,
+        )
+
+    @test animation_figure !== nothing
+    @test animation_index[] == 1
+    @test animation_frames == 2
+
+    @test_throws ArgumentError record_animation(
+        trajectory,
+        "not-an-mp4.gif";
+        duration=0.1,
+    )
+
+
 end
