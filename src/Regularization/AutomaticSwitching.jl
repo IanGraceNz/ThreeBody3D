@@ -324,3 +324,148 @@ Return pair radial separation rates in canonical order `(1,2)`, `(1,3)`,
 `(2,3)`. Use [`pair_observables`](@ref) when exact-collision flags are needed.
 """
 pair_radial_rates(u::AbstractVector{<:AbstractFloat}) = pair_observables(u).radial_rates
+
+"""
+    AutomaticSwitchingDecision
+
+Solver-independent decision returned by the experimental automatic-switching
+policy.
+
+`action` is one of `:none`, `:enter`, `:exit`, or `:failure`. `pair` identifies
+the affected ordered pair when applicable. `reason` is a machine-readable
+explanation suitable for diagnostics and tests. This type contains no solver
+state and does not locate threshold crossings.
+"""
+struct AutomaticSwitchingDecision
+    action::Symbol
+    pair::Union{Nothing,Tuple{Int,Int}}
+    reason::Symbol
+
+    function AutomaticSwitchingDecision(
+        action::Symbol,
+        pair::Union{Nothing,Tuple{<:Integer,<:Integer}},
+        reason::Symbol,
+    )
+        action in (:none, :enter, :exit, :failure) ||
+            throw(ArgumentError("decision action must be :none, :enter, :exit, or :failure."))
+        validated_pair = if isnothing(pair)
+            nothing
+        else
+            i, j, _ = _validate_pair(pair)
+            (i, j)
+        end
+        action in (:enter, :exit) && isnothing(validated_pair) &&
+            throw(ArgumentError("entry and exit decisions require a selected pair."))
+        new(action, validated_pair, reason)
+    end
+end
+
+@inline function _canonical_pair_index(pair::Tuple{<:Integer,<:Integer})
+    i, j, _ = _validate_pair(pair)
+    unordered = i < j ? (i, j) : (j, i)
+    index = findfirst(==(unordered), _CANONICAL_BINARY_PAIRS)
+    isnothing(index) && throw(ArgumentError("invalid binary pair."))
+    index
+end
+
+@inline _none_decision(reason::Symbol=:no_switch) =
+    AutomaticSwitchingDecision(:none, nothing, reason)
+@inline _failure_decision(reason::Symbol, pair=nothing) =
+    AutomaticSwitchingDecision(:failure, pair, reason)
+
+"""
+    automatic_entry_decision(observables, parameters)
+
+Apply the experimental automatic-entry policy to already computed
+[`PairObservables`](@ref).
+
+Entry is permitted only for one uniquely eligible pair whose separation is at
+or below `enter_threshold` and whose radial rate is negative. The pair must be
+the closest pair, the second-smallest separation must exceed
+`ambiguity_threshold`, and the isolation ratio must meet
+`minimum_separation_ratio`.
+
+Exact collisions and ambiguous close-pair configurations return structured
+`:failure` decisions. This function is algebraic: it performs no integration,
+root finding, or threshold-crossing location.
+"""
+function automatic_entry_decision(
+    observables::PairObservables{T},
+    parameters::AutomaticSwitchingParameters,
+) where {T<:AbstractFloat}
+    any(observables.collisions) &&
+        return _failure_decision(:collision_state, observables.closest_pair)
+
+    candidates = Int[]
+    for index in 1:3
+        if observables.separations[index] <= parameters.enter_threshold &&
+           observables.radial_rates[index] < zero(T)
+            push!(candidates, index)
+        end
+    end
+
+    isempty(candidates) && return _none_decision(:no_entry_candidate)
+    length(candidates) > 1 && return _failure_decision(:simultaneous_entry_candidates)
+
+    candidate_index = only(candidates)
+    candidate_pair = _CANONICAL_BINARY_PAIRS[candidate_index]
+    candidate_index == observables.order[1] ||
+        return _failure_decision(:candidate_not_closest, candidate_pair)
+
+    second_index = observables.order[2]
+    observables.separations[second_index] <= parameters.ambiguity_threshold &&
+        return _failure_decision(:ambiguous_close_pairs, candidate_pair)
+    observables.isolation_ratio < parameters.minimum_separation_ratio &&
+        return _failure_decision(:insufficient_pair_isolation, candidate_pair)
+
+    AutomaticSwitchingDecision(:enter, candidate_pair, :unique_approaching_pair)
+end
+
+"""
+    automatic_exit_decision(observables, parameters, pair)
+
+Apply the experimental automatic-exit policy for the currently regularized
+ordered `pair`.
+
+Exit is permitted only when the selected pair is still the closest isolated
+pair, its separation is at or above `exit_threshold`, and its radial rate is
+positive. Exact collision of the selected pair produces `:none`, because a
+Levi-Civita segment is expected to pass safely through that state. Collision of
+another pair, loss of the selected pair hierarchy, or inadequate isolation
+produces a structured `:failure` decision.
+
+This function is algebraic and performs no integration or event location.
+"""
+function automatic_exit_decision(
+    observables::PairObservables{T},
+    parameters::AutomaticSwitchingParameters,
+    pair::Tuple{<:Integer,<:Integer},
+) where {T<:AbstractFloat}
+    selected_index = _canonical_pair_index(pair)
+    selected_pair = (Int(pair[1]), Int(pair[2]))
+
+    for index in 1:3
+        if observables.collisions[index] && index != selected_index
+            return _failure_decision(:nonselected_pair_collision, selected_pair)
+        end
+    end
+    observables.collisions[selected_index] &&
+        return AutomaticSwitchingDecision(:none, selected_pair, :selected_pair_collision)
+
+    selected_index == observables.order[1] ||
+        return _failure_decision(:selected_pair_lost, selected_pair)
+
+    second_index = observables.order[2]
+    observables.separations[second_index] <= parameters.ambiguity_threshold &&
+        return _failure_decision(:ambiguous_close_pairs, selected_pair)
+    observables.isolation_ratio < parameters.minimum_separation_ratio &&
+        return _failure_decision(:insufficient_pair_isolation, selected_pair)
+
+    selected_separation = observables.separations[selected_index]
+    selected_rate = observables.radial_rates[selected_index]
+    if selected_separation >= parameters.exit_threshold && selected_rate > zero(T)
+        return AutomaticSwitchingDecision(:exit, selected_pair, :isolated_receding_pair)
+    end
+
+    AutomaticSwitchingDecision(:none, selected_pair, :exit_condition_not_met)
+end

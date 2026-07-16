@@ -1311,3 +1311,135 @@ end
     @test_throws ArgumentError pair_observables(zeros(17))
     @test_throws ArgumentError pair_observables(fill(NaN, 18))
 end
+
+@testset "Automatic switching entry and exit decisions" begin
+    parameters = AutomaticSwitchingParameters(
+        enter_threshold=0.2,
+        exit_threshold=0.4,
+        ambiguity_threshold=0.3,
+        minimum_separation_ratio=2.0,
+    )
+
+    function decision_state(r2, v2, r3, v3)
+        statevector(
+            [0.0, 0.0, 0.0], [0.0, 0.0, 0.0],
+            r2, v2,
+            r3, v3,
+        )
+    end
+
+    approaching = pair_observables(decision_state(
+        [0.2, 0.0, 0.0], [-1.0, 0.0, 0.0],
+        [2.0, 0.0, 0.0], [0.0, 0.0, 0.0],
+    ))
+    entry = automatic_entry_decision(approaching, parameters)
+    @test entry.action == :enter
+    @test entry.pair == (1, 2)
+    @test entry.reason == :unique_approaching_pair
+
+    outside = pair_observables(decision_state(
+        [0.21, 0.0, 0.0], [-1.0, 0.0, 0.0],
+        [2.0, 0.0, 0.0], [0.0, 0.0, 0.0],
+    ))
+    @test automatic_entry_decision(outside, parameters).action == :none
+
+    receding_entry = pair_observables(decision_state(
+        [0.1, 0.0, 0.0], [1.0, 0.0, 0.0],
+        [2.0, 0.0, 0.0], [0.0, 0.0, 0.0],
+    ))
+    @test automatic_entry_decision(receding_entry, parameters).action == :none
+
+    ambiguous = pair_observables(decision_state(
+        [0.1, 0.0, 0.0], [-1.0, 0.0, 0.0],
+        [0.25, 0.0, 0.0], [0.0, 0.0, 0.0],
+    ))
+    ambiguous_decision = automatic_entry_decision(ambiguous, parameters)
+    @test ambiguous_decision.action == :failure
+    @test ambiguous_decision.reason in (:simultaneous_entry_candidates, :ambiguous_close_pairs)
+
+    weakly_isolated_parameters = AutomaticSwitchingParameters(
+        enter_threshold=0.2,
+        exit_threshold=0.4,
+        ambiguity_threshold=0.2,
+        minimum_separation_ratio=3.0,
+    )
+    weakly_isolated = pair_observables(decision_state(
+        [0.2, 0.0, 0.0], [-1.0, 0.0, 0.0],
+        [0.5, 0.0, 0.0], [0.0, 0.0, 0.0],
+    ))
+    weak_decision = automatic_entry_decision(weakly_isolated, weakly_isolated_parameters)
+    @test weak_decision.action == :failure
+    @test weak_decision.reason == :insufficient_pair_isolation
+
+    collision = pair_observables(decision_state(
+        [0.0, 0.0, 0.0], [-1.0, 0.0, 0.0],
+        [2.0, 0.0, 0.0], [0.0, 0.0, 0.0],
+    ))
+    collision_decision = automatic_entry_decision(collision, parameters)
+    @test collision_decision.action == :failure
+    @test collision_decision.reason == :collision_state
+
+    receding = pair_observables(decision_state(
+        [0.4, 0.0, 0.0], [1.0, 0.0, 0.0],
+        [2.0, 0.0, 0.0], [0.0, 0.0, 0.0],
+    ))
+    exit = automatic_exit_decision(receding, parameters, (2, 1))
+    @test exit.action == :exit
+    @test exit.pair == (2, 1)
+    @test exit.reason == :isolated_receding_pair
+
+    below_exit = pair_observables(decision_state(
+        [0.39, 0.0, 0.0], [1.0, 0.0, 0.0],
+        [2.0, 0.0, 0.0], [0.0, 0.0, 0.0],
+    ))
+    @test automatic_exit_decision(below_exit, parameters, (1, 2)).action == :none
+
+    approaching_exit = pair_observables(decision_state(
+        [0.5, 0.0, 0.0], [-1.0, 0.0, 0.0],
+        [2.0, 0.0, 0.0], [0.0, 0.0, 0.0],
+    ))
+    @test automatic_exit_decision(approaching_exit, parameters, (1, 2)).action == :none
+
+    selected_collision = automatic_exit_decision(collision, parameters, (1, 2))
+    @test selected_collision.action == :none
+    @test selected_collision.reason == :selected_pair_collision
+
+    selected_pair_lost = pair_observables(decision_state(
+        [0.5, 0.0, 0.0], [1.0, 0.0, 0.0],
+        [0.45, 0.0, 0.0], [0.0, 0.0, 0.0],
+    ))
+    lost_decision = automatic_exit_decision(selected_pair_lost, parameters, (1, 2))
+    @test lost_decision.action == :failure
+    @test lost_decision.reason == :selected_pair_lost
+
+    nonselected_collision = pair_observables(decision_state(
+        [1.0, 0.0, 0.0], [1.0, 0.0, 0.0],
+        [1.0, 0.0, 0.0], [0.0, 0.0, 0.0],
+    ))
+    nonselected_collision_decision = automatic_exit_decision(
+        nonselected_collision, parameters, (1, 2),
+    )
+    @test nonselected_collision_decision.action == :failure
+    @test nonselected_collision_decision.reason == :nonselected_pair_collision
+
+    setprecision(BigFloat, 256) do
+        big_parameters = AutomaticSwitchingParameters(
+            enter_threshold=big"0.2",
+            exit_threshold=big"0.4",
+            ambiguity_threshold=big"0.3",
+            minimum_separation_ratio=big"2",
+        )
+        big_observables = pair_observables(statevector(
+            BigFloat[0, 0, 0], BigFloat[0, 0, 0],
+            BigFloat[big"0.2", 0, 0], BigFloat[-1, 0, 0],
+            BigFloat[2, 0, 0], BigFloat[0, 0, 0],
+        ))
+        big_decision = automatic_entry_decision(big_observables, big_parameters)
+        @test big_decision.action == :enter
+        @test big_decision.pair == (1, 2)
+    end
+
+    @test_throws ArgumentError AutomaticSwitchingDecision(:invalid, nothing, :invalid)
+    @test_throws ArgumentError AutomaticSwitchingDecision(:enter, nothing, :missing_pair)
+    @test_throws ArgumentError automatic_exit_decision(receding, parameters, (1, 1))
+end
