@@ -71,3 +71,28 @@ println()
 println("Dense state norm at t=", midpoint, ": ", norm(trajectory(midpoint)))
 println("First sampled time:      ", first(samples.times))
 println("Last sampled time:       ", last(samples.times))
+
+# Static plotting is safe in non-interactive runs when show=false.
+figure = plot_trajectory(trajectory; show=false, npoints=300)
+println("Static trajectory figure: ", typeof(figure))
+
+# Interactive animation and MP4 recording are opt-in because they may open a
+# window or invoke FFmpeg. Enable them from the shell before running the example:
+#
+#   $env:THREEBODY3D_ANIMATE = "true"
+#   $env:THREEBODY3D_RECORD_MP4 = "true"
+#
+# The output filename may be overridden with THREEBODY3D_MP4_FILENAME.
+if lowercase(get(ENV, "THREEBODY3D_ANIMATE", "false")) == "true"
+    animate(trajectory; fps=30, duration=8)
+end
+
+if lowercase(get(ENV, "THREEBODY3D_RECORD_MP4", "false")) == "true"
+    filename = get(
+        ENV,
+        "THREEBODY3D_MP4_FILENAME",
+        "automatic_regularization.mp4",
+    )
+    record_animation(trajectory, filename; fps=30, duration=8)
+    println("Recorded animation:      ", abspath(filename))
+end

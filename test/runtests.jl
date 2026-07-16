@@ -1961,5 +1961,43 @@ end
         duration=0.1,
     )
 
+    pair_figure, pair_index, pair_frames = ThreeBody3D._animation_scene(
+        trajectory;
+        fps=10,
+        duration=0.1,
+        markersize=12,
+        bodycolors=(:red, :green, :blue),
+        margin=0.05,
+        view=:pair_centered,
+        pair=(1, 2),
+        zoom_radius=0.6,
+    )
+    @test pair_figure !== nothing
+    @test pair_index[] == 1
+    @test pair_frames == 2
+
+    _, raw_points = ThreeBody3D._sample_solution(trajectory, 5)
+    centered = ThreeBody3D._pair_centered_points(trajectory, raw_points, (1, 2))
+    m1, m2 = trajectory.system.masses[1], trajectory.system.masses[2]
+    for k in eachindex(centered[1])
+        pair_com = (m1 .* centered[1][k] .+ m2 .* centered[2][k]) ./ (m1 + m2)
+        @test maximum(abs.(Tuple(pair_com))) < 2f-6
+    end
+
+    @test_throws ArgumentError ThreeBody3D._animation_scene(
+        trajectory; fps=10, duration=0.1, markersize=12,
+        bodycolors=(:red, :green, :blue), margin=0.05, view=:invalid,
+    )
+    @test_throws ArgumentError ThreeBody3D._animation_scene(
+        trajectory; fps=10, duration=0.1, markersize=12,
+        bodycolors=(:red, :green, :blue), margin=0.05,
+        view=:pair_centered, pair=(1, 1), zoom_radius=0.6,
+    )
+    @test_throws ArgumentError ThreeBody3D._animation_scene(
+        trajectory; fps=10, duration=0.1, markersize=12,
+        bodycolors=(:red, :green, :blue), margin=0.05,
+        view=:pair_centered, pair=(1, 2), zoom_radius=0.0,
+    )
+
 
 end
