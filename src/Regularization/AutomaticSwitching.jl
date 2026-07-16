@@ -662,3 +662,278 @@ function locate_cartesian_entry_event(
         observables,
     )
 end
+
+
+"""
+    RegularizedExitLocationResult
+
+Result of one perturbed planar Levi-Civita propagation performed while
+searching for the first outward crossing of `exit_threshold` by an explicitly
+selected ordered pair.
+
+`status` is one of `:completed`, `:exit`, or `:failure`. `regularized_result`
+retains the full fictitious-time numerical solution, while `physical_time`,
+`fictitious_time`, and `state` identify the terminal reconstructed Cartesian
+state. This type represents only one regularized segment; it does not resume
+Cartesian propagation or run the full switching controller.
+"""
+struct RegularizedExitLocationResult{T<:AbstractFloat,S,P,R,O}
+    status::Symbol
+    physical_time::T
+    fictitious_time::T
+    state::S
+    problem::P
+    regularized_result::R
+    decision::AutomaticSwitchingDecision
+    observables::O
+
+    function RegularizedExitLocationResult(
+        status::Symbol,
+        physical_time::T,
+        fictitious_time::T,
+        state::S,
+        problem::P,
+        regularized_result::R,
+        decision::AutomaticSwitchingDecision,
+        observables::O,
+    ) where {T<:AbstractFloat,S,P,R,O}
+        status in (:completed, :exit, :failure) ||
+            throw(ArgumentError("regularized exit-location status must be :completed, :exit, or :failure."))
+        all(isfinite, (physical_time, fictitious_time)) ||
+            throw(ArgumentError("regularized exit-location times must be finite."))
+        status === :exit && decision.action !== :exit &&
+            throw(ArgumentError("an :exit result requires an :exit decision."))
+        status === :failure && decision.action !== :failure &&
+            throw(ArgumentError("a :failure result requires a :failure decision."))
+        status === :completed && decision.action !== :none &&
+            throw(ArgumentError("a :completed result requires a :none decision."))
+        new{T,S,P,R,O}(
+            status, physical_time, fictitious_time, state, problem,
+            regularized_result, decision, observables,
+        )
+    end
+end
+
+@inline function _certified_exit_decision(
+    observables::PairObservables{T},
+    parameters::AutomaticSwitchingParameters,
+    pair::Tuple{Int,Int},
+) where {T<:AbstractFloat}
+    decision = automatic_exit_decision(observables, parameters, pair)
+    decision.action !== :none && return decision
+
+    selected_index = _canonical_pair_index(pair)
+    if decision.reason === :exit_condition_not_met &&
+       observables.radial_rates[selected_index] > zero(T)
+        return AutomaticSwitchingDecision(
+            :exit, pair, :certified_outward_threshold_crossing,
+        )
+    end
+
+    _failure_decision(:exit_condition_not_met, pair)
+end
+
+"""
+    locate_regularized_exit_event(system, state, pair, entry_time, target_time,
+                                  parameters; kwargs...)
+
+Propagate one explicitly selected planar binary with the existing perturbed
+Levi-Civita equations and locate its first outward crossing of
+`parameters.exit_threshold`.
+
+The returned [`RegularizedExitLocationResult`](@ref) has status:
+
+- `:completed` when physical `target_time` is reached before an exit crossing;
+- `:exit` when the selected pair crosses outward while receding and remains the
+  closest sufficiently isolated pair;
+- `:failure` when the initial state or located state is unsafe or ambiguous.
+
+The crossing condition is evaluated directly from the regularized binary
+position, for which the physical separation is `|u|^2`. Continuous root
+finding therefore remains well behaved through binary collision and is
+independent of `saveat`; that keyword controls only stored fictitious-time
+output. Physical-time targeting is used only to determine the maximum
+fictitious-time interval corresponding to `target_time`.
+
+This function does not resume Cartesian propagation and does not implement the
+full automatic-switching controller.
+"""
+function locate_regularized_exit_event(
+    system::ThreeBodySystem,
+    state::AbstractVector{<:AbstractFloat},
+    pair::Tuple{<:Integer,<:Integer},
+    entry_time::Real,
+    target_time::Real,
+    parameters::AutomaticSwitchingParameters;
+    branch::Integer=1,
+    initial_step::Real=1,
+    tolerance=nothing,
+    max_iterations::Integer=256,
+    algorithm=Vern9(),
+    reltol=nothing,
+    abstol=nothing,
+    saveat=nothing,
+    kwargs...,
+)
+    validate_state(state)
+    i, j, _ = _validate_pair(pair)
+    T = float(promote_type(
+        eltype(system.masses), eltype(state), typeof(entry_time), typeof(target_time),
+    ))
+    converted_system = ThreeBodySystem(Tuple(T.(system.masses)); G=T(system.G))
+    entry = Vector{T}(state)
+    t_entry = T(entry_time)
+    t_target = T(target_time)
+    all(isfinite, (t_entry, t_target)) ||
+        throw(ArgumentError("entry_time and target_time must be finite."))
+    t_target > t_entry ||
+        throw(ArgumentError("target_time must be greater than entry_time."))
+
+    initial_observables = pair_observables(entry)
+    selected_index = _canonical_pair_index((i, j))
+    if initial_observables.collisions[selected_index]
+        decision = _failure_decision(:initial_selected_pair_collision, (i, j))
+        return RegularizedExitLocationResult(
+            :failure, t_entry, zero(T), entry, nothing, nothing,
+            decision, initial_observables,
+        )
+    end
+    if initial_observables.separations[selected_index] >= parameters.exit_threshold
+        decision = _failure_decision(:initial_state_at_or_outside_exit_threshold, (i, j))
+        return RegularizedExitLocationResult(
+            :failure, t_entry, zero(T), entry, nothing, nothing,
+            decision, initial_observables,
+        )
+    end
+
+    problem = PerturbedLeviCivitaProblem(
+        converted_system, entry, (i, j); branch=branch, initial_time=t_entry,
+    )
+
+    step = abs(T(initial_step))
+    isfinite(step) && step > zero(T) ||
+        throw(ArgumentError("initial_step must be finite and positive."))
+    max_iterations > 0 || throw(ArgumentError("max_iterations must be positive."))
+    tol = isnothing(tolerance) ? sqrt(eps(T)) : T(tolerance)
+    isfinite(tol) && tol > zero(T) ||
+        throw(ArgumentError("tolerance must be finite and positive."))
+
+    located_s = Ref{Union{Nothing,T}}(nothing)
+    function condition(y, _s, _integrator)
+        y[1] * y[1] + y[2] * y[2] - parameters.exit_threshold
+    end
+    function affect_exit!(integrator)
+        located_s[] = T(integrator.t)
+        SciMLBase.terminate!(integrator)
+    end
+    callback = SciMLBase.ContinuousCallback(
+        condition, affect_exit!, nothing; save_positions=(true, true),
+    )
+
+    function final_integration(endpoint_s)
+        if isnothing(saveat)
+            integrate_perturbed_levi_civita(
+                problem, (zero(T), endpoint_s);
+                algorithm=algorithm, reltol=reltol, abstol=abstol, kwargs...,
+            )
+        else
+            integrate_perturbed_levi_civita(
+                problem, (zero(T), endpoint_s);
+                algorithm=algorithm, reltol=reltol, abstol=abstol,
+                saveat=saveat, kwargs...,
+            )
+        end
+    end
+
+    search_result = nothing
+    search_limit = step
+    target_s = nothing
+
+    for _ in 1:max_iterations
+        located_s[] = nothing
+        search_result = integrate_perturbed_levi_civita(
+            problem, (zero(T), search_limit);
+            algorithm=algorithm, reltol=reltol, abstol=abstol,
+            callback=callback, dense=true, save_everystep=true, kwargs...,
+        )
+
+        if !isnothing(located_s[])
+            break
+        end
+
+        terminal_time = T(search_result.solution(search_limit)[14])
+        if terminal_time >= t_target
+            left_s = zero(T)
+            right_s = search_limit
+            for _ in 1:max_iterations
+                midpoint_s = (left_s + right_s) / T(2)
+                midpoint_time = T(search_result.solution(midpoint_s)[14])
+                time_scale = max(one(T), abs(t_target))
+                s_scale = max(one(T), abs(left_s), abs(right_s), abs(midpoint_s))
+                time_converged = abs(midpoint_time - t_target) <= tol * time_scale
+                bracket_converged = abs(right_s - left_s) <= tol * s_scale
+                if time_converged && bracket_converged
+                    target_s = midpoint_s
+                    break
+                end
+                if midpoint_time < t_target
+                    left_s = midpoint_s
+                else
+                    right_s = midpoint_s
+                end
+            end
+            isnothing(target_s) && (target_s = (left_s + right_s) / T(2))
+            break
+        end
+
+        search_limit *= T(2)
+        isfinite(search_limit) || throw(ErrorException(
+            "Fictitious-time search interval overflowed before exit or target_time.",
+        ))
+    end
+
+    if isnothing(located_s[]) && isnothing(target_s)
+        throw(ErrorException(
+            "Unable to locate an exit crossing or target physical time within max_iterations expansions.",
+        ))
+    end
+
+    if !isnothing(target_s)
+        terminal_s = something(target_s)
+        regularized_result = final_integration(terminal_s)
+        terminal = perturbed_levi_civita_state(regularized_result, terminal_s)
+        terminal_state = Vector{T}(terminal.physical_state)
+        observables = pair_observables(terminal_state)
+        decision = automatic_exit_decision(observables, parameters, (i, j))
+        if decision.action === :failure
+            return RegularizedExitLocationResult(
+                :failure, T(terminal.physical_time), terminal_s, terminal_state,
+                problem, regularized_result, decision, observables,
+            )
+        end
+        return RegularizedExitLocationResult(
+            :completed, T(terminal.physical_time), terminal_s, terminal_state,
+            problem, regularized_result,
+            AutomaticSwitchingDecision(:none, (i, j), :exit_threshold_not_reached),
+            observables,
+        )
+    end
+
+    exit_s = something(located_s[])
+    regularized_result = final_integration(exit_s)
+    exit_state = perturbed_levi_civita_state(regularized_result, exit_s)
+    cartesian_state = Vector{T}(exit_state.physical_state)
+    observables = pair_observables(cartesian_state)
+    decision = _certified_exit_decision(observables, parameters, (i, j))
+    status = decision.action === :exit ? :exit : :failure
+    RegularizedExitLocationResult(
+        status,
+        T(exit_state.physical_time),
+        exit_s,
+        cartesian_state,
+        problem,
+        regularized_result,
+        decision,
+        observables,
+    )
+end

@@ -1508,3 +1508,70 @@ end
         pair_observables(u0),
     )
 end
+
+
+@testset "Regularized automatic exit-event location" begin
+    system = ThreeBodySystem((1e-12, 1e-12, 1e-12); G=1.0)
+    parameters = AutomaticSwitchingParameters(
+        enter_threshold=0.2,
+        exit_threshold=0.4,
+        ambiguity_threshold=0.3,
+        minimum_separation_ratio=2.0,
+    )
+    entry_state = statevector(
+        [-0.1, 0.0, 0.0], [0.5, 0.0, 0.0],
+        [0.1, 0.0, 0.0], [-0.5, 0.0, 0.0],
+        [10.0, 0.0, 0.0], [0.0, 0.0, 0.0],
+    )
+
+    located = locate_regularized_exit_event(
+        system, entry_state, (1, 2), 0.0, 0.8, parameters; saveat=0.05,
+    )
+    @test located.status == :exit
+    @test located.decision.action == :exit
+    @test located.decision.pair == (1, 2)
+    @test located.physical_time ≈ 0.6 atol=2e-7
+    @test located.observables.separations[1] ≈ parameters.exit_threshold atol=1e-9
+    @test located.observables.radial_rates[1] > 0
+
+    dense = locate_regularized_exit_event(
+        system, entry_state, (1, 2), 0.0, 0.8, parameters; saveat=0.013,
+    )
+    @test dense.status == :exit
+    @test dense.physical_time ≈ located.physical_time atol=1e-9
+    @test dense.fictitious_time ≈ located.fictitious_time atol=1e-9
+    @test maximum(abs.(dense.state .- located.state)) < 1e-8
+
+    completed = locate_regularized_exit_event(
+        system, entry_state, (1, 2), 0.0, 0.1, parameters,
+    )
+    @test completed.status == :completed
+    @test completed.decision.action == :none
+    @test completed.physical_time ≈ 0.1 atol=1e-8
+
+    outside = statevector(
+        [-0.25, 0.0, 0.0], [-0.5, 0.0, 0.0],
+        [0.25, 0.0, 0.0], [0.5, 0.0, 0.0],
+        [10.0, 0.0, 0.0], [0.0, 0.0, 0.0],
+    )
+    rejected = locate_regularized_exit_event(
+        system, outside, (1, 2), 0.0, 0.8, parameters,
+    )
+    @test rejected.status == :failure
+    @test rejected.decision.reason == :initial_state_at_or_outside_exit_threshold
+    @test isnothing(rejected.problem)
+
+    @test_throws ArgumentError locate_regularized_exit_event(
+        system, entry_state, (1, 2), 0.0, 0.0, parameters,
+    )
+    @test_throws ArgumentError RegularizedExitLocationResult(
+        :exit,
+        0.0,
+        0.0,
+        copy(entry_state),
+        nothing,
+        nothing,
+        AutomaticSwitchingDecision(:none, nothing, :invalid),
+        pair_observables(entry_state),
+    )
+end
