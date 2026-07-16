@@ -337,3 +337,60 @@ one unified physical trajectory. This is a manual research workflow; it does
 not perform automatic threshold switching.
 
 See `examples/manual_regularized_composition.jl`.
+
+### Experimental automatic threshold switching
+
+The v0.4 development branch includes a separate experimental controller that
+alternates between ordinary Cartesian propagation and planar Levi-Civita
+regularization for one isolated binary pair. The production [`simulate`] API
+is unchanged.
+
+```julia
+parameters = AutomaticSwitchingParameters(
+    enter_threshold=0.2,
+    exit_threshold=0.4,
+    ambiguity_threshold=0.3,
+    minimum_separation_ratio=2.0,
+)
+
+trajectory = simulate_experimental_switching(
+    system,
+    u0,
+    (0.0, 1.6),
+    parameters,
+)
+```
+
+The controller enters regularization only when one sufficiently isolated pair
+crosses `enter_threshold` while approaching. It exits only after that pair
+crosses the larger `exit_threshold` while receding. This hysteresis prevents
+threshold chattering. Ambiguous multi-pair configurations, possible triple
+encounters, failed transition checks, and loss of time progress produce a
+structured failure rather than an inferred pair choice.
+
+The result retains every Cartesian and regularized segment, all switch events,
+and transition diagnostics. It supports dense physical-time evaluation:
+
+```julia
+state = trajectory(0.75)
+```
+
+and unified physical-time sampling:
+
+```julia
+samples = sample_experimental_switching(trajectory; dt=0.01)
+
+samples.times
+samples.states
+samples[1]
+samples[end]
+```
+
+Switch epochs are inserted once by default, so the returned sample sequence is
+strictly increasing without duplicated handoff states. Pass
+`include_switches=false` when only the requested grid is desired.
+
+This path is currently limited to planar selected-pair Levi-Civita
+regularization. It is explicitly experimental and is not intended to handle
+ambiguous multi-pair or spatial triple encounters. See
+`examples/automatic_regularization.jl` for a complete executable workflow.
