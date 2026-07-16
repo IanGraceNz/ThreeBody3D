@@ -1910,3 +1910,34 @@ end
         trajectory; dt=1e-9, maximum_samples=100,
     )
 end
+
+@testset "Experimental automatic-switching visualization" begin
+    system = ThreeBodySystem((1e-12, 1e-12, 1e-12); G=1.0)
+    parameters = AutomaticSwitchingParameters(
+        enter_threshold=0.2,
+        exit_threshold=0.4,
+        ambiguity_threshold=0.3,
+        minimum_separation_ratio=2.0,
+        maximum_switches=10,
+    )
+    encounter_state = statevector(
+        [-0.5, 0.0, 0.0], [0.5, 0.0, 0.0],
+        [0.5, 0.0, 0.0], [-0.5, 0.0, 0.0],
+        [10.0, 0.0, 0.0], [0.0, 0.0, 0.0],
+    )
+    trajectory = simulate_experimental_switching(
+        system, encounter_state, (0.0, 1.6), parameters;
+        cartesian_kwargs=(saveat=0.09,),
+        regularized_kwargs=(saveat=0.027,),
+    )
+    @test trajectory.status == :completed
+
+    fig = plot_trajectory(trajectory; show=false, npoints=80)
+    @test fig !== nothing
+
+    @test_throws ArgumentError plot_trajectory(
+        trajectory;
+        show=false,
+        npoints=1,
+    )
+end

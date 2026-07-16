@@ -1269,12 +1269,51 @@ function experimental_switching_state(
             segment.location.simulation.solution(target),
         )
     elseif segment isa AutomaticRegularizedSegment
-        reconstructed = perturbed_levi_civita_state_at_time(
-            segment.location.problem,
-            target;
-            regularized_kwargs...,
-        )
-        return Vector{eltype(trajectory.final_state)}(reconstructed.physical_state)
+        if !isempty(regularized_kwargs)
+            reconstructed = perturbed_levi_civita_state_at_time(
+                segment.location.problem,
+                target;
+                regularized_kwargs...,
+            )
+            return Vector{eltype(trajectory.final_state)}(reconstructed.physical_state)
+        end
+
+        result = segment.location.regularized_result
+        endpoint_s = segment.location.fictitious_time
+        T = eltype(trajectory.final_state)
+        tolerance = haskey(regularized_kwargs, :tolerance) ?
+            T(regularized_kwargs.tolerance) : sqrt(eps(T))
+        max_iterations = haskey(regularized_kwargs, :max_iterations) ?
+            Int(regularized_kwargs.max_iterations) : 256
+        isfinite(tolerance) && tolerance > zero(T) ||
+            throw(ArgumentError("regularized evaluation tolerance must be finite and positive."))
+        max_iterations > 0 ||
+            throw(ArgumentError("regularized evaluation max_iterations must be positive."))
+
+        left_s = zero(T)
+        right_s = T(endpoint_s)
+        midpoint_s = (left_s + right_s) / T(2)
+        for _ in 1:max_iterations
+            midpoint_s = (left_s + right_s) / T(2)
+            midpoint_time = T(result.solution(midpoint_s)[14])
+            time_scale = max(one(T), abs(target))
+            s_scale = max(one(T), abs(left_s), abs(right_s), abs(midpoint_s))
+            time_converged = abs(midpoint_time - target) <= tolerance * time_scale
+            bracket_converged = abs(right_s - left_s) <= tolerance * s_scale
+            if time_converged && bracket_converged
+                reconstructed = perturbed_levi_civita_state(result, midpoint_s)
+                return Vector{T}(reconstructed.physical_state)
+            end
+            if midpoint_time < target
+                left_s = midpoint_s
+            else
+                right_s = midpoint_s
+            end
+        end
+
+        midpoint_s = (left_s + right_s) / T(2)
+        reconstructed = perturbed_levi_civita_state(result, midpoint_s)
+        return Vector{T}(reconstructed.physical_state)
     end
 
     throw(ErrorException("unsupported automatic-switching segment type $(typeof(segment))."))
