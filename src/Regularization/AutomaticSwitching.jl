@@ -937,3 +937,281 @@ function locate_regularized_exit_event(
         observables,
     )
 end
+
+"""
+    AutomaticCartesianSegment
+
+One retained Cartesian segment produced by the experimental automatic-switching
+controller. `location` is the validated [`CartesianEntryLocationResult`](@ref)
+that terminated the segment.
+"""
+struct AutomaticCartesianSegment{T<:AbstractFloat,S,L}
+    start_time::T
+    end_time::T
+    entry_state::S
+    exit_state::S
+    location::L
+end
+
+"""
+    AutomaticRegularizedSegment
+
+One retained perturbed Levi-Civita segment produced by the experimental
+automatic-switching controller. `pair` preserves the ordered regularized pair
+and `location` is the validated [`RegularizedExitLocationResult`](@ref).
+"""
+struct AutomaticRegularizedSegment{T<:AbstractFloat,S,L}
+    pair::Tuple{Int,Int}
+    start_time::T
+    end_time::T
+    entry_state::S
+    exit_state::S
+    location::L
+end
+
+"""
+    ExperimentalSwitchingTrajectory
+
+Controller-level result for experimental automatic switching between Cartesian
+and planar Levi-Civita propagation.
+
+All completed segments and switch events are retained even when `status` is
+`:failure`. Dense unified sampling is intentionally not part of this stage.
+"""
+struct ExperimentalSwitchingTrajectory{T<:AbstractFloat,S}
+    system::S
+    tspan::Tuple{T,T}
+    parameters::AutomaticSwitchingParameters
+    segments::Vector{Any}
+    switch_events::Vector{Any}
+    status::Symbol
+    final_time::T
+    final_state::Vector{T}
+    failure::Union{Nothing,AutomaticSwitchingFailure{T}}
+
+    function ExperimentalSwitchingTrajectory(
+        system::S,
+        tspan::Tuple{T,T},
+        parameters::AutomaticSwitchingParameters,
+        segments::Vector{Any},
+        switch_events::Vector{Any},
+        status::Symbol,
+        final_time::T,
+        final_state::Vector{T},
+        failure::Union{Nothing,AutomaticSwitchingFailure{T}},
+    ) where {T<:AbstractFloat,S}
+        status in (:completed, :failure) ||
+            throw(ArgumentError("experimental trajectory status must be :completed or :failure."))
+        status === :completed && !isnothing(failure) &&
+            throw(ArgumentError("a completed trajectory cannot contain a failure record."))
+        status === :failure && isnothing(failure) &&
+            throw(ArgumentError("a failed trajectory requires a failure record."))
+        new{T,S}(
+            system, tspan, parameters, segments, switch_events, status,
+            final_time, final_state, failure,
+        )
+    end
+end
+
+@inline function _automatic_failure(
+    time::T,
+    decision::AutomaticSwitchingDecision,
+) where {T<:AbstractFloat}
+    AutomaticSwitchingFailure(
+        time,
+        decision.reason,
+        "Experimental automatic switching terminated safely: $(decision.reason).";
+        pair=decision.pair,
+    )
+end
+
+function _entry_transition_diagnostics(system, state, time, pair)
+    problem = PerturbedLeviCivitaProblem(system, state, pair; initial_time=time)
+    reconstructed = Vector{eltype(state)}(
+        perturbed_levi_civita_state_at_time(problem, time).physical_state,
+    )
+    _transition_diagnostics(system, state, reconstructed, time, pair)
+end
+
+function _exit_transition_diagnostics(system, state, time, pair)
+    pair_state = to_pair_coordinates(system, state, pair)
+    reconstructed = Vector{eltype(state)}(from_pair_coordinates(system, pair_state))
+    _transition_diagnostics(system, state, reconstructed, time, pair)
+end
+
+@inline function _switch_event(time, kind, pair, observables, diagnostics)
+    RegularizationSwitchEvent(
+        time,
+        kind,
+        pair,
+        observables.separations,
+        observables.radial_rates,
+        observables.isolation_ratio,
+        diagnostics,
+    )
+end
+
+"""
+    simulate_experimental_switching(system, u0, tspan, parameters; kwargs...)
+
+Run the first experimental alternating automatic-switching controller:
+Cartesian propagation searches for an isolated inward entry crossing, and a
+selected planar Levi-Civita segment then searches for its isolated outward exit
+crossing. Every completed segment and switch event is retained.
+
+The controller fails safely on ambiguous decisions, insufficient physical-time
+progress, or exhaustion of `parameters.maximum_switches`. It leaves the
+ordinary [`simulate`](@ref) API unchanged. `cartesian_kwargs` and
+`regularized_kwargs` are named tuples forwarded to the corresponding validated
+one-segment locators. Unified dense sampling is deliberately deferred to a
+later stage.
+"""
+function simulate_experimental_switching(
+    system::ThreeBodySystem,
+    u0::AbstractVector{<:AbstractFloat},
+    tspan::Tuple{<:Real,<:Real},
+    parameters::AutomaticSwitchingParameters;
+    cartesian_kwargs::NamedTuple=NamedTuple(),
+    regularized_kwargs::NamedTuple=NamedTuple(),
+)
+    validate_state(u0)
+    T = float(promote_type(eltype(system.masses), eltype(u0), typeof(first(tspan)), typeof(last(tspan))))
+    converted_system = ThreeBodySystem(Tuple(T.(system.masses)); G=T(system.G))
+    t0, tf = T(first(tspan)), T(last(tspan))
+    all(isfinite, (t0, tf)) || throw(ArgumentError("tspan endpoints must be finite."))
+    tf > t0 || throw(ArgumentError("experimental automatic switching requires an increasing tspan."))
+
+    initial_state = Vector{T}(u0)
+    current_state = copy(initial_state)
+    current_time = t0
+    mode::ExperimentalSwitchingMode = CartesianSwitchingMode()
+    segments = Any[]
+    events = Any[]
+    switch_count = 0
+
+    function failed(reason::Symbol, message::String; pair=nothing)
+        failure = AutomaticSwitchingFailure(current_time, reason, message; pair=pair)
+        ExperimentalSwitchingTrajectory(
+            converted_system, (t0, tf), parameters, segments, events,
+            :failure, current_time, copy(current_state), failure,
+        )
+    end
+
+    while current_time < tf
+        segment_start = current_time
+        segment_entry_state = copy(current_state)
+
+        if mode isa CartesianSwitchingMode
+            located = locate_cartesian_entry_event(
+                converted_system, current_state, (current_time, tf), parameters;
+                cartesian_kwargs...,
+            )
+            push!(segments, AutomaticCartesianSegment(
+                segment_start,
+                T(located.physical_time),
+                segment_entry_state,
+                Vector{T}(located.state),
+                located,
+            ))
+            current_time = T(located.physical_time)
+            current_state = Vector{T}(located.state)
+
+            if located.status === :completed
+                return ExperimentalSwitchingTrajectory(
+                    converted_system, (t0, tf), parameters, segments, events,
+                    :completed, current_time, current_state, nothing,
+                )
+            elseif located.status === :failure
+                return ExperimentalSwitchingTrajectory(
+                    converted_system, (t0, tf), parameters, segments, events,
+                    :failure, current_time, current_state,
+                    _automatic_failure(current_time, located.decision),
+                )
+            end
+
+            current_time - segment_start >= parameters.minimum_time_progress ||
+                return failed(
+                    :insufficient_time_progress,
+                    "Cartesian entry event did not advance physical time sufficiently.";
+                    pair=located.decision.pair,
+                )
+            switch_count += 1
+            switch_count <= parameters.maximum_switches ||
+                return failed(
+                    :maximum_switches_exceeded,
+                    "The configured maximum number of switch events was exceeded.";
+                    pair=located.decision.pair,
+                )
+
+            pair = something(located.decision.pair)
+            diagnostics = _entry_transition_diagnostics(
+                converted_system, current_state, current_time, pair,
+            )
+            push!(events, _switch_event(
+                current_time, :entry, pair, located.observables, diagnostics,
+            ))
+            mode = RegularizedSwitchingMode(pair)
+        else
+            pair = mode.pair
+            located = locate_regularized_exit_event(
+                converted_system,
+                current_state,
+                pair,
+                current_time,
+                tf,
+                parameters;
+                regularized_kwargs...,
+            )
+            push!(segments, AutomaticRegularizedSegment(
+                pair,
+                segment_start,
+                T(located.physical_time),
+                segment_entry_state,
+                Vector{T}(located.state),
+                located,
+            ))
+            current_time = T(located.physical_time)
+            current_state = Vector{T}(located.state)
+
+            if located.status === :completed
+                return ExperimentalSwitchingTrajectory(
+                    converted_system, (t0, tf), parameters, segments, events,
+                    :completed, current_time, current_state, nothing,
+                )
+            elseif located.status === :failure
+                return ExperimentalSwitchingTrajectory(
+                    converted_system, (t0, tf), parameters, segments, events,
+                    :failure, current_time, current_state,
+                    _automatic_failure(current_time, located.decision),
+                )
+            end
+
+            current_time - segment_start >= parameters.minimum_time_progress ||
+                return failed(
+                    :insufficient_time_progress,
+                    "Regularized exit event did not advance physical time sufficiently.";
+                    pair=pair,
+                )
+            switch_count += 1
+            switch_count <= parameters.maximum_switches ||
+                return failed(
+                    :maximum_switches_exceeded,
+                    "The configured maximum number of switch events was exceeded.";
+                    pair=pair,
+                )
+
+            diagnostics = _exit_transition_diagnostics(
+                converted_system, current_state, current_time, pair,
+            )
+            push!(events, _switch_event(
+                current_time, :exit, pair, located.observables, diagnostics,
+            ))
+            mode = CartesianSwitchingMode()
+        end
+    end
+
+    ExperimentalSwitchingTrajectory(
+        converted_system, (t0, tf), parameters, segments, events,
+        :completed, current_time, current_state, nothing,
+    )
+end

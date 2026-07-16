@@ -1575,3 +1575,74 @@ end
         pair_observables(entry_state),
     )
 end
+
+@testset "Experimental alternating automatic-switching controller" begin
+    system = ThreeBodySystem((1e-12, 1e-12, 1e-12); G=1.0)
+    parameters = AutomaticSwitchingParameters(
+        enter_threshold=0.2,
+        exit_threshold=0.4,
+        ambiguity_threshold=0.3,
+        minimum_separation_ratio=2.0,
+        maximum_switches=10,
+    )
+
+    no_event_state = statevector(
+        [-1.0, 0.0, 0.0], [-1.0, 0.0, 0.0],
+        [1.0, 0.0, 0.0], [1.0, 0.0, 0.0],
+        [10.0, 0.0, 0.0], [0.0, 0.0, 0.0],
+    )
+    no_event = simulate_experimental_switching(
+        system, no_event_state, (0.0, 0.5), parameters,
+    )
+    @test no_event.status == :completed
+    @test isnothing(no_event.failure)
+    @test length(no_event.segments) == 1
+    @test no_event.segments[1] isa AutomaticCartesianSegment
+    @test isempty(no_event.switch_events)
+    @test no_event.final_time ≈ 0.5
+
+    encounter_state = statevector(
+        [-0.5, 0.0, 0.0], [0.5, 0.0, 0.0],
+        [0.5, 0.0, 0.0], [-0.5, 0.0, 0.0],
+        [10.0, 0.0, 0.0], [0.0, 0.0, 0.0],
+    )
+    cycled = simulate_experimental_switching(
+        system,
+        encounter_state,
+        (0.0, 1.6),
+        parameters;
+        cartesian_kwargs=(saveat=0.07,),
+        regularized_kwargs=(saveat=0.031,),
+    )
+    @test cycled.status == :completed
+    @test isnothing(cycled.failure)
+    @test length(cycled.segments) == 3
+    @test cycled.segments[1] isa AutomaticCartesianSegment
+    @test cycled.segments[2] isa AutomaticRegularizedSegment
+    @test cycled.segments[3] isa AutomaticCartesianSegment
+    @test [event.kind for event in cycled.switch_events] == [:entry, :exit]
+    @test all(event -> event.pair == (1, 2), cycled.switch_events)
+    @test cycled.switch_events[1].physical_time ≈ 0.8 atol=2e-7
+    @test cycled.switch_events[2].physical_time ≈ 1.4 atol=2e-7
+    @test cycled.final_time ≈ 1.6 atol=1e-8
+
+    limited_parameters = AutomaticSwitchingParameters(
+        enter_threshold=0.2,
+        exit_threshold=0.4,
+        ambiguity_threshold=0.3,
+        minimum_separation_ratio=2.0,
+        maximum_switches=1,
+    )
+    limited = simulate_experimental_switching(
+        system, encounter_state, (0.0, 1.6), limited_parameters,
+    )
+    @test limited.status == :failure
+    @test !isnothing(limited.failure)
+    @test limited.failure.reason == :maximum_switches_exceeded
+    @test length(limited.segments) == 2
+    @test length(limited.switch_events) == 1
+
+    @test_throws ArgumentError simulate_experimental_switching(
+        system, encounter_state, (1.0, 0.0), parameters,
+    )
+end
