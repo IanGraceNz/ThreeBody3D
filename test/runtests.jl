@@ -1646,3 +1646,93 @@ end
         system, encounter_state, (1.0, 0.0), parameters,
     )
 end
+
+@testset "Experimental automatic-switching validation" begin
+    system = ThreeBodySystem((1e-12, 1e-12, 1e-12); G=1.0)
+    parameters = AutomaticSwitchingParameters(
+        enter_threshold=0.2,
+        exit_threshold=0.4,
+        ambiguity_threshold=0.3,
+        minimum_separation_ratio=2.0,
+        maximum_switches=10,
+    )
+    encounter_state = statevector(
+        [-0.5, 0.0, 0.0], [0.5, 0.0, 0.0],
+        [0.5, 0.0, 0.0], [-0.5, 0.0, 0.0],
+        [10.0, 0.0, 0.0], [0.0, 0.0, 0.0],
+    )
+    tspan = (0.0, 1.6)
+
+    automatic = simulate_experimental_switching(
+        system,
+        encounter_state,
+        tspan,
+        parameters;
+        cartesian_kwargs=(saveat=0.07,),
+        regularized_kwargs=(saveat=0.031,),
+    )
+    @test automatic.status == :completed
+    @test length(automatic.switch_events) == 2
+    @test [event.kind for event in automatic.switch_events] == [:entry, :exit]
+
+    entry_time = automatic.switch_events[1].physical_time
+    exit_time = automatic.switch_events[2].physical_time
+
+    cartesian_before_reference = simulate(
+        system,
+        encounter_state,
+        (tspan[1], entry_time);
+        solver=:accurate,
+        saveat=[entry_time],
+    )
+    cartesian_after_reference = simulate(
+        system,
+        automatic.segments[2].exit_state,
+        (exit_time, tspan[2]);
+        solver=:accurate,
+        saveat=[tspan[2]],
+    )
+
+    @test maximum(abs.(automatic.segments[1].exit_state .- cartesian_before_reference.solution.u[end])) < 2e-8
+    @test maximum(abs.(automatic.segments[2].entry_state .- automatic.segments[1].exit_state)) < 2e-12
+    @test maximum(abs.(automatic.segments[2].exit_state .- automatic.segments[2].location.state)) < 2e-12
+    @test maximum(abs.(automatic.segments[3].entry_state .- automatic.segments[2].exit_state)) < 2e-12
+    @test maximum(abs.(automatic.final_state .- cartesian_after_reference.solution.u[end])) < 2e-8
+
+    diagnostic_fields = (
+        :state_residual,
+        :position_residual,
+        :velocity_residual,
+        :energy_jump,
+        :momentum_jump,
+        :angular_momentum_jump,
+        :center_of_mass_jump,
+        :center_of_mass_velocity_jump,
+    )
+    for event in automatic.switch_events
+        diagnostics = event.transition_diagnostics
+        @test all(field -> getfield(diagnostics, field) <= 1e-12, diagnostic_fields)
+    end
+
+    irregular = simulate_experimental_switching(
+        system,
+        encounter_state,
+        tspan,
+        parameters;
+        cartesian_kwargs=(saveat=[0.0, 0.11, 0.37, 0.79, 1.03, 1.6],),
+        regularized_kwargs=(saveat=0.017,),
+    )
+    @test irregular.status == :completed
+    @test length(irregular.segments) == length(automatic.segments)
+    @test [event.kind for event in irregular.switch_events] ==
+          [event.kind for event in automatic.switch_events]
+    @test [event.pair for event in irregular.switch_events] ==
+          [event.pair for event in automatic.switch_events]
+    @test all(isapprox.(
+        [event.physical_time for event in irregular.switch_events],
+        [event.physical_time for event in automatic.switch_events];
+        atol=1e-9,
+        rtol=0.0,
+    ))
+    @test maximum(abs.(irregular.final_state .- automatic.final_state)) < 2e-8
+end
