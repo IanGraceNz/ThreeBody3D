@@ -469,3 +469,196 @@ function automatic_exit_decision(
 
     AutomaticSwitchingDecision(:none, selected_pair, :exit_condition_not_met)
 end
+
+"""
+    CartesianEntryLocationResult
+
+Result of one experimental Cartesian propagation performed while searching for
+an inward crossing of `enter_threshold`.
+
+`status` is one of `:completed`, `:entry`, or `:failure`. `simulation` retains
+the complete Cartesian [`SimulationResult`](@ref). `physical_time` and `state`
+identify the final time and Cartesian state of this propagation. `decision` and
+`observables` record the automatic-switching policy evaluation at that state.
+
+This type represents only Cartesian entry-event location. It does not start a
+regularized segment or run the full switching controller.
+"""
+struct CartesianEntryLocationResult{T<:AbstractFloat,S,R,O}
+    status::Symbol
+    physical_time::T
+    state::S
+    simulation::R
+    decision::AutomaticSwitchingDecision
+    observables::O
+
+    function CartesianEntryLocationResult(
+        status::Symbol,
+        physical_time::T,
+        state::S,
+        simulation::R,
+        decision::AutomaticSwitchingDecision,
+        observables::O,
+    ) where {T<:AbstractFloat,S,R,O}
+        status in (:completed, :entry, :failure) ||
+            throw(ArgumentError("Cartesian entry-location status must be :completed, :entry, or :failure."))
+        isfinite(physical_time) ||
+            throw(ArgumentError("Cartesian entry-location physical_time must be finite."))
+        status === :entry && decision.action !== :enter &&
+            throw(ArgumentError("an :entry result requires an :enter decision."))
+        status === :failure && decision.action !== :failure &&
+            throw(ArgumentError("a :failure result requires a :failure decision."))
+        status === :completed && decision.action !== :none &&
+            throw(ArgumentError("a :completed result requires a :none decision."))
+        new{T,S,R,O}(status, physical_time, state, simulation, decision, observables)
+    end
+end
+
+
+"""
+    locate_cartesian_entry_event(system, u0, tspan, parameters; kwargs...)
+
+Propagate one ordinary Cartesian segment and locate the earliest inward crossing
+of `parameters.enter_threshold` using continuous solver root finding.
+
+The returned [`CartesianEntryLocationResult`](@ref) has status:
+
+- `:completed` when the segment reaches the end of `tspan` without a crossing;
+- `:entry` when a unique isolated approaching pair is eligible for
+  regularization at the located crossing;
+- `:failure` when the located state is ambiguous or otherwise unsafe.
+
+Event detection is independent of `saveat`; that keyword controls only saved
+output. Initial states at or inside `enter_threshold` are rejected because the
+first experimental controller must not guess whether such a state lies before
+or after pericentre. Remaining keywords are forwarded to [`simulate`](@ref).
+
+This function does not start a Levi-Civita segment and does not alter the public
+behavior of `simulate`.
+"""
+function locate_cartesian_entry_event(
+    system::ThreeBodySystem,
+    u0::AbstractVector{<:AbstractFloat},
+    tspan::Tuple{<:Real,<:Real},
+    parameters::AutomaticSwitchingParameters;
+    solver=:accurate,
+    reltol::Union{Nothing,Real}=nothing,
+    abstol::Union{Nothing,Real}=nothing,
+    saveat=nothing,
+    maxiters::Integer=10^7,
+    precision::Integer=256,
+    kwargs...,
+)
+    initial_observables = pair_observables(u0)
+    if minimum(initial_observables.separations) <= parameters.enter_threshold
+        decision = _failure_decision(
+            :initial_state_inside_entry_threshold,
+            initial_observables.closest_pair,
+        )
+        T = eltype(u0)
+        return CartesianEntryLocationResult(
+            :failure,
+            T(first(tspan)),
+            copy(u0),
+            nothing,
+            decision,
+            initial_observables,
+        )
+    end
+
+    simulation = simulate(
+        system,
+        u0,
+        tspan;
+        solver,
+        reltol,
+        abstol,
+        saveat,
+        maxiters,
+        precision,
+        close_approach_threshold=parameters.enter_threshold,
+        close_approach_policy=:terminate,
+        kwargs...,
+    )
+
+    if !terminated_by_close_approach(simulation)
+        physical_time = last(simulation.solution.prob.tspan)
+        state = collect(simulation(physical_time))
+        observables = pair_observables(state)
+        decision = _none_decision(:entry_threshold_not_reached)
+        return CartesianEntryLocationResult(
+            :completed,
+            physical_time,
+            state,
+            simulation,
+            decision,
+            observables,
+        )
+    end
+
+    isempty(simulation.close_approach_events) &&
+        error("Cartesian entry search terminated without recording a close-approach event.")
+    event = first(simulation.close_approach_events)
+    physical_time = event.time
+    state = collect(simulation(physical_time))
+    observables = pair_observables(state)
+    decision = automatic_entry_decision(observables, parameters)
+
+    # The continuous callback has already certified that `event.pair` crossed
+    # the entry threshold inward. Dense reevaluation at the same root-found
+    # time can differ by a few ulps and place the separation just above the
+    # threshold, so revalidate the physical entry conditions without requiring
+    # a second exact threshold comparison.
+    if decision.action === :none
+        event_index = _canonical_pair_index(event.pair)
+        event_rate = observables.radial_rates[event_index]
+        if !observables.collisions[event_index] && event_rate < zero(event_rate)
+            if event_index != observables.order[1]
+                decision = _failure_decision(:candidate_not_closest, event.pair)
+            else
+                second_index = observables.order[2]
+                if observables.separations[second_index] <= parameters.ambiguity_threshold
+                    decision = _failure_decision(:ambiguous_close_pairs, event.pair)
+                elseif observables.isolation_ratio < parameters.minimum_separation_ratio
+                    decision = _failure_decision(:insufficient_pair_isolation, event.pair)
+                else
+                    decision = AutomaticSwitchingDecision(
+                        :enter,
+                        event.pair,
+                        :certified_inward_threshold_crossing,
+                    )
+                end
+            end
+        end
+    end
+
+    if decision.action === :enter
+        return CartesianEntryLocationResult(
+            :entry,
+            physical_time,
+            state,
+            simulation,
+            decision,
+            observables,
+        )
+    elseif decision.action === :failure
+        return CartesianEntryLocationResult(
+            :failure,
+            physical_time,
+            state,
+            simulation,
+            decision,
+            observables,
+        )
+    end
+
+    failure = _failure_decision(:entry_condition_not_met, event.pair)
+    CartesianEntryLocationResult(
+        :failure,
+        physical_time,
+        state,
+        simulation,
+        failure,
+        observables,
+    )
+end

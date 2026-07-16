@@ -1443,3 +1443,68 @@ end
     @test_throws ArgumentError AutomaticSwitchingDecision(:enter, nothing, :missing_pair)
     @test_throws ArgumentError automatic_exit_decision(receding, parameters, (1, 1))
 end
+
+@testset "Cartesian automatic entry-event location" begin
+    system = ThreeBodySystem((1e-12, 1e-12, 1e-12); G=1.0)
+    parameters = AutomaticSwitchingParameters(
+        enter_threshold=0.2,
+        exit_threshold=0.4,
+        ambiguity_threshold=0.3,
+        minimum_separation_ratio=2.0,
+    )
+    u0 = statevector(
+        [-0.25, 0.0, 0.0], [0.5, 0.0, 0.0],
+        [0.25, 0.0, 0.0], [-0.5, 0.0, 0.0],
+        [10.0, 0.0, 0.0], [0.0, 0.0, 0.0],
+    )
+
+    located = locate_cartesian_entry_event(
+        system, u0, (0.0, 0.5), parameters; saveat=0.1,
+    )
+    @test located.status == :entry
+    @test located.decision.action == :enter
+    @test located.decision.pair == (1, 2)
+    @test located.physical_time ≈ 0.3 atol=1e-8
+    @test located.observables.separations[1] ≈ parameters.enter_threshold atol=1e-10
+    @test located.observables.radial_rates[1] < 0
+    @test terminated_by_close_approach(located.simulation)
+
+    irregular = locate_cartesian_entry_event(
+        system,
+        u0,
+        (0.0, 0.5),
+        parameters;
+        saveat=[0.0, 0.07, 0.19, 0.41, 0.5],
+    )
+    @test irregular.status == :entry
+    @test irregular.decision.pair == located.decision.pair
+    @test irregular.physical_time ≈ located.physical_time atol=1e-10
+    @test maximum(abs.(irregular.state .- located.state)) < 1e-9
+
+    completed = locate_cartesian_entry_event(
+        system, u0, (0.0, 0.1), parameters; saveat=0.02,
+    )
+    @test completed.status == :completed
+    @test completed.decision.action == :none
+    @test completed.physical_time == 0.1
+    @test !terminated_by_close_approach(completed.simulation)
+
+    inside = statevector(
+        [-0.05, 0.0, 0.0], [0.5, 0.0, 0.0],
+        [0.05, 0.0, 0.0], [-0.5, 0.0, 0.0],
+        [10.0, 0.0, 0.0], [0.0, 0.0, 0.0],
+    )
+    rejected = locate_cartesian_entry_event(system, inside, (0.0, 0.5), parameters)
+    @test rejected.status == :failure
+    @test rejected.decision.reason == :initial_state_inside_entry_threshold
+    @test isnothing(rejected.simulation)
+
+    @test_throws ArgumentError CartesianEntryLocationResult(
+        :entry,
+        0.0,
+        copy(u0),
+        nothing,
+        AutomaticSwitchingDecision(:none, nothing, :invalid),
+        pair_observables(u0),
+    )
+end
