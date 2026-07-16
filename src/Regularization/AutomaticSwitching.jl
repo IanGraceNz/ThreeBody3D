@@ -1215,3 +1215,71 @@ function simulate_experimental_switching(
         :completed, current_time, current_state, nothing,
     )
 end
+
+@inline function _automatic_segment_contains(segment, time)
+    segment.start_time <= time <= segment.end_time
+end
+
+function _automatic_segment_index(
+    trajectory::ExperimentalSwitchingTrajectory,
+    time::Real,
+)
+    T = eltype(trajectory.final_state)
+    target = T(time)
+    isfinite(target) || throw(ArgumentError("evaluation time must be finite."))
+    t0, tf = trajectory.tspan
+    t0 <= target <= trajectory.final_time || throw(ArgumentError(
+        "evaluation time must lie within the computed trajectory interval " *
+        "[$t0, $(trajectory.final_time)].",
+    ))
+
+    for (index, segment) in pairs(trajectory.segments)
+        _automatic_segment_contains(segment, target) && return index, target
+    end
+    throw(ErrorException("no retained automatic-switching segment contains time $target."))
+end
+
+"""
+    experimental_switching_state(trajectory, time; regularized_kwargs=NamedTuple())
+
+Evaluate an [`ExperimentalSwitchingTrajectory`](@ref) at absolute physical time
+`time`.
+
+Cartesian segments use the retained dense ODE solution. Regularized segments use
+bounded perturbed Levi-Civita physical-time targeting. Exact segment boundaries
+return the stored handoff states without interpolation, so entry and exit epochs
+are represented consistently across adjacent segments.
+
+`regularized_kwargs` is a named tuple forwarded only when a time strictly inside
+a regularized segment requires physical-time inversion.
+"""
+function experimental_switching_state(
+    trajectory::ExperimentalSwitchingTrajectory,
+    time::Real;
+    regularized_kwargs::NamedTuple=NamedTuple(),
+)
+    index, target = _automatic_segment_index(trajectory, time)
+    segment = trajectory.segments[index]
+
+    target == segment.start_time && return copy(segment.entry_state)
+    target == segment.end_time && return copy(segment.exit_state)
+
+    if segment isa AutomaticCartesianSegment
+        return Vector{eltype(trajectory.final_state)}(
+            segment.location.simulation.solution(target),
+        )
+    elseif segment isa AutomaticRegularizedSegment
+        reconstructed = perturbed_levi_civita_state_at_time(
+            segment.location.problem,
+            target;
+            regularized_kwargs...,
+        )
+        return Vector{eltype(trajectory.final_state)}(reconstructed.physical_state)
+    end
+
+    throw(ErrorException("unsupported automatic-switching segment type $(typeof(segment))."))
+end
+
+function (trajectory::ExperimentalSwitchingTrajectory)(time::Real; kwargs...)
+    experimental_switching_state(trajectory, time; kwargs...)
+end

@@ -1736,3 +1736,88 @@ end
     ))
     @test maximum(abs.(irregular.final_state .- automatic.final_state)) < 2e-8
 end
+
+@testset "Experimental automatic-switching physical-time evaluation" begin
+    system = ThreeBodySystem((1e-12, 1e-12, 1e-12); G=1.0)
+    parameters = AutomaticSwitchingParameters(
+        enter_threshold=0.2,
+        exit_threshold=0.4,
+        ambiguity_threshold=0.3,
+        minimum_separation_ratio=2.0,
+        maximum_switches=10,
+    )
+    encounter_state = statevector(
+        [-0.5, 0.0, 0.0], [0.5, 0.0, 0.0],
+        [0.5, 0.0, 0.0], [-0.5, 0.0, 0.0],
+        [10.0, 0.0, 0.0], [0.0, 0.0, 0.0],
+    )
+    trajectory = simulate_experimental_switching(
+        system,
+        encounter_state,
+        (0.0, 1.6),
+        parameters;
+        cartesian_kwargs=(saveat=0.09,),
+        regularized_kwargs=(saveat=0.027,),
+    )
+
+    @test trajectory.status == :completed
+    @test length(trajectory.segments) == 3
+    entry_time = trajectory.switch_events[1].physical_time
+    exit_time = trajectory.switch_events[2].physical_time
+
+    @test experimental_switching_state(trajectory, 0.0) == trajectory.segments[1].entry_state
+    @test experimental_switching_state(trajectory, entry_time) == trajectory.segments[1].exit_state
+    @test trajectory(entry_time) == trajectory.segments[1].exit_state
+    @test experimental_switching_state(trajectory, exit_time) == trajectory.segments[2].exit_state
+    @test experimental_switching_state(trajectory, 1.6) == trajectory.final_state
+
+    cartesian_before_time = entry_time / 2
+    cartesian_before_expected = trajectory.segments[1].location.simulation.solution(cartesian_before_time)
+    @test maximum(abs.(
+        trajectory(cartesian_before_time) .- cartesian_before_expected
+    )) < 2e-12
+
+    regularized_time = (entry_time + exit_time) / 2
+    regularized_expected = perturbed_levi_civita_state_at_time(
+        trajectory.segments[2].location.problem,
+        regularized_time;
+        initial_step=trajectory.segments[2].location.fictitious_time / 4,
+    ).physical_state
+    @test maximum(abs.(
+        experimental_switching_state(
+            trajectory,
+            regularized_time;
+            regularized_kwargs=(
+                initial_step=trajectory.segments[2].location.fictitious_time / 4,
+            ),
+        ) .- regularized_expected
+    )) < 2e-12
+
+    cartesian_after_time = (exit_time + trajectory.final_time) / 2
+    cartesian_after_expected = trajectory.segments[3].location.simulation.solution(cartesian_after_time)
+    @test maximum(abs.(
+        trajectory(cartesian_after_time) .- cartesian_after_expected
+    )) < 2e-12
+
+    @test_throws ArgumentError trajectory(-eps())
+    @test_throws ArgumentError trajectory(trajectory.final_time + eps(trajectory.final_time))
+    @test_throws ArgumentError trajectory(Inf)
+
+    no_switch_state = statevector(
+        [-1.0, 0.0, 0.0], [0.0, 0.1, 0.0],
+        [1.0, 0.0, 0.0], [0.0, -0.1, 0.0],
+        [0.0, 3.0, 0.0], [0.0, 0.0, 0.0],
+    )
+    no_switch = simulate_experimental_switching(
+        system,
+        no_switch_state,
+        (0.0, 0.2),
+        parameters;
+        cartesian_kwargs=(saveat=0.07,),
+    )
+    @test no_switch.status == :completed
+    @test length(no_switch.segments) == 1
+    @test maximum(abs.(
+        no_switch(0.11) .- no_switch.segments[1].location.simulation.solution(0.11)
+    )) < 2e-12
+end
