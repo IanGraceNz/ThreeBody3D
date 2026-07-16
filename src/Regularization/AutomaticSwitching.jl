@@ -1283,3 +1283,145 @@ end
 function (trajectory::ExperimentalSwitchingTrajectory)(time::Real; kwargs...)
     experimental_switching_state(trajectory, time; kwargs...)
 end
+
+
+"""
+    ExperimentalSwitchingSamples
+
+Unified physical-time samples from an [`ExperimentalSwitchingTrajectory`](@ref).
+`times` is strictly increasing and `states[k]` is the complete Cartesian state
+at `times[k]`. Switch epochs, when requested, occur exactly once.
+"""
+struct ExperimentalSwitchingSamples{T<:AbstractFloat}
+    times::Vector{T}
+    states::Vector{Vector{T}}
+
+    function ExperimentalSwitchingSamples(
+        times::Vector{T},
+        states::Vector{Vector{T}},
+    ) where {T<:AbstractFloat}
+        length(times) == length(states) ||
+            throw(ArgumentError("sample times and states must have equal lengths."))
+        isempty(times) && throw(ArgumentError("at least one sample is required."))
+        all(isfinite, times) || throw(ArgumentError("sample times must be finite."))
+        all(diff(times) .> zero(T)) ||
+            throw(ArgumentError("sample times must be strictly increasing."))
+        all(state -> length(state) == STATE_SIZE, states) ||
+            throw(ArgumentError("every sampled state must have length STATE_SIZE."))
+        new{T}(times, states)
+    end
+end
+
+Base.length(samples::ExperimentalSwitchingSamples) = length(samples.times)
+Base.firstindex(::ExperimentalSwitchingSamples) = 1
+Base.lastindex(samples::ExperimentalSwitchingSamples) = length(samples)
+Base.eachindex(samples::ExperimentalSwitchingSamples) = Base.OneTo(length(samples))
+Base.getindex(samples::ExperimentalSwitchingSamples, index::Integer) = samples.states[index]
+
+function _validated_automatic_sample_times(
+    trajectory::ExperimentalSwitchingTrajectory,
+    times;
+    include_switches::Bool,
+)
+    T = eltype(trajectory.final_state)
+    converted = T[]
+    for time in times
+        value = T(time)
+        isfinite(value) || throw(ArgumentError("sample times must be finite."))
+        push!(converted, value)
+    end
+    isempty(converted) && throw(ArgumentError("at least one sample time is required."))
+    all(diff(converted) .> zero(T)) ||
+        throw(ArgumentError("explicit sample times must be strictly increasing and unique."))
+
+    t0 = trajectory.tspan[1]
+    tf = trajectory.final_time
+    first(converted) >= t0 && last(converted) <= tf || throw(ArgumentError(
+        "sample times must lie within the computed trajectory interval [$t0, $tf].",
+    ))
+
+    include_switches || return converted
+    switch_times = T[event.physical_time for event in trajectory.switch_events]
+    sort!(unique!(vcat(converted, switch_times)))
+end
+
+"""
+    sample_experimental_switching(trajectory, times;
+                                  include_switches=true,
+                                  regularized_kwargs=NamedTuple())
+
+Evaluate an [`ExperimentalSwitchingTrajectory`](@ref) at explicit, strictly
+increasing physical times. When `include_switches=true`, every retained switch
+epoch is inserted and represented exactly once. Sampling is restricted to the
+successfully computed interval, including for safely failed trajectories.
+"""
+function sample_experimental_switching(
+    trajectory::ExperimentalSwitchingTrajectory,
+    times;
+    include_switches::Bool=true,
+    regularized_kwargs::NamedTuple=NamedTuple(),
+)
+    sample_times = _validated_automatic_sample_times(
+        trajectory, times; include_switches=include_switches,
+    )
+    T = eltype(trajectory.final_state)
+    states = Vector{Vector{T}}(undef, length(sample_times))
+    for index in eachindex(sample_times)
+        states[index] = experimental_switching_state(
+            trajectory,
+            sample_times[index];
+            regularized_kwargs=regularized_kwargs,
+        )
+    end
+    ExperimentalSwitchingSamples(sample_times, states)
+end
+
+"""
+    sample_experimental_switching(trajectory; dt, include_switches=true,
+                                  regularized_kwargs=NamedTuple(),
+                                  maximum_samples=1_000_000)
+
+Sample an experimental switching trajectory on a uniform physical-time grid.
+The initial and final computed epochs are always included. If the interval is
+not an integer multiple of `dt`, the final interval is shortened. Switch epochs
+are optionally inserted exactly once without changing event location.
+"""
+function sample_experimental_switching(
+    trajectory::ExperimentalSwitchingTrajectory;
+    dt::Real,
+    include_switches::Bool=true,
+    regularized_kwargs::NamedTuple=NamedTuple(),
+    maximum_samples::Integer=1_000_000,
+)
+    maximum_samples > 1 || throw(ArgumentError("maximum_samples must exceed one."))
+    T = eltype(trajectory.final_state)
+    step = T(dt)
+    isfinite(step) && step > zero(T) ||
+        throw(ArgumentError("dt must be finite and positive."))
+
+    t0 = trajectory.tspan[1]
+    tf = trajectory.final_time
+    interval = tf - t0
+    estimated = floor(Int, interval / step) + 2
+    estimated <= maximum_samples || throw(ArgumentError(
+        "requested sampling grid exceeds maximum_samples=$maximum_samples.",
+    ))
+
+    times = T[t0]
+    time = t0
+    while time + step < tf
+        time += step
+        push!(times, time)
+        length(times) < maximum_samples || throw(ArgumentError(
+            "requested sampling grid exceeds maximum_samples=$maximum_samples.",
+        ))
+    end
+    tf > last(times) && push!(times, tf)
+
+    sample_experimental_switching(
+        trajectory,
+        times;
+        include_switches=include_switches,
+        regularized_kwargs=regularized_kwargs,
+    )
+end

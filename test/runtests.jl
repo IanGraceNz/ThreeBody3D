@@ -1821,3 +1821,92 @@ end
         no_switch(0.11) .- no_switch.segments[1].location.simulation.solution(0.11)
     )) < 2e-12
 end
+
+@testset "Experimental automatic-switching unified sampling" begin
+    system = ThreeBodySystem((1e-12, 1e-12, 1e-12); G=1.0)
+    parameters = AutomaticSwitchingParameters(
+        enter_threshold=0.2,
+        exit_threshold=0.4,
+        ambiguity_threshold=0.3,
+        minimum_separation_ratio=2.0,
+        maximum_switches=10,
+    )
+    encounter_state = statevector(
+        [-0.5, 0.0, 0.0], [0.5, 0.0, 0.0],
+        [0.5, 0.0, 0.0], [-0.5, 0.0, 0.0],
+        [10.0, 0.0, 0.0], [0.0, 0.0, 0.0],
+    )
+    trajectory = simulate_experimental_switching(
+        system,
+        encounter_state,
+        (0.0, 1.6),
+        parameters;
+        cartesian_kwargs=(saveat=0.09,),
+        regularized_kwargs=(saveat=0.027,),
+    )
+    @test trajectory.status == :completed
+
+    entry_time = trajectory.switch_events[1].physical_time
+    exit_time = trajectory.switch_events[2].physical_time
+    explicit = sample_experimental_switching(
+        trajectory,
+        [0.0, 0.3, 0.9, 1.5, 1.6];
+        regularized_kwargs=(
+            initial_step=trajectory.segments[2].location.fictitious_time / 4,
+        ),
+    )
+    @test explicit isa ExperimentalSwitchingSamples
+    @test length(explicit) == length(explicit.times) == length(explicit.states)
+    @test issorted(explicit.times)
+    @test all(diff(explicit.times) .> 0)
+    @test count(==(entry_time), explicit.times) == 1
+    @test count(==(exit_time), explicit.times) == 1
+    @test first(explicit.times) == 0.0
+    @test last(explicit.times) == 1.6
+    @test explicit[1] == trajectory.segments[1].entry_state
+    @test explicit[end] == trajectory.final_state
+
+    for index in eachindex(explicit.times)
+        @test maximum(abs.(
+            explicit.states[index] .-
+            experimental_switching_state(
+                trajectory,
+                explicit.times[index];
+                regularized_kwargs=(
+                    initial_step=trajectory.segments[2].location.fictitious_time / 4,
+                ),
+            )
+        )) < 2e-12
+    end
+
+    without_switches = sample_experimental_switching(
+        trajectory,
+        [0.0, 0.8, 1.6];
+        include_switches=false,
+    )
+    @test without_switches.times == [0.0, 0.8, 1.6]
+
+    uniform = sample_experimental_switching(
+        trajectory;
+        dt=0.23,
+        regularized_kwargs=(
+            initial_step=trajectory.segments[2].location.fictitious_time / 4,
+        ),
+    )
+    @test first(uniform.times) == trajectory.tspan[1]
+    @test last(uniform.times) == trajectory.final_time
+    @test count(==(entry_time), uniform.times) == 1
+    @test count(==(exit_time), uniform.times) == 1
+    @test all(diff(uniform.times) .> 0)
+
+    @test_throws ArgumentError sample_experimental_switching(trajectory, Float64[])
+    @test_throws ArgumentError sample_experimental_switching(trajectory, [0.0, 0.0])
+    @test_throws ArgumentError sample_experimental_switching(trajectory, [0.2, 0.1])
+    @test_throws ArgumentError sample_experimental_switching(trajectory, [-0.1, 0.2])
+    @test_throws ArgumentError sample_experimental_switching(trajectory, [0.0, Inf])
+    @test_throws ArgumentError sample_experimental_switching(trajectory; dt=0.0)
+    @test_throws ArgumentError sample_experimental_switching(trajectory; dt=Inf)
+    @test_throws ArgumentError sample_experimental_switching(
+        trajectory; dt=1e-9, maximum_samples=100,
+    )
+end
