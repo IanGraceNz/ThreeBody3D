@@ -12,7 +12,7 @@ include("Physics.jl")
 include("Integrator.jl")
 include("Diagnostics.jl")
 include("Validation.jl")
-include("Benchmarks.jl")
+include("ValidationBenchmarks/ValidationBenchmarks.jl")
 include("Visualization.jl")
 
 export ThreeBodySystem,
