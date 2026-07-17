@@ -2001,3 +2001,48 @@ end
 
 
 end
+@testset "Experimental automatic-switching diagnostics" begin
+    system = ThreeBodySystem((1e-12, 1e-12, 1e-12); G=1.0)
+    parameters = AutomaticSwitchingParameters(
+        enter_threshold=0.2,
+        exit_threshold=0.4,
+        ambiguity_threshold=0.3,
+        minimum_separation_ratio=2.0,
+        maximum_switches=10,
+    )
+    u0 = statevector(
+        [-0.5, 0.0, 0.0], [0.5, 0.0, 0.0],
+        [0.5, 0.0, 0.0], [-0.5, 0.0, 0.0],
+        [10.0, 0.0, 0.0], [0.0, 0.0, 0.0],
+    )
+    trajectory = simulate_experimental_switching(
+        system, u0, (0.0, 1.6), parameters;
+        cartesian_kwargs=(saveat=0.09,),
+        regularized_kwargs=(saveat=0.027,),
+    )
+    samples = sample_experimental_switching(trajectory; dt=0.05)
+    report = diagnostics_report(trajectory, samples)
+
+    @test report isa ExperimentalSwitchingDiagnosticsReport
+    @test report.sample_count == length(samples)
+    @test report.segment_count == length(trajectory.segments)
+    @test report.switch_count == length(trajectory.switch_events) == 2
+    @test report.initial_energy == total_energy(system, first(samples.states))
+    @test report.final_energy == total_energy(system, last(samples.states))
+    @test report.minimum_separation <= parameters.enter_threshold
+    @test report.maximum_relative_energy_drift >= 0
+    @test report.maximum_center_of_mass_velocity_drift >= 0
+    @test report.maximum_transition_state_residual >= 0
+    @test report.maximum_transition_energy_jump >= 0
+    @test occursin("experimental switching diagnostics", sprint(show, report))
+
+    keyword_report = diagnostics_report(trajectory; dt=0.05)
+    @test keyword_report.sample_count == report.sample_count
+    @test keyword_report.switch_count == report.switch_count
+    @test keyword_report.maximum_relative_energy_drift ≈ report.maximum_relative_energy_drift
+
+    truncated = sample_experimental_switching(
+        trajectory, [0.1, trajectory.final_time]; include_switches=false,
+    )
+    @test_throws ArgumentError diagnostics_report(trajectory, truncated)
+end

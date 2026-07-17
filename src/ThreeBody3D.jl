@@ -55,7 +55,7 @@ export ThreeBodySystem,
        linear_momentum, angular_momentum,
        kinetic_energy, potential_energy, total_energy,
        minimum_separation, relative_energy_error,
-       DiagnosticsReport, diagnostics_report,
+       DiagnosticsReport, ExperimentalSwitchingDiagnosticsReport, diagnostics_report,
        periodicity_error, CloseApproachReport, close_approach_report,
        SolverBenchmark, benchmark_solvers, benchmark_extreme_solvers,
        plot_trajectory, animate, record_animation
