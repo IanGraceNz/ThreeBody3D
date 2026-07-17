@@ -198,9 +198,12 @@ provides one unified physical trajectory through `result.times`,
 
 `saveat` controls only the unified output samples; it does not control either
 handoff state. Cartesian solver options use the `cartesian_*` keywords, while
-regularized targeting and integration use the `regularized_*` keywords. This is
-an explicit research workflow: it does not detect thresholds or switch pairs
-automatically.
+regularized targeting and integration use the `regularized_*` keywords. When
+`regularized_tolerance` is omitted but either regularized ODE tolerance is
+supplied, the tighter supplied tolerance is also used for physical-time
+targeting. This prevents the Sundman-time inversion from becoming less accurate
+than the requested regularized integration. This is an explicit research
+workflow: it does not detect thresholds or switch pairs automatically.
 """
 function compose_regularized_trajectory(
     system::ThreeBodySystem,
@@ -253,7 +256,18 @@ function compose_regularized_trajectory(
         reltol=regularized_reltol,
         abstol=regularized_abstol,
     )
-    regularized_segment = if isnothing(regularized_tolerance)
+    targeting_tolerance = if !isnothing(regularized_tolerance)
+        T(regularized_tolerance)
+    elseif !isnothing(regularized_reltol) && !isnothing(regularized_abstol)
+        min(T(regularized_reltol), T(regularized_abstol))
+    elseif !isnothing(regularized_reltol)
+        T(regularized_reltol)
+    elseif !isnothing(regularized_abstol)
+        T(regularized_abstol)
+    else
+        nothing
+    end
+    regularized_segment = if isnothing(targeting_tolerance)
         propagate_regularized_segment(
             converted_system, entry_state, (i, j), entry_time, exit_time;
             branch=branch, regularized_keyword_values...,
@@ -261,7 +275,7 @@ function compose_regularized_trajectory(
     else
         propagate_regularized_segment(
             converted_system, entry_state, (i, j), entry_time, exit_time;
-            branch=branch, tolerance=T(regularized_tolerance),
+            branch=branch, tolerance=targeting_tolerance,
             regularized_keyword_values...,
         )
     end

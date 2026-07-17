@@ -1026,6 +1026,27 @@ end
     @test composed(0.2) ≈ composed.regularized_segment.entry_state atol=0 rtol=0
     @test composed(0.5) ≈ composed.regularized_segment.exit_state atol=0 rtol=0
 
+    derived_targeting = compose_regularized_trajectory(
+        system, u0, (0.0, 0.8), (1, 2), (0.2, 0.5);
+        saveat=0.1,
+        cartesian_reltol=1e-13,
+        cartesian_abstol=1e-13,
+        regularized_initial_step=0.4,
+        regularized_reltol=1e-13,
+        regularized_abstol=1e-13,
+    )
+    derived_segment = derived_targeting.regularized_segment
+    derived_exit_time = derived_segment.regularized_result.solution(
+        derived_segment.exit_fictitious_time,
+    )[14]
+    @test abs(derived_exit_time - derived_segment.exit_time) ≤ 5e-13
+    @test isapprox(
+        derived_segment.exit_state,
+        composed.regularized_segment.exit_state;
+        atol=5e-10,
+        rtol=5e-10,
+    )
+
     for diagnostics in (composed.entry_continuity, composed.exit_continuity)
         @test diagnostics.state_residual ≤ 5e-15
         @test diagnostics.position_residual ≤ 5e-15
