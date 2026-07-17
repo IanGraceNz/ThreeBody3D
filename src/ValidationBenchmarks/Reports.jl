@@ -3,8 +3,8 @@
 
 Common scientific and solver-work summary returned by
 [`run_validation_benchmark`](@ref). `diagnostics` contains the full conservation
-report for the run, while `periodicity_error` measures return to the initial
-state after the complete requested interval.
+report for the run. `periodicity_error` is finite for periodic benchmarks and
+`NaN` otherwise; `benchmark_metrics` stores named benchmark-specific measures.
 """
 struct ValidationBenchmarkReport{T,D}
     name::Symbol
@@ -15,6 +15,7 @@ struct ValidationBenchmarkReport{T,D}
     expected_final_time::T
     diagnostics::D
     periodicity_error::T
+    benchmark_metrics::NamedTuple
     saved_states::Int
     accepted_steps::Int
     rejected_steps::Int
@@ -37,5 +38,11 @@ function Base.show(io::IO, report::ValidationBenchmarkReport)
     println(io, "  maximum angular momentum drift:", report.diagnostics.maximum_angular_momentum_drift)
     println(io, "  maximum COM residual:          ", report.diagnostics.maximum_center_of_mass_residual)
     println(io, "  minimum pair separation:       ", report.diagnostics.minimum_separation)
-    print(io, "  periodicity error:              ", report.periodicity_error)
+    if isfinite(report.periodicity_error)
+        println(io, "  periodicity error:              ", report.periodicity_error)
+    end
+    for (name, value) in pairs(report.benchmark_metrics)
+        label = replace(string(name), '_' => ' ')
+        println(io, "  ", rpad(label * ":", 31), value)
+    end
 end

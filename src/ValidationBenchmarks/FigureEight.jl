@@ -40,6 +40,7 @@ function _run_figure_eight_benchmark(
         expected_final_time,
         diagnostics,
         periodicity_error(result, expected_final_time),
+        NamedTuple(),
         length(result.solution.t),
         Int(stats.naccept),
         Int(stats.nreject),

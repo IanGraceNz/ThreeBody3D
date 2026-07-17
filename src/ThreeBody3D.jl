@@ -59,7 +59,7 @@ export ThreeBodySystem,
        DiagnosticsReport, ExperimentalSwitchingDiagnosticsReport, diagnostics_report,
        periodicity_error, CloseApproachReport, close_approach_report,
        SolverBenchmark, benchmark_solvers, benchmark_extreme_solvers,
-       FIGURE_EIGHT_PERIOD, ValidationBenchmarkReport,
+       FIGURE_EIGHT_PERIOD, HIERARCHICAL_TRIPLE_DURATION, ValidationBenchmarkReport,
        validation_benchmark_names, run_validation_benchmark,
        plot_trajectory, animate, record_animation
 

@@ -2048,7 +2048,7 @@ end
 end
 
 @testset "Validation benchmark framework" begin
-    @test validation_benchmark_names() == (:figure_eight,)
+    @test :figure_eight in validation_benchmark_names()
     @test FIGURE_EIGHT_PERIOD > 0
 
     report = run_validation_benchmark(
@@ -2080,4 +2080,40 @@ end
     @test_throws ArgumentError run_validation_benchmark(:figure_eight; periods=0)
     @test_throws ArgumentError run_validation_benchmark(:figure_eight; saveat=0.0)
     @test_throws ArgumentError run_validation_benchmark(:figure_eight; solver=:invalid)
+end
+
+@testset "Hierarchical-triple validation benchmark" begin
+    @test validation_benchmark_names() == (:figure_eight, :hierarchical_triple)
+    @test HIERARCHICAL_TRIPLE_DURATION > 0
+
+    report = run_validation_benchmark(
+        :hierarchical_triple;
+        duration=5.0,
+        solver=:accurate,
+        saveat=0.05,
+    )
+
+    @test report isa ValidationBenchmarkReport
+    @test report.name == :hierarchical_triple
+    @test report.status == :completed
+    @test report.profile == :accurate
+    @test report.initial_time == 0.0
+    @test isapprox(report.final_time, 5.0; atol=1e-14, rtol=0)
+    @test isnan(report.periodicity_error)
+    @test isapprox(report.benchmark_metrics.initial_hierarchy_ratio, 10.0; atol=1e-12, rtol=0)
+    @test report.benchmark_metrics.minimum_hierarchy_ratio > 5
+    @test report.benchmark_metrics.final_hierarchy_ratio > 5
+    @test report.diagnostics.maximum_relative_energy_drift < 1e-9
+    @test report.diagnostics.maximum_linear_momentum_drift < 1e-11
+    @test report.diagnostics.maximum_angular_momentum_drift < 1e-10
+    @test report.diagnostics.maximum_center_of_mass_residual < 1e-10
+    @test occursin("validation benchmark: hierarchical_triple", sprint(show, report))
+    @test occursin("minimum hierarchy ratio", sprint(show, report))
+
+    @test_throws ArgumentError run_validation_benchmark(
+        :hierarchical_triple; duration=0.0,
+    )
+    @test_throws ArgumentError run_validation_benchmark(
+        :figure_eight; duration=1.0,
+    )
 end
