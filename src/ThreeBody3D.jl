@@ -12,6 +12,7 @@ include("Physics.jl")
 include("Integrator.jl")
 include("Diagnostics.jl")
 include("Validation.jl")
+include("Benchmarks.jl")
 include("Visualization.jl")
 
 export ThreeBodySystem,
@@ -58,6 +59,8 @@ export ThreeBodySystem,
        DiagnosticsReport, ExperimentalSwitchingDiagnosticsReport, diagnostics_report,
        periodicity_error, CloseApproachReport, close_approach_report,
        SolverBenchmark, benchmark_solvers, benchmark_extreme_solvers,
+       FIGURE_EIGHT_PERIOD, ValidationBenchmarkReport,
+       validation_benchmark_names, run_validation_benchmark,
        plot_trajectory, animate, record_animation
 
 end

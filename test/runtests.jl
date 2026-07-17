@@ -2046,3 +2046,38 @@ end
     )
     @test_throws ArgumentError diagnostics_report(trajectory, truncated)
 end
+
+@testset "Validation benchmark framework" begin
+    @test validation_benchmark_names() == (:figure_eight,)
+    @test FIGURE_EIGHT_PERIOD > 0
+
+    report = run_validation_benchmark(
+        :figure_eight;
+        periods=1,
+        solver=:accurate,
+        saveat=0.05,
+    )
+
+    @test report isa ValidationBenchmarkReport
+    @test report.name == :figure_eight
+    @test report.status == :completed
+    @test report.profile == :accurate
+    @test report.initial_time == 0.0
+    @test isapprox(report.final_time, report.expected_final_time; atol=1e-14, rtol=0)
+    @test report.saved_states > 2
+    @test report.accepted_steps > 0
+    @test report.rejected_steps >= 0
+    @test report.rhs_evaluations > 0
+    @test report.diagnostics.maximum_relative_energy_drift < 1e-10
+    @test report.diagnostics.maximum_linear_momentum_drift < 1e-12
+    @test report.diagnostics.maximum_angular_momentum_drift < 1e-11
+    @test report.diagnostics.maximum_center_of_mass_residual < 1e-11
+    @test report.diagnostics.minimum_separation > 0
+    @test report.periodicity_error < 1e-5
+    @test occursin("validation benchmark: figure_eight", sprint(show, report))
+
+    @test_throws ArgumentError run_validation_benchmark(:unknown)
+    @test_throws ArgumentError run_validation_benchmark(:figure_eight; periods=0)
+    @test_throws ArgumentError run_validation_benchmark(:figure_eight; saveat=0.0)
+    @test_throws ArgumentError run_validation_benchmark(:figure_eight; solver=:invalid)
+end
