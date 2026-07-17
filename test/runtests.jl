@@ -1778,20 +1778,37 @@ end
     )) < 2e-12
 
     regularized_time = (entry_time + exit_time) / 2
-    regularized_expected = perturbed_levi_civita_state_at_time(
-        trajectory.segments[2].location.problem,
+    default_regularized_state = experimental_switching_state(
+        trajectory,
+        regularized_time,
+    )
+    strict_regularized_state = experimental_switching_state(
+        trajectory,
         regularized_time;
-        initial_step=trajectory.segments[2].location.fictitious_time / 4,
-    ).physical_state
+        regularized_kwargs=(
+            tolerance=1e-14,
+            max_iterations=256,
+        ),
+    )
     @test maximum(abs.(
-        experimental_switching_state(
-            trajectory,
-            regularized_time;
-            regularized_kwargs=(
-                initial_step=trajectory.segments[2].location.fictitious_time / 4,
-            ),
-        ) .- regularized_expected
-    )) < 2e-12
+        default_regularized_state .- strict_regularized_state
+    )) < 1e-10
+
+    @test_throws ArgumentError experimental_switching_state(
+        trajectory,
+        regularized_time;
+        regularized_kwargs=(initial_step=0.1,),
+    )
+    @test_throws ArgumentError experimental_switching_state(
+        trajectory,
+        regularized_time;
+        regularized_kwargs=(tolerance=0.0,),
+    )
+    @test_throws ArgumentError experimental_switching_state(
+        trajectory,
+        regularized_time;
+        regularized_kwargs=(max_iterations=0,),
+    )
 
     cartesian_after_time = (exit_time + trajectory.final_time) / 2
     cartesian_after_expected = trajectory.segments[3].location.simulation.solution(cartesian_after_time)
@@ -1848,12 +1865,14 @@ end
 
     entry_time = trajectory.switch_events[1].physical_time
     exit_time = trajectory.switch_events[2].physical_time
+    evaluation_kwargs = (
+        tolerance=1e-14,
+        max_iterations=256,
+    )
     explicit = sample_experimental_switching(
         trajectory,
         [0.0, 0.3, 0.9, 1.5, 1.6];
-        regularized_kwargs=(
-            initial_step=trajectory.segments[2].location.fictitious_time / 4,
-        ),
+        regularized_kwargs=evaluation_kwargs,
     )
     @test explicit isa ExperimentalSwitchingSamples
     @test length(explicit) == length(explicit.times) == length(explicit.states)
@@ -1872,9 +1891,7 @@ end
             experimental_switching_state(
                 trajectory,
                 explicit.times[index];
-                regularized_kwargs=(
-                    initial_step=trajectory.segments[2].location.fictitious_time / 4,
-                ),
+                regularized_kwargs=evaluation_kwargs,
             )
         )) < 2e-12
     end
@@ -1889,9 +1906,7 @@ end
     uniform = sample_experimental_switching(
         trajectory;
         dt=0.23,
-        regularized_kwargs=(
-            initial_step=trajectory.segments[2].location.fictitious_time / 4,
-        ),
+        regularized_kwargs=evaluation_kwargs,
     )
     @test first(uniform.times) == trajectory.tspan[1]
     @test last(uniform.times) == trajectory.final_time

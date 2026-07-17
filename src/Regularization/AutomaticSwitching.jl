@@ -1250,8 +1250,9 @@ bounded perturbed Levi-Civita physical-time targeting. Exact segment boundaries
 return the stored handoff states without interpolation, so entry and exit epochs
 are represented consistently across adjacent segments.
 
-`regularized_kwargs` is a named tuple forwarded only when a time strictly inside
-a regularized segment requires physical-time inversion.
+`regularized_kwargs` configures inversion of physical time within the retained
+regularized dense solution. The supported keys are `tolerance` and
+`max_iterations`; evaluator calls never reintegrate the segment.
 """
 function experimental_switching_state(
     trajectory::ExperimentalSwitchingTrajectory,
@@ -1269,20 +1270,20 @@ function experimental_switching_state(
             segment.location.simulation.solution(target),
         )
     elseif segment isa AutomaticRegularizedSegment
-        if !isempty(regularized_kwargs)
-            reconstructed = perturbed_levi_civita_state_at_time(
-                segment.location.problem,
-                target;
-                regularized_kwargs...,
-            )
-            return Vector{eltype(trajectory.final_state)}(reconstructed.physical_state)
-        end
+        supported_keys = (:tolerance, :max_iterations)
+        unsupported_keys = setdiff(keys(regularized_kwargs), supported_keys)
+        isempty(unsupported_keys) || throw(ArgumentError(
+            "unsupported regularized evaluation keyword(s): " *
+            join(string.(unsupported_keys), ", ") *
+            "; supported keywords are tolerance and max_iterations.",
+        ))
 
         result = segment.location.regularized_result
         endpoint_s = segment.location.fictitious_time
         T = eltype(trajectory.final_state)
+        default_tolerance = T(100) * eps(T)
         tolerance = haskey(regularized_kwargs, :tolerance) ?
-            T(regularized_kwargs.tolerance) : sqrt(eps(T))
+            T(regularized_kwargs.tolerance) : default_tolerance
         max_iterations = haskey(regularized_kwargs, :max_iterations) ?
             Int(regularized_kwargs.max_iterations) : 256
         isfinite(tolerance) && tolerance > zero(T) ||
