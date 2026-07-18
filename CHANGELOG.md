@@ -2,6 +2,10 @@
 
 ## 0.4.0-DEV
 
+- Documented stable, development, experimental, and internal API tiers in
+  `API_STABILITY.md` without changing implementation behaviour.
+- Clarified that the production `simulate` interface remains separate from the
+  experimental automatic-switching controller.
 - Added reversible mass-weighted pair-centred coordinates as the first regularization building block.
 - Added ordered-pair orientation, third-body metadata, Float64/BigFloat round-trip tests, and the v0.4 regularization design specification.
 - No integration equations or existing simulation behaviour changed in Stage 1.
