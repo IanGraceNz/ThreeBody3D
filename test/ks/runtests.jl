@@ -966,3 +966,68 @@ end
     y[17:19].=ri
     @test_throws DomainError ThreeBody3D.ks_three_body_rhs(y,p)
 end
+
+@testset "Explicit KS regularized segment" begin
+    system = ThreeBodySystem((1.0, 0.4, 0.2))
+    state = statevector(
+        SVector(-0.3,0.0,0.0), SVector(0.0,-0.45,0.08),
+        SVector(0.7,0.0,0.0), SVector(0.0,0.65,-0.12),
+        SVector(6.0,1.0,0.5), SVector(-0.03,0.02,0.01),
+    )
+    segment = ThreeBody3D.propagate_ks_segment(
+        system, state, (1,2), 0.0, 0.2; reltol=1e-13, abstol=1e-13,
+    )
+    @test segment.start_time == 0.0
+    @test segment.end_time == 0.2
+    @test segment.ks_result.solution === segment.ks_result.solution
+    @test segment.ks_result.solution.u[end][10] ≈ 0.2 atol=5e-14
+    @test segment(0.0) == state
+    @test segment(0.2) == segment.exit_state
+    @test length(segment.times) == length(segment.states) == length(segment.ks_result.solution.t)
+    @test issorted(segment.times)
+
+    for index in eachindex(segment.times)
+        @test segment(segment.times[index]) ≈ segment.states[index] rtol=3e-10 atol=3e-11
+    end
+    midpoint = 0.1
+    first_eval = segment(midpoint)
+    second_eval = segment(midpoint)
+    @test first_eval == second_eval
+    direct = simulate(system, state, (0.0, midpoint); solver=:accurate, reltol=1e-13, abstol=1e-13)
+    @test first_eval ≈ direct.solution(midpoint) rtol=3e-10 atol=3e-11
+    @test segment.diagnostics.entry_transition.state_residual <= 5e-15
+    @test segment.diagnostics.exit_transition.state_residual <= 5e-15
+    @test segment.diagnostics.maximum_scaled_constraint_residual <= 5e-10
+    @test segment.diagnostics.maximum_relative_energy_drift <= 5e-10
+    @test segment.diagnostics.minimum_nonselected_separation > 1.0
+    @test segment.diagnostics.solver_statistics.saved_states == length(segment.ks_result.solution.t)
+end
+
+@testset "Explicit KS segment precision and validation" begin
+    for T in (Float32, Float64, BigFloat)
+        system = ThreeBodySystem((T(1), T(0.5), T(0.25)); G=T(1))
+        state = statevector(
+            SVector{3,T}(-1,0,0), SVector{3,T}(0,-T(0.2),0),
+            SVector{3,T}(1,0,0), SVector{3,T}(0,T(0.4),0),
+            SVector{3,T}(5,1,0), SVector{3,T}(0,0,0),
+        )
+        segment = ThreeBody3D.propagate_ks_segment(system, state, (1,2), T(0), T(0.02))
+        @test eltype(segment.exit_state) === T
+        @test eltype(segment(T(0.01))) === T
+    end
+    system = ThreeBodySystem((1.0,1.0,1.0))
+    state = statevector(SVector(-1.0,0,0),zeros(3),SVector(1.0,0,0),zeros(3),SVector(4.0,0,0),zeros(3))
+    @test_throws ArgumentError ThreeBody3D.propagate_ks_segment(system,state,(1,2),1.0,0.5)
+    @test_throws ArgumentError ThreeBody3D.propagate_ks_segment(system,state,(1,2),0.0,0.0)
+    segment = ThreeBody3D.propagate_ks_segment(system,state,(1,2),0.0,0.02)
+    @test_throws ArgumentError segment(-0.01)
+    @test_throws ArgumentError segment(0.03)
+    @test_throws ArgumentError ThreeBody3D.propagate_ks_segment(
+        system,state,(1,2),0.0,0.02; nonselected_threshold=-1.0,
+    )
+    close_state = copy(state)
+    close_state[13:15] .= close_state[1:3] .+ [1e-3,0.0,0.0]
+    @test_throws DomainError ThreeBody3D.propagate_ks_segment(
+        system, close_state, (1,2), 0.0, 0.02; nonselected_threshold=2e-3,
+    )
+end
