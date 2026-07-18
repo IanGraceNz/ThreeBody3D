@@ -304,3 +304,42 @@ end
 println()
 println("For the full collision-ejection animation, run:")
 println("  animate_collision_ejection_reference()")
+
+include(joinpath(@__DIR__, "AcceptanceCriteria.jl"))
+
+const TRIPLE_COLLISION_POSITION_ERROR_LIMIT = 1e-10
+const TRIPLE_COLLISION_VELOCITY_ERROR_LIMIT = 1e-9
+const TRIPLE_COLLISION_EVENT_SEPARATION_RELATIVE_LIMIT = 1e-6
+
+triple_collision_criteria = (
+    validation_criterion(
+        "integration terminated at close-approach event",
+        terminated_by_close_approach(numerical),
+        "== true",
+        terminated_by_close_approach(numerical),
+    ),
+    validation_criterion(
+        "event-separation relative residual",
+        abs(event.separation - CLOSE_APPROACH_THRESHOLD) / CLOSE_APPROACH_THRESHOLD,
+        "<= $(TRIPLE_COLLISION_EVENT_SEPARATION_RELATIVE_LIMIT)",
+        abs(event.separation - CLOSE_APPROACH_THRESHOLD) / CLOSE_APPROACH_THRESHOLD <=
+            TRIPLE_COLLISION_EVENT_SEPARATION_RELATIVE_LIMIT,
+    ),
+    validation_criterion(
+        "maximum scaled position error",
+        maximum_scaled_position_error,
+        "<= $(TRIPLE_COLLISION_POSITION_ERROR_LIMIT)",
+        maximum_scaled_position_error <= TRIPLE_COLLISION_POSITION_ERROR_LIMIT,
+    ),
+    validation_criterion(
+        "maximum scaled velocity error",
+        maximum_scaled_velocity_error,
+        "<= $(TRIPLE_COLLISION_VELOCITY_ERROR_LIMIT)",
+        maximum_scaled_velocity_error <= TRIPLE_COLLISION_VELOCITY_ERROR_LIMIT,
+    ),
+)
+
+validate_acceptance_criteria(
+    "Equilateral triple-collision validation acceptance criteria",
+    triple_collision_criteria,
+)

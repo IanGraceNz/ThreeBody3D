@@ -246,3 +246,31 @@ function run_randomized_regression_validation(;
 end
 
 randomized_validation = run_randomized_regression_validation()
+
+include(joinpath(@__DIR__, "AcceptanceCriteria.jl"))
+
+randomized_criteria = (
+    validation_criterion(
+        "completed integrations",
+        randomized_validation.completed,
+        "== $(randomized_validation.trials)",
+        randomized_validation.completed == randomized_validation.trials,
+    ),
+    validation_criterion(
+        "finite trajectories",
+        randomized_validation.finite,
+        "== $(randomized_validation.trials)",
+        randomized_validation.finite == randomized_validation.trials,
+    ),
+    validation_criterion(
+        "trials within validation limits",
+        randomized_validation.passing,
+        "== $(randomized_validation.trials)",
+        randomized_validation.passing == randomized_validation.trials,
+    ),
+)
+
+validate_acceptance_criteria(
+    "Randomized-regression validation acceptance criteria",
+    randomized_criteria,
+)

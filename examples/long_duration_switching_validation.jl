@@ -36,3 +36,68 @@ trajectory.status == :completed || error(
 
 report = diagnostics_report(trajectory; dt=0.02)
 println(report)
+
+include(joinpath(@__DIR__, "validation", "AcceptanceCriteria.jl"))
+
+const SWITCHING_ENERGY_DRIFT_LIMIT = 1e-5
+const SWITCHING_MOMENTUM_DRIFT_LIMIT = 1e-12
+const SWITCHING_ANGULAR_MOMENTUM_DRIFT_LIMIT = 1e-12
+const SWITCHING_COM_RESIDUAL_LIMIT = 1e-12
+const SWITCHING_TRANSITION_STATE_RESIDUAL_LIMIT = 1e-12
+const SWITCHING_TRANSITION_ENERGY_JUMP_LIMIT = 1e-12
+
+switching_criteria = (
+    validation_criterion(
+        "trajectory completed",
+        trajectory.status,
+        "== completed",
+        trajectory.status == :completed,
+    ),
+    validation_criterion(
+        "expected number of representation switches",
+        report.switch_count,
+        "== 2",
+        report.switch_count == 2,
+    ),
+    validation_criterion(
+        "maximum relative energy drift",
+        report.maximum_relative_energy_drift,
+        "<= $(SWITCHING_ENERGY_DRIFT_LIMIT)",
+        report.maximum_relative_energy_drift <= SWITCHING_ENERGY_DRIFT_LIMIT,
+    ),
+    validation_criterion(
+        "maximum momentum drift",
+        report.maximum_linear_momentum_drift,
+        "<= $(SWITCHING_MOMENTUM_DRIFT_LIMIT)",
+        report.maximum_linear_momentum_drift <= SWITCHING_MOMENTUM_DRIFT_LIMIT,
+    ),
+    validation_criterion(
+        "maximum angular-momentum drift",
+        report.maximum_angular_momentum_drift,
+        "<= $(SWITCHING_ANGULAR_MOMENTUM_DRIFT_LIMIT)",
+        report.maximum_angular_momentum_drift <= SWITCHING_ANGULAR_MOMENTUM_DRIFT_LIMIT,
+    ),
+    validation_criterion(
+        "maximum centre-of-mass residual",
+        report.maximum_center_of_mass_residual,
+        "<= $(SWITCHING_COM_RESIDUAL_LIMIT)",
+        report.maximum_center_of_mass_residual <= SWITCHING_COM_RESIDUAL_LIMIT,
+    ),
+    validation_criterion(
+        "maximum transition state residual",
+        report.maximum_transition_state_residual,
+        "<= $(SWITCHING_TRANSITION_STATE_RESIDUAL_LIMIT)",
+        report.maximum_transition_state_residual <= SWITCHING_TRANSITION_STATE_RESIDUAL_LIMIT,
+    ),
+    validation_criterion(
+        "maximum transition energy jump",
+        report.maximum_transition_energy_jump,
+        "<= $(SWITCHING_TRANSITION_ENERGY_JUMP_LIMIT)",
+        report.maximum_transition_energy_jump <= SWITCHING_TRANSITION_ENERGY_JUMP_LIMIT,
+    ),
+)
+
+validate_acceptance_criteria(
+    "Automatic-switching validation acceptance criteria",
+    switching_criteria,
+)

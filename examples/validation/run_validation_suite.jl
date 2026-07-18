@@ -34,6 +34,11 @@ const VALIDATION_SUITE_ENTRIES = (
         joinpath(@__DIR__, "..", "long_duration_switching_validation.jl"),
     ),
     ValidationSuiteEntry(
+        :close_encounter_comparison,
+        "Independent high-precision validation of close-encounter regularization",
+        joinpath(@__DIR__, "close_encounter_comparison.jl"),
+    ),
+    ValidationSuiteEntry(
         :equilateral_triple_collision_reference,
         "Analytic homothetic reference approaching a triple collision",
         joinpath(@__DIR__, "equilateral_triple_collision_reference.jl"),

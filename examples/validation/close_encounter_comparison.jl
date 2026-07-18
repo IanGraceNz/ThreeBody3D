@@ -672,3 +672,111 @@ println("Regularized endpoint physical-time consistency")
 @printf("  explicit stored Sundman time:           %.17g\n", endpoint_times.explicit_solution_time)
 @printf("  automatic Sundman-time residual:         %.3e\n", endpoint_times.automatic_time_residual)
 @printf("  explicit Sundman-time residual:          %.3e\n", endpoint_times.explicit_time_residual)
+
+
+function validate_close_encounter_comparison(
+    cartesian,
+    automatic,
+    explicit,
+    exit_difference,
+    reference_periapsis,
+    periapses,
+    endpoint_times,
+)
+    periapsis_by_name = Dict(item.name => item.result for item in periapses)
+    automatic_periapsis = periapsis_by_name["Automatic switching"]
+    explicit_periapsis = periapsis_by_name["Explicit regularized"]
+    cartesian_periapsis = periapsis_by_name["Cartesian"]
+
+    checks = (
+        (
+            "automatic maximum state error",
+            automatic.errors.maximum_combined <= 1.0e-9,
+            automatic.errors.maximum_combined,
+            "<= 1e-9",
+        ),
+        (
+            "explicit maximum state error",
+            explicit.errors.maximum_combined <= 1.0e-9,
+            explicit.errors.maximum_combined,
+            "<= 1e-9",
+        ),
+        (
+            "automatic-explicit exit-state agreement",
+            exit_difference.state <= 1.0e-10,
+            exit_difference.state,
+            "<= 1e-10",
+        ),
+        (
+            "explicit Sundman exit-time residual",
+            abs(endpoint_times.explicit_time_residual) <= 5.0e-12,
+            abs(endpoint_times.explicit_time_residual),
+            "<= 5e-12",
+        ),
+        (
+            "automatic periapsis separation error",
+            abs(Float64(
+                automatic_periapsis.separation - reference_periapsis.separation,
+            )) <= 1.0e-10,
+            abs(Float64(
+                automatic_periapsis.separation - reference_periapsis.separation,
+            )),
+            "<= 1e-10",
+        ),
+        (
+            "explicit periapsis separation error",
+            abs(Float64(
+                explicit_periapsis.separation - reference_periapsis.separation,
+            )) <= 1.0e-10,
+            abs(Float64(
+                explicit_periapsis.separation - reference_periapsis.separation,
+            )),
+            "<= 1e-10",
+        ),
+        (
+            "Cartesian under-resolution is exposed",
+            abs(Float64(
+                cartesian_periapsis.separation - reference_periapsis.separation,
+            )) >= 1.0e-3,
+            abs(Float64(
+                cartesian_periapsis.separation - reference_periapsis.separation,
+            )),
+            ">= 1e-3",
+        ),
+        (
+            "automatic regularization improves maximum state error",
+            automatic.errors.maximum_combined <= 0.5 * cartesian.errors.maximum_combined,
+            automatic.errors.maximum_combined / cartesian.errors.maximum_combined,
+            "<= 0.5 times Cartesian",
+        ),
+    )
+
+    println()
+    println("Close-encounter validation acceptance criteria")
+    for (name, passed, value, criterion) in checks
+        @printf(
+            "  %-52s %4s  value=%10.3e  criterion %s\n",
+            name,
+            passed ? "PASS" : "FAIL",
+            value,
+            criterion,
+        )
+    end
+
+    failures = filter(check -> !check[2], checks)
+    isempty(failures) || error(
+        "Close-encounter validation failed $(length(failures)) acceptance criterion/criteria.",
+    )
+
+    nothing
+end
+
+validate_close_encounter_comparison(
+    cartesian,
+    automatic,
+    explicit,
+    exit_difference,
+    reference_periapsis,
+    periapses,
+    endpoint_times,
+)
