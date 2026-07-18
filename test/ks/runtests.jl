@@ -595,3 +595,123 @@ end
     @test_throws ArgumentError ThreeBody3D.ks_energy_consistency_residual(zeros(4), zeros(4), Inf, 1.0)
     @test_throws ArgumentError ThreeBody3D.ks_energy_consistency_residual(zeros(4), zeros(4), 1.0, NaN)
 end
+
+@testset "KS unperturbed state and RHS" begin
+    mu = 2.0
+    q = SVector(1.5, -0.4, 0.8)
+    v = SVector(-0.2, 0.7, 0.3)
+    problem = ThreeBody3D.KSTwoBodyProblem(mu, q, v; initial_time=1.25)
+    y0 = ThreeBody3D.ks_initial_state(problem)
+    u, w, h, t = ThreeBody3D.ks_unpack_state(y0)
+    rhs = ThreeBody3D.ks_unperturbed_rhs(y0)
+
+    @test u == problem.u0
+    @test w == problem.w0
+    @test h == problem.binding_energy
+    @test t == problem.initial_time
+    @test SVector{4,Float64}(rhs[1:4]) == w
+    @test SVector{4,Float64}(rhs[5:8]) ≈ -(h / 2) * u
+    @test rhs[9] == 0.0
+    @test rhs[10] == dot(u, u)
+    @test ThreeBody3D.ks_energy_consistency_residual(u, w, h, mu) <= 1000eps(Float64)
+    @test ThreeBody3D.ks_scaled_constraint_residual(u, w) <= 1000eps(Float64)
+
+    q2, v2, t2 = ThreeBody3D.ks_cartesian_state(y0)
+    @test q2 ≈ q
+    @test v2 ≈ v
+    @test t2 == 1.25
+end
+
+@testset "KS exact unperturbed propagation" begin
+    cases = (
+        (SVector(1.0, 0.0, 0.0), SVector(0.0, 1.0, 0.0)),
+        (SVector(1.0, 0.0, 0.0), SVector(0.0, 0.6, 0.35)),
+        (SVector(1.0, 0.0, 0.0), SVector(0.0, 1.8, 0.4)),
+        (SVector(1.0, 0.0, 0.0), SVector(0.0, 0.0, 0.0)),
+    )
+    for (q, v) in cases
+        problem = ThreeBody3D.KSTwoBodyProblem(1.0, q, v)
+        for s in (0.0, 0.15, 0.7)
+            u, w, h, t = ThreeBody3D.ks_exact_state(problem, s)
+            @test isfinite(t)
+            @test h == problem.binding_energy
+            @test ThreeBody3D.ks_scaled_constraint_residual(u, w) <= 3000eps(Float64)
+            @test ThreeBody3D.ks_energy_consistency_residual(u, w, h, 1.0) <= 5000eps(Float64)
+        end
+    end
+end
+
+@testset "KS numerical unperturbed integration" begin
+    problem = ThreeBody3D.KSTwoBodyProblem(
+        1.0, SVector(1.2, -0.3, 0.7), SVector(-0.1, 0.55, 0.25); initial_time=0.4)
+    result = ThreeBody3D.integrate_ks_two_body(problem, (0.0, 3.0); saveat=0.1)
+    for s in (0.0, 0.3, 1.1, 2.7, 3.0)
+        u, w, h, t = ThreeBody3D.ks_state(result, s)
+        ue, we, he, te = ThreeBody3D.ks_exact_state(problem, s)
+        @test u ≈ ue rtol=2e-10 atol=2e-11
+        @test w ≈ we rtol=2e-10 atol=2e-11
+        @test h ≈ he rtol=2e-12 atol=2e-12
+        @test t ≈ te rtol=3e-10 atol=3e-11
+        @test ThreeBody3D.ks_scaled_constraint_residual(u, w) <= 2e-10
+        @test ThreeBody3D.ks_energy_consistency_residual(u, w, h, 1.0) <= 2e-10
+    end
+end
+
+@testset "KS physical final-time targeting" begin
+    problem = ThreeBody3D.KSTwoBodyProblem(
+        1.0, SVector(1.0, 0.0, 0.0), SVector(0.0, 0.8, 0.3); initial_time=2.0)
+    for target in (1.7, 2.4, 3.2)
+        s = ThreeBody3D.ks_fictitious_time(problem, target)
+        _, _, _, exact_time = ThreeBody3D.ks_exact_state(problem, s)
+        @test exact_time ≈ target rtol=2e-12 atol=2e-12
+    end
+    result = ThreeBody3D.integrate_ks_two_body_to_time(problem, 2.75)
+    @test result.solution.u[end][10] ≈ 2.75 rtol=2e-10 atol=2e-11
+end
+
+@testset "KS radial collision continuation" begin
+    problem = ThreeBody3D.KSTwoBodyProblem(1.0, SVector(1.0, 0.0, 0.0), zeros(3))
+    collision_s = pi / sqrt(2.0)
+    uc, wc, hc, tc = ThreeBody3D.ks_exact_state(problem, collision_s)
+    @test norm(uc) <= 2e-15
+    @test all(isfinite, wc)
+    @test isfinite(hc)
+    @test isfinite(tc)
+    @test ThreeBody3D.ks_energy_consistency_residual(uc, wc, hc, 1.0) <= 1000eps(Float64)
+
+    before = ThreeBody3D.ks_exact_state(problem, collision_s - 1e-3)
+    after = ThreeBody3D.ks_exact_state(problem, collision_s + 1e-3)
+    @test ThreeBody3D.ks_position(before[1]) ≈ ThreeBody3D.ks_position(after[1]) rtol=1e-10
+    @test all(isfinite, after[1]) && all(isfinite, after[2])
+    @test_throws DomainError ThreeBody3D.ks_to_cartesian_velocity(zeros(4), wc)
+
+    result = ThreeBody3D.integrate_ks_two_body(problem, (0.0, collision_s + 0.2);
+        tstops=[collision_s], reltol=1e-13, abstol=1e-13)
+    u_after, w_after, _, _ = ThreeBody3D.ks_state(result, collision_s + 0.1)
+    ue_after, we_after, _, _ = ThreeBody3D.ks_exact_state(problem, collision_s + 0.1)
+    @test u_after ≈ ue_after rtol=2e-10 atol=2e-11
+    @test w_after ≈ we_after rtol=2e-10 atol=2e-11
+end
+
+@testset "KS dynamics precision and validation" begin
+    for T in (Float32, Float64, BigFloat)
+        problem = ThreeBody3D.KSTwoBodyProblem(T(1), SVector{3,T}(1,0,0), SVector{3,T}(0,1,0))
+        y = ThreeBody3D.ks_initial_state(problem)
+        rhs = ThreeBody3D.ks_unperturbed_rhs(y)
+        state = ThreeBody3D.ks_exact_state(problem, T(0.2))
+        @test eltype(y) == T
+        @test eltype(rhs) == T
+        @test eltype(state[1]) == T
+        @test state[3] isa T
+        @test state[4] isa T
+    end
+
+    @test_throws ArgumentError ThreeBody3D.KSTwoBodyProblem(0.0, ones(3), zeros(3))
+    @test_throws ArgumentError ThreeBody3D.KSTwoBodyProblem(1.0, ones(2), zeros(3))
+    @test_throws DomainError ThreeBody3D.KSTwoBodyProblem(1.0, zeros(3), zeros(3))
+    @test_throws ArgumentError ThreeBody3D.ks_pack_state(zeros(3), zeros(4), 1.0, 0.0)
+    @test_throws ArgumentError ThreeBody3D.ks_unpack_state(zeros(9))
+    @test_throws ArgumentError ThreeBody3D.ks_unperturbed_rhs([zeros(9); NaN])
+    @test_throws ArgumentError ThreeBody3D.integrate_ks_two_body(
+        ThreeBody3D.KSTwoBodyProblem(1.0, ones(3), zeros(3)), (0.0, 0.0))
+end

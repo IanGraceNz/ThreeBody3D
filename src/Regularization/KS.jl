@@ -4,3 +4,5 @@
 # governed by KS_REGULARIZATION_DESIGN.md.
 include("KSTransforms.jl")
 include("KSDiagnostics.jl")
+
+include("KSDynamics.jl")
