@@ -209,3 +209,166 @@ end
     @test_throws ArgumentError ThreeBody3D.align_ks_gauge(zeros(4), zeros(4), zeros(3))
     @test_throws ArgumentError ThreeBody3D.align_ks_gauge(zeros(4), zeros(4), [0.0, 0.0, Inf, 0.0])
 end
+
+@testset "KS deterministic inverse position lift" begin
+    fixtures = (
+        SVector(1.0, 0.0, 0.0),
+        SVector(-1.0, 0.0, 0.0),
+        SVector(0.0, 1.0, 0.0),
+        SVector(0.0, 0.0, 1.0),
+        SVector(3.0, -4.0, 12.0),
+        SVector(-7.0, 2.5, -1.25),
+        SVector(1.0e-18, -2.0e-18, 3.0e-18),
+        SVector(-1.0e18, 2.0e17, -3.0e17),
+    )
+
+    for q in fixtures
+        u = ThreeBody3D.cartesian_to_ks_position(q)
+        rho = norm(q)
+        tolerance = 2000eps(Float64)
+        @test isapprox(
+            ThreeBody3D.ks_position(u),
+            q;
+            rtol=tolerance,
+            atol=tolerance * max(rho, 1.0),
+        )
+        @test isapprox(
+            ThreeBody3D.ks_radius(u),
+            rho;
+            rtol=tolerance,
+            atol=tolerance * max(rho, 1.0),
+        )
+    end
+
+    positive_axis = ThreeBody3D.cartesian_to_ks_position(SVector(9.0, 0.0, 0.0))
+    @test positive_axis == SVector(0.0, -0.0, 0.0, -3.0)
+
+    negative_axis = ThreeBody3D.cartesian_to_ks_position(SVector(-9.0, 0.0, 0.0))
+    @test negative_axis == SVector(0.0, 3.0, 0.0, 0.0)
+
+    positive_chart = ThreeBody3D.cartesian_to_ks_position(SVector(0.25, 2.0, -3.0))
+    negative_chart = ThreeBody3D.cartesian_to_ks_position(SVector(-0.25, 2.0, -3.0))
+    @test iszero(positive_chart[1])
+    @test iszero(negative_chart[3])
+end
+
+@testset "KS inverse lift axis robustness" begin
+    scales = (1.0e-12, 1.0, 1.0e12)
+    offsets = (0.0, 1.0e-12, -1.0e-12, 1.0e-8, -1.0e-8)
+
+    for scale in scales, offset in offsets
+        q_positive = SVector(scale, scale * offset, -2scale * offset)
+        q_negative = SVector(-scale, scale * offset, -2scale * offset)
+        for q in (q_positive, q_negative)
+            u = ThreeBody3D.cartesian_to_ks_position(q)
+            tolerance = 5000eps(Float64)
+            @test all(isfinite, u)
+            @test isapprox(
+                ThreeBody3D.ks_position(u),
+                q;
+                rtol=tolerance,
+                atol=tolerance * max(norm(q), 1.0),
+            )
+        end
+    end
+
+    boundary_vectors = (
+        SVector(0.0, 1.0, 2.0),
+        SVector(eps(Float64), 1.0, 2.0),
+        SVector(-eps(Float64), 1.0, 2.0),
+    )
+    for q in boundary_vectors
+        u = ThreeBody3D.cartesian_to_ks_position(q)
+        @test isapprox(
+            ThreeBody3D.ks_position(u),
+            q;
+            rtol=5000eps(Float64),
+            atol=5000eps(Float64) * norm(q),
+        )
+    end
+end
+
+@testset "KS inverse lift reference alignment" begin
+    q = SVector(-2.5, 1.75, 0.625)
+    candidate = ThreeBody3D.cartesian_to_ks_position(q)
+    reference = ThreeBody3D.ks_gauge_transform(candidate, 1.234)
+    aligned = ThreeBody3D.cartesian_to_ks_position(q; reference=reference)
+    tolerance = 2000eps(Float64)
+
+    @test norm(aligned - reference) <= tolerance * max(norm(reference), 1.0)
+    @test norm(aligned - reference) <= norm(candidate - reference)
+    @test isapprox(
+        ThreeBody3D.ks_position(aligned),
+        q;
+        rtol=tolerance,
+        atol=tolerance * max(norm(q), 1.0),
+    )
+
+    opposite = -reference
+    aligned_opposite = ThreeBody3D.cartesian_to_ks_position(q; reference=opposite)
+    @test norm(aligned_opposite - opposite) <= tolerance * max(norm(opposite), 1.0)
+
+    nearby_positions = (
+        q,
+        q + SVector(1.0e-10, -2.0e-10, 3.0e-10),
+        q + SVector(-2.0e-10, 1.0e-10, -1.0e-10),
+    )
+    previous = reference
+    for nearby in nearby_positions
+        current = ThreeBody3D.cartesian_to_ks_position(nearby; reference=previous)
+        @test dot(current, previous) >= zero(eltype(current))
+        @test isapprox(
+            ThreeBody3D.ks_position(current),
+            nearby;
+            rtol=5000eps(Float64),
+            atol=5000eps(Float64) * max(norm(nearby), 1.0),
+        )
+        previous = current
+    end
+end
+
+@testset "KS inverse lift precision and validation" begin
+    for T in (Float32, Float64, BigFloat)
+        q = SVector{3,T}(T(-3.25), T(1.5), T(-0.875))
+        candidate = ThreeBody3D.cartesian_to_ks_position(q)
+        phi = T === BigFloat ? big"0.918273645546372819" : T(0.9182736)
+        reference = ThreeBody3D.ks_gauge_transform(candidate, phi)
+        aligned = ThreeBody3D.cartesian_to_ks_position(q; reference=reference)
+        tolerance = T(5000) * eps(T)
+        rho = norm(q)
+
+        @test eltype(candidate) === T
+        @test eltype(aligned) === T
+        @test isapprox(
+            ThreeBody3D.ks_position(candidate),
+            q;
+            rtol=tolerance,
+            atol=tolerance * max(rho, one(T)),
+        )
+        @test isapprox(
+            ThreeBody3D.ks_radius(candidate),
+            rho;
+            rtol=tolerance,
+            atol=tolerance * max(rho, one(T)),
+        )
+        @test norm(aligned - reference) <= tolerance * max(norm(reference), one(T))
+    end
+
+    mixed = ThreeBody3D.cartesian_to_ks_position(
+        Float32[-1, 2, 3];
+        reference=BigFloat[0, 1, 0, 0],
+    )
+    @test eltype(mixed) === BigFloat
+
+    @test_throws ArgumentError ThreeBody3D.cartesian_to_ks_position([1.0, 2.0])
+    @test_throws ArgumentError ThreeBody3D.cartesian_to_ks_position([1.0, 2.0, Inf])
+    @test_throws DomainError ThreeBody3D.cartesian_to_ks_position(zeros(3))
+    @test_throws ArgumentError ThreeBody3D.cartesian_to_ks_position(
+        ones(3);
+        reference=zeros(3),
+    )
+    @test_throws ArgumentError ThreeBody3D.cartesian_to_ks_position(
+        ones(3);
+        reference=[0.0, 0.0, NaN, 0.0],
+    )
+end

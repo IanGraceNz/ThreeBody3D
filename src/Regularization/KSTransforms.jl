@@ -188,3 +188,69 @@ function align_ks_gauge(
     phi = atan(b, a)
     ks_gauge_transform(uv, wv, phi)
 end
+
+"""
+    cartesian_to_ks_position(q; reference=nothing)
+
+Lift a nonzero three-dimensional Cartesian relative position `q` to the
+fixed classical KS1 coordinate convention.
+
+The deterministic two-chart construction selects the chart with the larger
+analytic denominator. When `reference` is supplied, the resulting coordinate
+is aligned over the complete gauge fiber with that prior KS representative.
+Exact Cartesian collision is rejected because a history-free inverse lift is
+not defined there.
+"""
+function cartesian_to_ks_position(
+    q::AbstractVector{<:Real};
+    reference::Union{Nothing,AbstractVector{<:Real}}=nothing,
+)
+    length(q) == 3 || throw(ArgumentError("q must contain three components."))
+    reference === nothing || length(reference) == 4 ||
+        throw(ArgumentError("reference must contain four components."))
+
+    T = reference === nothing ?
+        float(eltype(q)) :
+        float(promote_type(eltype(q), eltype(reference)))
+    qv = SVector{3,T}(q)
+    all(isfinite, qv) || throw(ArgumentError("q must be finite."))
+
+    reference_v = if reference === nothing
+        nothing
+    else
+        value = SVector{4,T}(reference)
+        all(isfinite, value) || throw(ArgumentError("reference must be finite."))
+        value
+    end
+
+    x, y, z = qv
+    rho = norm(qv)
+    iszero(rho) && throw(DomainError(qv, "a Cartesian-to-KS lift is undefined at exact collision."))
+
+    two = T(2)
+    candidate = if x >= zero(T)
+        radicand = max(two * (rho + x), zero(T))
+        denominator = sqrt(radicand)
+        SVector{4,T}(
+            zero(T),
+            -z / denominator,
+            y / denominator,
+            -denominator / two,
+        )
+    else
+        radicand = max(two * (rho - x), zero(T))
+        denominator = sqrt(radicand)
+        SVector{4,T}(
+            y / denominator,
+            denominator / two,
+            zero(T),
+            z / denominator,
+        )
+    end
+
+    reference_v === nothing && return candidate
+
+    a = dot(candidate, reference_v)
+    b = dot(ks_gauge_direction(candidate), reference_v)
+    ks_gauge_transform(candidate, atan(b, a))
+end
