@@ -505,3 +505,93 @@ end
     @test_throws ArgumentError ThreeBody3D.cartesian_to_ks_state(ones(3), zeros(2))
     @test_throws DomainError ThreeBody3D.cartesian_to_ks_state(zeros(3), zeros(3))
 end
+
+@testset "KS transformation diagnostics" begin
+    u = SVector(1.0, 2.0, 3.0, 4.0)
+    q = ThreeBody3D.ks_position(u)
+    v = SVector(-0.5, 1.25, 0.75)
+    w = ThreeBody3D.cartesian_to_ks_velocity(u, v)
+    mu = 7.0
+    h = (mu - 2dot(w, w)) / dot(u, u)
+    tolerance = 5000eps(Float64)
+
+    @test ThreeBody3D.ks_radial_identity_residual(SVector(1.0, 0.0, 0.0, 0.0)) == 0.0
+    @test ThreeBody3D.ks_jacobian_identity_residual(SVector(1.0, 0.0, 0.0, 0.0)) == 0.0
+    @test ThreeBody3D.ks_scaled_constraint_residual(u, w) <= tolerance
+    @test ThreeBody3D.ks_position_roundtrip_residual(q) <= tolerance
+    @test ThreeBody3D.ks_velocity_roundtrip_residual(q, v) <= tolerance
+    @test ThreeBody3D.ks_energy_consistency_residual(u, w, h, mu) <= tolerance
+
+    corrupted_w = w + 0.25 * ThreeBody3D.ks_gauge_direction(u)
+    corrupted_h = h + 0.5
+    @test ThreeBody3D.ks_scaled_constraint_residual(u, corrupted_w) > 1.0e-3
+    @test ThreeBody3D.ks_energy_consistency_residual(u, w, corrupted_h, mu) > 1.0e-3
+
+    collision_w = SVector(sqrt(mu / 2), 0.0, 0.0, 0.0)
+    @test isfinite(ThreeBody3D.ks_energy_consistency_residual(zeros(4), collision_w, 3.0, mu))
+    @test ThreeBody3D.ks_energy_consistency_residual(zeros(4), collision_w, 3.0, mu) <= tolerance
+end
+
+@testset "KS diagnostic scaling and precision" begin
+    for T in (Float32, Float64, BigFloat)
+        tolerance = T(12000) * eps(T)
+        for scale in (T(1.0e-12), one(T), T(1.0e12))
+            u = scale * SVector{4,T}(T(0.7), T(-1.1), T(0.4), T(1.3))
+            q = ThreeBody3D.ks_position(u)
+            v = SVector{3,T}(T(-0.6), T(1.4), T(0.25))
+            w = ThreeBody3D.cartesian_to_ks_velocity(u, v)
+            mu = T(2.75)
+            h = (mu - T(2) * dot(w, w)) / dot(u, u)
+
+            @test ThreeBody3D.ks_radial_identity_residual(u) <= tolerance
+            @test ThreeBody3D.ks_jacobian_identity_residual(u) <= tolerance
+            @test ThreeBody3D.ks_scaled_constraint_residual(u, w) <= tolerance
+            @test ThreeBody3D.ks_position_roundtrip_residual(q) <= tolerance
+            @test ThreeBody3D.ks_velocity_roundtrip_residual(q, v) <= tolerance
+            @test ThreeBody3D.ks_energy_consistency_residual(u, w, h, mu) <= tolerance
+        end
+    end
+
+    mixed = ThreeBody3D.ks_energy_consistency_residual(
+        Float32[1, 0, 0, 0],
+        BigFloat[0, 0, 0, 0],
+        big"2.0",
+        big"2.0",
+    )
+    @test mixed isa BigFloat
+end
+
+@testset "KS diagnostic validation and immutability" begin
+    u = [0.7, -1.1, 0.4, 1.3]
+    w = [-0.2, 0.8, 1.1, -0.35]
+    q = [1.0, 2.0, 3.0]
+    v = [-0.5, 0.25, 1.5]
+    original_u = copy(u)
+    original_w = copy(w)
+    original_q = copy(q)
+    original_v = copy(v)
+
+    ThreeBody3D.ks_radial_identity_residual(u)
+    ThreeBody3D.ks_jacobian_identity_residual(u)
+    ThreeBody3D.ks_scaled_constraint_residual(u, w)
+    ThreeBody3D.ks_position_roundtrip_residual(q)
+    ThreeBody3D.ks_velocity_roundtrip_residual(q, v)
+    ThreeBody3D.ks_energy_consistency_residual(u, w, 1.0, 2.0)
+
+    @test u == original_u
+    @test w == original_w
+    @test q == original_q
+    @test v == original_v
+
+    @test_throws ArgumentError ThreeBody3D.ks_radial_identity_residual(zeros(3))
+    @test_throws ArgumentError ThreeBody3D.ks_jacobian_identity_residual([0.0, Inf, 0.0, 0.0])
+    @test_throws ArgumentError ThreeBody3D.ks_scaled_constraint_residual(zeros(4), zeros(3))
+    @test_throws ArgumentError ThreeBody3D.ks_scaled_constraint_residual(zeros(4), [0.0, NaN, 0.0, 0.0])
+    @test_throws ArgumentError ThreeBody3D.ks_position_roundtrip_residual(zeros(2))
+    @test_throws DomainError ThreeBody3D.ks_position_roundtrip_residual(zeros(3))
+    @test_throws ArgumentError ThreeBody3D.ks_velocity_roundtrip_residual(ones(3), zeros(2))
+    @test_throws DomainError ThreeBody3D.ks_velocity_roundtrip_residual(zeros(3), zeros(3))
+    @test_throws ArgumentError ThreeBody3D.ks_energy_consistency_residual(zeros(3), zeros(4), 1.0, 1.0)
+    @test_throws ArgumentError ThreeBody3D.ks_energy_consistency_residual(zeros(4), zeros(4), Inf, 1.0)
+    @test_throws ArgumentError ThreeBody3D.ks_energy_consistency_residual(zeros(4), zeros(4), 1.0, NaN)
+end
