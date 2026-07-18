@@ -48,6 +48,31 @@ const VALIDATION_SUITE_ENTRIES = (
         "Deterministic-seed randomized robustness validation",
         joinpath(@__DIR__, "randomized_regression_validation.jl"),
     ),
+    ValidationSuiteEntry(
+        :ks_kepler,
+        "Exact isolated Kepler propagation in KS coordinates",
+        joinpath(@__DIR__, "ks_kepler_validation.jl"),
+    ),
+    ValidationSuiteEntry(
+        :ks_collision_continuation,
+        "Finite KS continuation through a radial binary collision",
+        joinpath(@__DIR__, "ks_collision_continuation.jl"),
+    ),
+    ValidationSuiteEntry(
+        :ks_levi_civita_comparison,
+        "Independent KS and Levi-Civita physical-state comparison",
+        joinpath(@__DIR__, "ks_levi_civita_comparison.jl"),
+    ),
+    ValidationSuiteEntry(
+        :ks_hierarchical_triple,
+        "Coupled pair-centred KS propagation in a hierarchical triple",
+        joinpath(@__DIR__, "ks_hierarchical_triple.jl"),
+    ),
+    ValidationSuiteEntry(
+        :ks_switching_comparison,
+        "Automatic-switching comparison between KS and Levi-Civita",
+        joinpath(@__DIR__, "ks_switching_comparison.jl"),
+    ),
 )
 
 function validation_command(path)
