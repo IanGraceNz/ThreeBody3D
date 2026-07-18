@@ -372,3 +372,136 @@ end
         reference=[0.0, 0.0, NaN, 0.0],
     )
 end
+
+@testset "KS velocity transformations" begin
+    fixtures = (
+        (SVector(3.0, -4.0, 12.0), SVector(-0.5, 1.25, 0.75)),
+        (SVector(-7.0, 2.5, -1.25), SVector(2.0, -0.25, 1.5)),
+        (SVector(1.0e-14, -2.0e-14, 3.0e-14), SVector(4.0, -5.0, 6.0)),
+        (SVector(-1.0e14, 2.0e13, -3.0e13), SVector(-2.0, 0.5, 3.0)),
+    )
+
+    for (q, v) in fixtures
+        u, w = ThreeBody3D.cartesian_to_ks_state(q, v)
+        tolerance = 5000eps(Float64)
+        @test isapprox(
+            ThreeBody3D.ks_position(u), q;
+            rtol=tolerance,
+            atol=tolerance * max(norm(q), 1.0),
+        )
+        @test isapprox(
+            ThreeBody3D.ks_to_cartesian_velocity(u, w), v;
+            rtol=tolerance,
+            atol=tolerance * max(norm(v), 1.0),
+        )
+        @test abs(ThreeBody3D.ks_constraint_residual(u, w)) <=
+            tolerance * max(norm(u) * norm(w), 1.0)
+    end
+end
+
+@testset "KS horizontal velocity projection" begin
+    u = SVector(0.7, -1.1, 0.4, 1.3)
+    v = SVector(-0.6, 1.4, 0.25)
+    w = ThreeBody3D.cartesian_to_ks_velocity(u, v)
+    reconstructed = ThreeBody3D.ks_to_cartesian_velocity(u, w)
+    tolerance = 2000eps(Float64)
+
+    @test isapprox(reconstructed, v; rtol=tolerance, atol=tolerance * norm(v))
+    @test abs(ThreeBody3D.ks_constraint_residual(u, w)) <=
+        tolerance * max(norm(u) * norm(w), 1.0)
+    @test isapprox(
+        ThreeBody3D.cartesian_to_ks_velocity(u, reconstructed),
+        w;
+        rtol=tolerance,
+        atol=tolerance * max(norm(w), 1.0),
+    )
+
+    arbitrary_w = SVector(-0.2, 0.8, 1.1, -0.35)
+    projected_w = ThreeBody3D.cartesian_to_ks_velocity(
+        u,
+        ThreeBody3D.ks_to_cartesian_velocity(u, arbitrary_w),
+    )
+    gauge = ThreeBody3D.ks_gauge_direction(u)
+    expected = arbitrary_w - gauge * (
+        dot(gauge, arbitrary_w) / dot(gauge, gauge)
+    )
+    @test isapprox(
+        projected_w,
+        expected;
+        rtol=tolerance,
+        atol=tolerance * max(norm(expected), 1.0),
+    )
+    @test abs(ThreeBody3D.ks_constraint_residual(u, projected_w)) <=
+        tolerance * max(norm(u) * norm(projected_w), 1.0)
+end
+
+@testset "KS velocity gauge invariance" begin
+    q = SVector(-2.5, 1.75, 0.625)
+    v = SVector(0.4, -1.2, 2.1)
+    u, w = ThreeBody3D.cartesian_to_ks_state(q, v)
+    transformed_u, transformed_w = ThreeBody3D.ks_gauge_transform(u, w, 1.137)
+    tolerance = 3000eps(Float64)
+
+    @test isapprox(
+        ThreeBody3D.ks_position(transformed_u), q;
+        rtol=tolerance,
+        atol=tolerance * max(norm(q), 1.0),
+    )
+    @test isapprox(
+        ThreeBody3D.ks_to_cartesian_velocity(transformed_u, transformed_w), v;
+        rtol=tolerance,
+        atol=tolerance * max(norm(v), 1.0),
+    )
+
+    reference = ThreeBody3D.ks_gauge_transform(u, -0.83)
+    aligned_u, aligned_w = ThreeBody3D.cartesian_to_ks_state(q, v; reference=reference)
+    @test norm(aligned_u - reference) <= tolerance * max(norm(reference), 1.0)
+    @test isapprox(
+        ThreeBody3D.ks_to_cartesian_velocity(aligned_u, aligned_w), v;
+        rtol=tolerance,
+        atol=tolerance * max(norm(v), 1.0),
+    )
+end
+
+@testset "KS velocity precision and validation" begin
+    for T in (Float32, Float64, BigFloat)
+        q = SVector{3,T}(T(-3.25), T(1.5), T(-0.875))
+        v = SVector{3,T}(T(0.625), T(-1.125), T(2.25))
+        u, w = ThreeBody3D.cartesian_to_ks_state(q, v)
+        tolerance = T(8000) * eps(T)
+
+        @test eltype(u) === T
+        @test eltype(w) === T
+        @test eltype(ThreeBody3D.ks_to_cartesian_velocity(u, w)) === T
+        @test isapprox(
+            ThreeBody3D.ks_position(u), q;
+            rtol=tolerance,
+            atol=tolerance * max(norm(q), one(T)),
+        )
+        @test isapprox(
+            ThreeBody3D.ks_to_cartesian_velocity(u, w), v;
+            rtol=tolerance,
+            atol=tolerance * max(norm(v), one(T)),
+        )
+        @test abs(ThreeBody3D.ks_constraint_residual(u, w)) <=
+            tolerance * max(norm(u) * norm(w), one(T))
+    end
+
+    mixed_u, mixed_w = ThreeBody3D.cartesian_to_ks_state(
+        Float32[-1, 2, 3],
+        BigFloat[0.5, -1.0, 2.0],
+    )
+    @test eltype(mixed_u) === BigFloat
+    @test eltype(mixed_w) === BigFloat
+
+    @test_throws ArgumentError ThreeBody3D.cartesian_to_ks_velocity(zeros(3), zeros(3))
+    @test_throws ArgumentError ThreeBody3D.cartesian_to_ks_velocity(zeros(4), zeros(4))
+    @test_throws ArgumentError ThreeBody3D.cartesian_to_ks_velocity(zeros(4), [0.0, Inf, 0.0])
+    @test_throws ArgumentError ThreeBody3D.ks_to_cartesian_velocity(zeros(3), zeros(4))
+    @test_throws ArgumentError ThreeBody3D.ks_to_cartesian_velocity(zeros(4), zeros(3))
+    @test_throws DomainError ThreeBody3D.ks_to_cartesian_velocity(zeros(4), zeros(4))
+    @test_throws ArgumentError ThreeBody3D.ks_to_cartesian_velocity(ones(4), [0.0, 0.0, NaN, 0.0])
+    @test_throws ArgumentError ThreeBody3D.cartesian_to_ks_state(zeros(2), zeros(3))
+    @test_throws ArgumentError ThreeBody3D.cartesian_to_ks_state(ones(3), zeros(2))
+    @test_throws DomainError ThreeBody3D.cartesian_to_ks_state(zeros(3), zeros(3))
+end

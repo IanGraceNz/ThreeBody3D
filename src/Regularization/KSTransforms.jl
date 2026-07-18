@@ -254,3 +254,82 @@ function cartesian_to_ks_position(
     b = dot(ks_gauge_direction(candidate), reference_v)
     ks_gauge_transform(candidate, atan(b, a))
 end
+
+"""
+    cartesian_to_ks_velocity(u, v)
+
+Return the horizontal KS fictitious-time velocity corresponding to the
+Cartesian relative velocity `v` at the nonzero KS coordinate `u`.
+
+The lift is `w = J(u)'v / 4` and therefore satisfies the classical KS
+bilinear constraint to roundoff.
+"""
+function cartesian_to_ks_velocity(
+    u::AbstractVector{<:Real},
+    v::AbstractVector{<:Real},
+)
+    length(u) == 4 || throw(ArgumentError("u must contain four components."))
+    length(v) == 3 || throw(ArgumentError("v must contain three components."))
+    T = float(promote_type(eltype(u), eltype(v)))
+    uv = SVector{4,T}(u)
+    vv = SVector{3,T}(v)
+    all(isfinite, uv) || throw(ArgumentError("u must be finite."))
+    all(isfinite, vv) || throw(ArgumentError("v must be finite."))
+
+    T(1//4) * transpose(ks_jacobian(uv)) * vv
+end
+
+"""
+    ks_to_cartesian_velocity(u, w)
+
+Reconstruct Cartesian relative velocity from a KS coordinate `u` and its
+fictitious-time derivative `w` using `v = J(u)w / ρ`.
+
+Exact collision is rejected because Cartesian velocity reconstruction is
+singular at `ρ = 0` even though the regularized KS state may remain finite.
+"""
+function ks_to_cartesian_velocity(
+    u::AbstractVector{<:Real},
+    w::AbstractVector{<:Real},
+)
+    length(u) == 4 || throw(ArgumentError("u must contain four components."))
+    length(w) == 4 || throw(ArgumentError("w must contain four components."))
+    T = float(promote_type(eltype(u), eltype(w)))
+    uv = SVector{4,T}(u)
+    wv = SVector{4,T}(w)
+    all(isfinite, uv) || throw(ArgumentError("u must be finite."))
+    all(isfinite, wv) || throw(ArgumentError("w must be finite."))
+
+    rho = dot(uv, uv)
+    iszero(rho) && throw(DomainError(uv, "Cartesian velocity reconstruction is undefined at exact collision."))
+    ks_jacobian(uv) * wv / rho
+end
+
+"""
+    cartesian_to_ks_state(q, v; reference=nothing)
+
+Lift a noncollision Cartesian relative position and velocity to a KS position
+coordinate and its horizontal fictitious-time derivative. Return `(u, w)`.
+
+When `reference` is supplied, the deterministic position lift is gauge-aligned
+to that prior KS representative before the velocity is lifted.
+"""
+function cartesian_to_ks_state(
+    q::AbstractVector{<:Real},
+    v::AbstractVector{<:Real};
+    reference::Union{Nothing,AbstractVector{<:Real}}=nothing,
+)
+    length(q) == 3 || throw(ArgumentError("q must contain three components."))
+    length(v) == 3 || throw(ArgumentError("v must contain three components."))
+    T = reference === nothing ?
+        float(promote_type(eltype(q), eltype(v))) :
+        float(promote_type(eltype(q), eltype(v), eltype(reference)))
+    qv = SVector{3,T}(q)
+    vv = SVector{3,T}(v)
+    all(isfinite, qv) || throw(ArgumentError("q must be finite."))
+    all(isfinite, vv) || throw(ArgumentError("v must be finite."))
+
+    u = cartesian_to_ks_position(qv; reference=reference)
+    w = cartesian_to_ks_velocity(u, vv)
+    u, w
+end
