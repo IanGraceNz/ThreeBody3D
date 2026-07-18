@@ -787,3 +787,69 @@ end
     @test_throws ArgumentError ThreeBody3D.cross_validate_ks_levi_civita(1.0, [Inf, 0.0], [0.0, 1.0], [0.0])
     @test_throws ArgumentError ThreeBody3D.cross_validate_ks_levi_civita(1.0, [1.0, 0.0], [0.0, 1.0], [NaN])
 end
+
+@testset "KS perturbed dynamics controlled forcing" begin
+    q0 = SVector(1.2, -0.3, 0.5)
+    v0 = SVector(-0.1, 0.45, 0.2)
+    zero_force(q,v,t) = zero(q)
+    p0 = ThreeBody3D.KSPerturbedProblem(1.0, q0, v0, zero_force; initial_time=0.2)
+    base = ThreeBody3D.KSTwoBodyProblem(1.0, q0, v0; initial_time=0.2)
+    @test ThreeBody3D.ks_perturbed_rhs(ThreeBody3D.ks_initial_state(p0), p0) ≈
+          ThreeBody3D.ks_unperturbed_rhs(ThreeBody3D.ks_initial_state(base))
+    r0 = ThreeBody3D.integrate_ks_perturbed(p0, (0.0, 1.5); reltol=1e-13, abstol=1e-13)
+    ru = ThreeBody3D.integrate_ks_two_body(base, (0.0, 1.5); reltol=1e-13, abstol=1e-13)
+    for s in (0.0, 0.4, 1.0, 1.5)
+        @test r0.solution(s) ≈ ru.solution(s) rtol=2e-10 atol=2e-11
+    end
+
+    a = SVector(0.03, -0.02, 0.01)
+    constant_force(q,v,t) = a
+    pc = ThreeBody3D.KSPerturbedProblem(1.0, q0, v0, constant_force)
+    yc = ThreeBody3D.ks_initial_state(pc)
+    rhs = ThreeBody3D.ks_perturbed_rhs(yc, pc)
+    u,w,h,t = ThreeBody3D.ks_unpack_state(yc)
+    J = ThreeBody3D.ks_jacobian(u); rho = dot(u,u)
+    @test SVector{4,Float64}(rhs[5:8]) ≈ -(h/2)*u + (rho/4)*(transpose(J)*a)
+    @test rhs[9] ≈ -dot(J*w, a)
+    @test rhs[10] == rho
+
+    linear_force(q,v,t) = -0.015q
+    pl = ThreeBody3D.KSPerturbedProblem(1.0, q0, v0, linear_force)
+    rl = ThreeBody3D.integrate_ks_perturbed(pl, (0.0, 2.0); saveat=0.05)
+    for y in rl.solution.u
+        u,w,h,t = ThreeBody3D.ks_unpack_state(y)
+        @test all(isfinite, y)
+        @test ThreeBody3D.ks_scaled_constraint_residual(u,w) <= 2e-9
+        @test ThreeBody3D.ks_energy_consistency_residual(u,w,h,1.0) <= 2e-9
+    end
+
+    timed_force(q,v,t) = SVector(0.01sin(t), -0.02cos(t), 0.005sin(2t))
+    pt = ThreeBody3D.KSPerturbedProblem(1.0, q0, v0, timed_force)
+    rt = ThreeBody3D.integrate_ks_perturbed(pt, (0.0, 0.8))
+    @test all(isfinite, rt.solution.u[end])
+end
+
+@testset "KS perturbed dynamics collision regularity" begin
+    smooth_force(q,v,t) = SVector(0.2, -0.1, 0.05)
+    p = ThreeBody3D.KSPerturbedProblem(1.0, SVector(1.0,0.0,0.0), zeros(3), smooth_force)
+    ycollision = ThreeBody3D.ks_pack_state(zeros(4), SVector(0.0,0.0,0.0,inv(sqrt(2.0))), 1.0, 1.0)
+    rhs = ThreeBody3D.ks_perturbed_rhs(ycollision, p)
+    @test all(isfinite, rhs)
+    @test SVector{4,Float64}(rhs[5:8]) == zeros(4)
+    @test rhs[10] == 0.0
+end
+
+@testset "KS perturbed dynamics precision and validation" begin
+    for T in (Float32, Float64, BigFloat)
+        force(q,v,t) = SVector{3,T}(T(0.01), T(-0.02), T(0.03))
+        p = ThreeBody3D.KSPerturbedProblem(T(1), SVector{3,T}(1,0,0), SVector{3,T}(0,1,0), force)
+        y = ThreeBody3D.ks_initial_state(p)
+        rhs = ThreeBody3D.ks_perturbed_rhs(y,p)
+        @test eltype(y) == T
+        @test eltype(rhs) == T
+    end
+    @test_throws ArgumentError ThreeBody3D.KSPerturbedProblem(1.0, ones(3), zeros(3), (q,v,t)->ones(2))
+    @test_throws ArgumentError ThreeBody3D.KSPerturbedProblem(1.0, ones(3), zeros(3), (q,v,t)->[1.0,NaN,0.0])
+    p = ThreeBody3D.KSPerturbedProblem(1.0, ones(3), zeros(3), (q,v,t)->zeros(3))
+    @test_throws ArgumentError ThreeBody3D.integrate_ks_perturbed(p, (0.0,0.0))
+end

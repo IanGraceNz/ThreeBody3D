@@ -7,3 +7,5 @@ include("KSDiagnostics.jl")
 
 include("KSDynamics.jl")
 include("KSCrossValidation.jl")
+
+include("KSPerturbedDynamics.jl")
