@@ -715,3 +715,75 @@ end
     @test_throws ArgumentError ThreeBody3D.integrate_ks_two_body(
         ThreeBody3D.KSTwoBodyProblem(1.0, ones(3), zeros(3)), (0.0, 0.0))
 end
+
+@testset "KS and Levi-Civita planar cross-validation" begin
+    cases = (
+        (1.0, SVector(1.0, 0.0), SVector(0.0, 1.0), collect(range(0.0, 2π; length=17))),
+        (1.0, SVector(1.0, 0.0), SVector(0.0, 0.35), collect(range(0.0, 1.0; length=15))),
+        (1.0, SVector(1.0, 0.0), SVector(0.0, 1.7), collect(range(0.0, 0.8; length=13))),
+    )
+
+    for (mu, q, v, times) in cases
+        report = ThreeBody3D.cross_validate_ks_levi_civita(mu, q, v, times)
+        tolerance = 2.0e-10
+        @test report.numeric_type === Float64
+        @test length(report.samples) == length(times)
+        @test report.maximum_position_error <= tolerance
+        @test report.maximum_velocity_error <= tolerance
+        @test report.maximum_time_error <= tolerance
+        @test report.maximum_energy_error <= tolerance
+        @test report.maximum_levi_civita_energy_drift <= tolerance
+        @test report.maximum_ks_energy_drift <= tolerance
+        @test report.initial_transition_position_error <= tolerance
+        @test report.initial_transition_velocity_error <= tolerance
+        @test report.final_transition_position_error <= tolerance
+        @test report.final_transition_velocity_error <= tolerance
+    end
+end
+
+@testset "KS and Levi-Civita near-collision cross-validation" begin
+    mu = 1.0
+    q = SVector(2.0, 0.0)
+    v = SVector(0.0, 0.0)
+    lc = LeviCivitaOscillator(mu, q, v)
+    collision_time = levi_civita_physical_time(lc, π)
+    times = [0.0, collision_time * 0.5, collision_time * 0.9,
+        collision_time * (1 - 1.0e-6), collision_time * (1 + 1.0e-6)]
+    report = ThreeBody3D.cross_validate_ks_levi_civita(mu, q, v, times)
+
+    @test report.maximum_position_error <= 5.0e-9
+    @test report.maximum_velocity_error <= 5.0e-7
+    @test report.maximum_time_error <= 5.0e-10
+    @test report.maximum_energy_error <= 5.0e-7
+    @test all(isfinite, (report.maximum_position_error, report.maximum_velocity_error,
+        report.maximum_time_error, report.maximum_energy_error))
+end
+
+@testset "KS and Levi-Civita BigFloat cross-validation" begin
+    setprecision(BigFloat, 256) do
+        mu = big"1.0"
+        q = SVector{2,BigFloat}(big"1.0", big"0.0")
+        v = SVector{2,BigFloat}(big"0.0", big"0.08")
+        times = BigFloat[big"0.0", big"0.1", big"0.25", big"0.5", big"0.8"]
+        report = ThreeBody3D.cross_validate_ks_levi_civita(mu, q, v, times)
+        tolerance = big"1e-55"
+
+        @test report.numeric_type === BigFloat
+        @test report.maximum_position_error <= tolerance
+        @test report.maximum_velocity_error <= tolerance
+        @test report.maximum_time_error <= tolerance
+        @test report.maximum_energy_error <= tolerance
+        @test report.maximum_levi_civita_energy_drift <= tolerance
+        @test report.maximum_ks_energy_drift <= tolerance
+    end
+end
+
+@testset "KS and Levi-Civita cross-validation input validation" begin
+    @test_throws ArgumentError ThreeBody3D.cross_validate_ks_levi_civita(1.0, [1.0], [0.0, 1.0], [0.0])
+    @test_throws ArgumentError ThreeBody3D.cross_validate_ks_levi_civita(1.0, [1.0, 0.0], [0.0], [0.0])
+    @test_throws ArgumentError ThreeBody3D.cross_validate_ks_levi_civita(1.0, [1.0, 0.0], [0.0, 1.0], Float64[])
+    @test_throws ArgumentError ThreeBody3D.cross_validate_ks_levi_civita(0.0, [1.0, 0.0], [0.0, 1.0], [0.0])
+    @test_throws DomainError ThreeBody3D.cross_validate_ks_levi_civita(1.0, [0.0, 0.0], [0.0, 1.0], [0.0])
+    @test_throws ArgumentError ThreeBody3D.cross_validate_ks_levi_civita(1.0, [Inf, 0.0], [0.0, 1.0], [0.0])
+    @test_throws ArgumentError ThreeBody3D.cross_validate_ks_levi_civita(1.0, [1.0, 0.0], [0.0, 1.0], [NaN])
+end

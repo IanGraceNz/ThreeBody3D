@@ -6,3 +6,4 @@ include("KSTransforms.jl")
 include("KSDiagnostics.jl")
 
 include("KSDynamics.jl")
+include("KSCrossValidation.jl")
