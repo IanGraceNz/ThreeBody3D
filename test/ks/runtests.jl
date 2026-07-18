@@ -79,3 +79,133 @@ end
     @test_throws ArgumentError ThreeBody3D.ks_position([1.0, 2.0, 3.0, Inf])
     @test_throws ArgumentError ThreeBody3D.ks_constraint_residual(zeros(4), [0.0, 0.0, NaN, 0.0])
 end
+
+@testset "KS gauge transformations" begin
+    fixtures = (
+        (SVector(0.7, -1.1, 0.4, 1.3), SVector(-0.2, 0.5, 0.8, -0.6), 0.37),
+        (SVector(-2.0, 0.25, 1.5, -0.75), SVector(0.4, -1.2, 0.3, 0.9), -1.1),
+        (SVector(1.0e-7, -2.0e-7, 3.0e-7, 4.0e-7), SVector(0.5, 0.25, -0.75, 1.0), 2.3),
+    )
+
+    for (u, w, phi) in fixtures
+        transformed_u, transformed_w = ThreeBody3D.ks_gauge_transform(u, w, phi)
+        rho = ThreeBody3D.ks_radius(u)
+        tolerance = 1000eps(Float64)
+
+        @test isapprox(
+            ThreeBody3D.ks_position(transformed_u),
+            ThreeBody3D.ks_position(u);
+            rtol=tolerance,
+            atol=tolerance * max(rho, 1.0),
+        )
+        @test isapprox(
+            ThreeBody3D.ks_radius(transformed_u),
+            rho;
+            rtol=tolerance,
+            atol=tolerance * max(rho, 1.0),
+        )
+        @test isapprox(
+            ThreeBody3D.ks_jacobian(transformed_u) * transformed_w,
+            ThreeBody3D.ks_jacobian(u) * w;
+            rtol=tolerance,
+            atol=tolerance * max(norm(ThreeBody3D.ks_jacobian(u) * w), 1.0),
+        )
+        @test isapprox(
+            ThreeBody3D.ks_constraint_residual(transformed_u, transformed_w),
+            ThreeBody3D.ks_constraint_residual(u, w);
+            rtol=tolerance,
+            atol=tolerance * max(norm(u) * norm(w), 1.0),
+        )
+    end
+
+    u = SVector(0.7, -1.1, 0.4, 1.3)
+    phi1 = 0.41
+    phi2 = -1.27
+    composed = ThreeBody3D.ks_gauge_transform(
+        ThreeBody3D.ks_gauge_transform(u, phi2),
+        phi1,
+    )
+    direct = ThreeBody3D.ks_gauge_transform(u, phi1 + phi2)
+    @test isapprox(composed, direct; rtol=500eps(Float64), atol=500eps(Float64) * norm(u))
+    @test ThreeBody3D.ks_gauge_transform(u, 0.0) == u
+    @test isapprox(
+        ThreeBody3D.ks_gauge_transform(u, pi),
+        -u;
+        rtol=500eps(Float64),
+        atol=500eps(Float64) * norm(u),
+    )
+end
+
+@testset "KS gauge alignment" begin
+    u = SVector(0.6, -0.9, 1.1, 0.35)
+    w = SVector(-0.3, 0.8, 0.2, -0.5)
+    reference = ThreeBody3D.ks_gauge_transform(u, 1.17)
+    aligned_u, aligned_w = ThreeBody3D.align_ks_gauge(u, w, reference)
+
+    tolerance = 1000eps(Float64)
+    @test norm(aligned_u - reference) <= tolerance * max(norm(reference), 1.0)
+    @test norm(aligned_u - reference) <= norm(u - reference)
+    @test isapprox(
+        ThreeBody3D.ks_position(aligned_u),
+        ThreeBody3D.ks_position(u);
+        rtol=tolerance,
+        atol=tolerance * max(ThreeBody3D.ks_radius(u), 1.0),
+    )
+    @test isapprox(
+        ThreeBody3D.ks_jacobian(aligned_u) * aligned_w,
+        ThreeBody3D.ks_jacobian(u) * w;
+        rtol=tolerance,
+        atol=tolerance * max(norm(ThreeBody3D.ks_jacobian(u) * w), 1.0),
+    )
+
+    opposite_reference = -reference
+    opposite_u, opposite_w = ThreeBody3D.align_ks_gauge(u, w, opposite_reference)
+    @test norm(opposite_u - opposite_reference) <= tolerance * max(norm(opposite_reference), 1.0)
+    @test isapprox(
+        ThreeBody3D.ks_jacobian(opposite_u) * opposite_w,
+        ThreeBody3D.ks_jacobian(u) * w;
+        rtol=tolerance,
+        atol=tolerance * max(norm(ThreeBody3D.ks_jacobian(u) * w), 1.0),
+    )
+end
+
+@testset "KS gauge precision and validation" begin
+    for T in (Float32, Float64, BigFloat)
+        u = SVector{4,T}(T(0.75), T(-0.5), T(1.25), T(0.375))
+        w = SVector{4,T}(T(-0.25), T(0.625), T(0.5), T(-0.75))
+        reference = SVector{4,T}(T(-0.2), T(0.9), T(0.4), T(-1.1))
+        phi = T === BigFloat ? big"0.7312345678901234567890123456789" : T(0.7312345)
+
+        transformed_u, transformed_w = ThreeBody3D.ks_gauge_transform(u, w, phi)
+        aligned_u, aligned_w = ThreeBody3D.align_ks_gauge(u, w, reference)
+        tolerance = T(2000) * eps(T)
+        rho = ThreeBody3D.ks_radius(u)
+
+        @test eltype(transformed_u) === T
+        @test eltype(transformed_w) === T
+        @test eltype(aligned_u) === T
+        @test eltype(aligned_w) === T
+        @test isapprox(
+            ThreeBody3D.ks_position(transformed_u),
+            ThreeBody3D.ks_position(u);
+            rtol=tolerance,
+            atol=tolerance * max(rho, one(T)),
+        )
+        @test isapprox(
+            ThreeBody3D.ks_radius(transformed_u),
+            rho;
+            rtol=tolerance,
+            atol=tolerance * max(rho, one(T)),
+        )
+        @test norm(aligned_u - reference) <= norm(u - reference) + tolerance * max(norm(u), norm(reference), one(T))
+    end
+
+    @test_throws ArgumentError ThreeBody3D.ks_gauge_transform([1.0, 2.0, 3.0], 0.5)
+    @test_throws ArgumentError ThreeBody3D.ks_gauge_transform(zeros(4), [1.0, 2.0, 3.0], 0.5)
+    @test_throws ArgumentError ThreeBody3D.ks_gauge_transform(zeros(4), zeros(4), Inf)
+    @test_throws ArgumentError ThreeBody3D.ks_gauge_transform([1.0, 2.0, NaN, 4.0], 0.5)
+    @test_throws ArgumentError ThreeBody3D.align_ks_gauge(zeros(3), zeros(4), zeros(4))
+    @test_throws ArgumentError ThreeBody3D.align_ks_gauge(zeros(4), zeros(3), zeros(4))
+    @test_throws ArgumentError ThreeBody3D.align_ks_gauge(zeros(4), zeros(4), zeros(3))
+    @test_throws ArgumentError ThreeBody3D.align_ks_gauge(zeros(4), zeros(4), [0.0, 0.0, Inf, 0.0])
+end

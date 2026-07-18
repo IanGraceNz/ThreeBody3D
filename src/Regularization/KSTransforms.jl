@@ -94,3 +94,97 @@ function ks_constraint_residual(
     u1, u2, u3, u4 = uv
     dot(SVector{4,T}(u4, -u3, u2, -u1), wv)
 end
+
+function _ks_gauge_inputs(
+    u::AbstractVector{<:Real},
+    phi::Real,
+)
+    length(u) == 4 || throw(ArgumentError("u must contain four components."))
+    T = float(promote_type(eltype(u), typeof(phi)))
+    uv = SVector{4,T}(u)
+    phiv = T(phi)
+    all(isfinite, uv) || throw(ArgumentError("u must be finite."))
+    isfinite(phiv) || throw(ArgumentError("phi must be finite."))
+    uv, phiv
+end
+
+"""
+    ks_gauge_transform(u, phi)
+
+Apply the finite one-parameter gauge action of the fixed classical KS1
+convention to the KS position coordinate `u`.
+
+The Cartesian position and KS radius are invariant under this transformation.
+"""
+function ks_gauge_transform(u::AbstractVector{<:Real}, phi::Real)
+    uv, phiv = _ks_gauge_inputs(u, phi)
+    T = eltype(uv)
+    u1, u2, u3, u4 = uv
+    cosine = cos(phiv)
+    sine = sin(phiv)
+
+    SVector{4,T}(
+        cosine * u1 + sine * u4,
+        cosine * u2 - sine * u3,
+        sine * u2 + cosine * u3,
+       -sine * u1 + cosine * u4,
+    )
+end
+
+"""
+    ks_gauge_transform(u, w, phi)
+
+Apply the same finite KS gauge transformation to the coordinate `u` and its
+fictitious-time derivative `w`. Return `(transformed_u, transformed_w)`.
+"""
+function ks_gauge_transform(
+    u::AbstractVector{<:Real},
+    w::AbstractVector{<:Real},
+    phi::Real,
+)
+    length(u) == 4 || throw(ArgumentError("u must contain four components."))
+    length(w) == 4 || throw(ArgumentError("w must contain four components."))
+    T = float(promote_type(eltype(u), eltype(w), typeof(phi)))
+    uv = SVector{4,T}(u)
+    wv = SVector{4,T}(w)
+    phiv = T(phi)
+    all(isfinite, uv) || throw(ArgumentError("u must be finite."))
+    all(isfinite, wv) || throw(ArgumentError("w must be finite."))
+    isfinite(phiv) || throw(ArgumentError("phi must be finite."))
+
+    transformed_u = ks_gauge_transform(uv, phiv)
+    transformed_w = ks_gauge_transform(wv, phiv)
+    transformed_u, transformed_w
+end
+
+"""
+    align_ks_gauge(u, w, reference_u)
+
+Choose the representative on the gauge fiber through `(u, w)` that maximizes
+its Euclidean alignment with `reference_u`. The same gauge action is applied
+to `u` and `w`, and the aligned pair is returned.
+"""
+function align_ks_gauge(
+    u::AbstractVector{<:Real},
+    w::AbstractVector{<:Real},
+    reference_u::AbstractVector{<:Real},
+)
+    length(u) == 4 || throw(ArgumentError("u must contain four components."))
+    length(w) == 4 || throw(ArgumentError("w must contain four components."))
+    length(reference_u) == 4 ||
+        throw(ArgumentError("reference_u must contain four components."))
+
+    T = float(promote_type(eltype(u), eltype(w), eltype(reference_u)))
+    uv = SVector{4,T}(u)
+    wv = SVector{4,T}(w)
+    reference = SVector{4,T}(reference_u)
+    all(isfinite, uv) || throw(ArgumentError("u must be finite."))
+    all(isfinite, wv) || throw(ArgumentError("w must be finite."))
+    all(isfinite, reference) ||
+        throw(ArgumentError("reference_u must be finite."))
+
+    a = dot(uv, reference)
+    b = dot(ks_gauge_direction(uv), reference)
+    phi = atan(b, a)
+    ks_gauge_transform(uv, wv, phi)
+end
