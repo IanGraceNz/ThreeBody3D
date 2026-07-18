@@ -2153,3 +2153,5 @@ end
         :figure_eight; duration=1.0,
     )
 end
+
+include("ks/runtests.jl")
