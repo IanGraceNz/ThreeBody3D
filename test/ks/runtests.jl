@@ -1031,3 +1031,95 @@ end
         system, close_state, (1,2), 0.0, 0.02; nonselected_threshold=2e-3,
     )
 end
+
+@testset "Automatic KS switching integration" begin
+    system = ThreeBodySystem((1e-12, 1e-12, 1e-12); G=1.0)
+    parameters = ThreeBody3D.AutomaticSwitchingParameters(
+        enter_threshold=0.2,
+        exit_threshold=0.4,
+        ambiguity_threshold=0.3,
+        minimum_separation_ratio=2.0,
+        maximum_switches=10,
+    )
+    encounter_state = statevector(
+        [-0.5, 0.0, 0.0], [0.5, 0.0, 0.0],
+        [0.5, 0.0, 0.0], [-0.5, 0.0, 0.0],
+        [10.0, 0.0, 0.0], [0.0, 0.0, 0.0],
+    )
+
+    trajectory = ThreeBody3D.simulate_experimental_switching(
+        system, encounter_state, (0.0, 1.6), parameters;
+        regularization_backend=:ks,
+        cartesian_kwargs=(saveat=0.07,),
+        regularized_kwargs=(saveat=0.031,),
+    )
+    @test trajectory.status == :completed
+    @test isnothing(trajectory.failure)
+    @test length(trajectory.segments) == 3
+    @test trajectory.segments[2].location.problem isa ThreeBody3D.KSThreeBodyProblem
+    @test trajectory.segments[2].location.regularized_result isa ThreeBody3D.KSThreeBodyResult
+    @test [event.kind for event in trajectory.switch_events] == [:entry, :exit]
+    @test all(event -> event.pair == (1,2), trajectory.switch_events)
+    @test trajectory.switch_events[1].physical_time ≈ 0.8 atol=3e-7
+    @test trajectory.switch_events[2].physical_time ≈ 1.4 atol=3e-7
+    @test trajectory.final_time ≈ 1.6 atol=1e-8
+
+    entry = trajectory.segments[2].entry_state
+    exit = trajectory.segments[2].exit_state
+    @test maximum(abs.(entry .- trajectory.segments[1].exit_state)) <= 2e-12
+    @test maximum(abs.(exit .- trajectory.segments[3].entry_state)) <= 2e-12
+    @test all(event -> event.transition_diagnostics.state_residual <= 1e-12,
+              trajectory.switch_events)
+
+    midpoint = (trajectory.segments[2].start_time + trajectory.segments[2].end_time) / 2
+    sampled = ThreeBody3D.experimental_switching_state(trajectory, midpoint)
+    @test length(sampled) == 18
+    @test all(isfinite, sampled)
+    @test sampled == ThreeBody3D.experimental_switching_state(trajectory, midpoint)
+
+    manual = ThreeBody3D.propagate_ks_segment(
+        system, entry, (1,2), trajectory.segments[2].start_time,
+        trajectory.segments[2].end_time; reltol=1e-12, abstol=1e-12,
+    )
+    @test exit ≈ manual.exit_state rtol=2e-9 atol=2e-10
+
+    @test_throws ArgumentError ThreeBody3D.simulate_experimental_switching(
+        system, encounter_state, (0.0, 1.0), parameters;
+        regularization_backend=:unknown,
+    )
+end
+
+@testset "Automatic KS exit location and pair permutations" begin
+    parameters = ThreeBody3D.AutomaticSwitchingParameters(
+        enter_threshold=0.2,
+        exit_threshold=0.4,
+        ambiguity_threshold=0.3,
+        minimum_separation_ratio=2.0,
+        maximum_switches=10,
+    )
+    system = ThreeBodySystem((1e-12, 1e-12, 1e-12); G=1.0)
+    positions = (
+        [-0.1, 0.0, 0.0], [0.1, 0.0, 0.0], [10.0, 0.0, 0.0],
+    )
+    velocities = (
+        [-0.5, 0.0, 0.0], [0.5, 0.0, 0.0], [0.0, 0.0, 0.0],
+    )
+    for pair in ((1,2), (1,3), (2,3))
+        i, j = pair
+        k = only(setdiff((1,2,3), pair))
+        r = [zeros(3) for _ in 1:3]
+        v = [zeros(3) for _ in 1:3]
+        r[i] = positions[1]; r[j] = positions[2]; r[k] = positions[3]
+        v[i] = velocities[1]; v[j] = velocities[2]; v[k] = velocities[3]
+        state = statevector(r[1],v[1],r[2],v[2],r[3],v[3])
+        located = ThreeBody3D.locate_ks_regularized_exit_event(
+            system, state, pair, 0.0, 0.5, parameters,
+        )
+        @test located.status == :exit
+        @test located.decision.action == :exit
+        @test located.problem.pair == pair
+        @test located.physical_time ≈ 0.2 atol=3e-7
+        @test located.observables.separations[ThreeBody3D._canonical_pair_index(pair)] ≈ 0.4 atol=3e-8
+        @test located.regularized_result.solution.u[end][10] ≈ located.physical_time atol=2e-12
+    end
+end

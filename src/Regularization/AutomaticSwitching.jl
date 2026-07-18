@@ -973,7 +973,7 @@ end
     ExperimentalSwitchingTrajectory
 
 Controller-level result for experimental automatic switching between Cartesian
-and planar Levi-Civita propagation.
+and a selected regularized backend (planar Levi-Civita or spatial KS).
 
 All completed segments and switch events are retained even when `status` is
 `:failure`. Dense unified sampling is intentionally not part of this stage.
@@ -1054,10 +1054,11 @@ end
 """
     simulate_experimental_switching(system, u0, tspan, parameters; kwargs...)
 
-Run the first experimental alternating automatic-switching controller:
-Cartesian propagation searches for an isolated inward entry crossing, and a
-selected planar Levi-Civita segment then searches for its isolated outward exit
-crossing. Every completed segment and switch event is retained.
+Run the experimental alternating automatic-switching controller. Cartesian
+propagation searches for an isolated inward entry crossing, and the selected
+regularization backend then searches for its isolated outward exit crossing.
+Set `regularization_backend=:ks` to use coupled spatial KS propagation; the
+default `:levi_civita` preserves the validated legacy path. Every completed segment and switch event is retained.
 
 The controller fails safely on ambiguous decisions, insufficient physical-time
 progress, or exhaustion of `parameters.maximum_switches`. It leaves the
@@ -1073,6 +1074,7 @@ function simulate_experimental_switching(
     parameters::AutomaticSwitchingParameters;
     cartesian_kwargs::NamedTuple=NamedTuple(),
     regularized_kwargs::NamedTuple=NamedTuple(),
+    regularization_backend::Symbol=:levi_civita,
 )
     validate_state(u0)
     T = float(promote_type(eltype(system.masses), eltype(u0), typeof(first(tspan)), typeof(last(tspan))))
@@ -1081,6 +1083,9 @@ function simulate_experimental_switching(
     all(isfinite, (t0, tf)) || throw(ArgumentError("tspan endpoints must be finite."))
     tf > t0 || throw(ArgumentError("experimental automatic switching requires an increasing tspan."))
 
+    regularization_backend in (:levi_civita, :ks) ||
+        throw(ArgumentError("regularization_backend must be :levi_civita or :ks."))
+
     initial_state = Vector{T}(u0)
     current_state = copy(initial_state)
     current_time = t0
@@ -1088,6 +1093,7 @@ function simulate_experimental_switching(
     segments = Any[]
     events = Any[]
     switch_count = 0
+    ks_gauge_references = Dict{Tuple{Int,Int},Any}()
 
     function failed(reason::Symbol, message::String; pair=nothing)
         failure = AutomaticSwitchingFailure(current_time, reason, message; pair=pair)
@@ -1144,24 +1150,34 @@ function simulate_experimental_switching(
                 )
 
             pair = something(located.decision.pair)
-            diagnostics = _entry_transition_diagnostics(
-                converted_system, current_state, current_time, pair,
-            )
+            diagnostics = if regularization_backend === :ks
+                reference = get(ks_gauge_references, pair, nothing)
+                _ks_entry_transition_diagnostics(
+                    converted_system, current_state, current_time, pair, reference,
+                )
+            else
+                _entry_transition_diagnostics(
+                    converted_system, current_state, current_time, pair,
+                )
+            end
             push!(events, _switch_event(
                 current_time, :entry, pair, located.observables, diagnostics,
             ))
             mode = RegularizedSwitchingMode(pair)
         else
             pair = mode.pair
-            located = locate_regularized_exit_event(
-                converted_system,
-                current_state,
-                pair,
-                current_time,
-                tf,
-                parameters;
-                regularized_kwargs...,
-            )
+            located = if regularization_backend === :ks
+                reference = get(ks_gauge_references, pair, nothing)
+                locate_ks_regularized_exit_event(
+                    converted_system, current_state, pair, current_time, tf, parameters;
+                    reference=reference, regularized_kwargs...,
+                )
+            else
+                locate_regularized_exit_event(
+                    converted_system, current_state, pair, current_time, tf, parameters;
+                    regularized_kwargs...,
+                )
+            end
             push!(segments, AutomaticRegularizedSegment(
                 pair,
                 segment_start,
@@ -1200,6 +1216,11 @@ function simulate_experimental_switching(
                     pair=pair,
                 )
 
+            if regularization_backend === :ks && !isnothing(located.problem) &&
+               !isnothing(located.regularized_result)
+                terminal_y = located.regularized_result.solution.u[end]
+                ks_gauge_references[pair] = SVector{4,T}(terminal_y[1:4])
+            end
             diagnostics = _exit_transition_diagnostics(
                 converted_system, current_state, current_time, pair,
             )
@@ -1246,7 +1267,7 @@ Evaluate an [`ExperimentalSwitchingTrajectory`](@ref) at absolute physical time
 `time`.
 
 Cartesian segments use the retained dense ODE solution. Regularized segments use
-bounded perturbed Levi-Civita physical-time targeting. Exact segment boundaries
+bounded inversion of the retained Levi-Civita or KS Sundman-time solution. Exact segment boundaries
 return the stored handoff states without interpolation, so entry and exit epochs
 are represented consistently across adjacent segments.
 
@@ -1296,12 +1317,19 @@ function experimental_switching_state(
         midpoint_s = (left_s + right_s) / T(2)
         for _ in 1:max_iterations
             midpoint_s = (left_s + right_s) / T(2)
-            midpoint_time = T(result.solution(midpoint_s)[14])
+            is_ks = segment.location.problem isa KSThreeBodyProblem
+            time_index = is_ks ? 10 : 14
+            midpoint_time = T(result.solution(midpoint_s)[time_index])
             time_scale = max(one(T), abs(target))
             s_scale = max(one(T), abs(left_s), abs(right_s), abs(midpoint_s))
             time_converged = abs(midpoint_time - target) <= tolerance * time_scale
             bracket_converged = abs(right_s - left_s) <= tolerance * s_scale
             if time_converged && bracket_converged
+                if segment.location.problem isa KSThreeBodyProblem
+                    return Vector{T}(ks_three_body_cartesian_state(
+                        segment.location.problem, result.solution(midpoint_s),
+                    ))
+                end
                 reconstructed = perturbed_levi_civita_state(result, midpoint_s)
                 return Vector{T}(reconstructed.physical_state)
             end
@@ -1313,6 +1341,11 @@ function experimental_switching_state(
         end
 
         midpoint_s = (left_s + right_s) / T(2)
+        if segment.location.problem isa KSThreeBodyProblem
+            return Vector{T}(ks_three_body_cartesian_state(
+                segment.location.problem, result.solution(midpoint_s),
+            ))
+        end
         reconstructed = perturbed_levi_civita_state(result, midpoint_s)
         return Vector{T}(reconstructed.physical_state)
     end

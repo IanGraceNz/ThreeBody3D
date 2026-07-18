@@ -18,3 +18,5 @@ include("KSSegment.jl")
 include("SegmentComposition.jl")
 
 include("AutomaticSwitching.jl")
+
+include("KSAutoSwitching.jl")
