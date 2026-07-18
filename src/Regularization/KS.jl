@@ -9,3 +9,5 @@ include("KSDynamics.jl")
 include("KSCrossValidation.jl")
 
 include("KSPerturbedDynamics.jl")
+
+include("KSThreeBodyCoupling.jl")

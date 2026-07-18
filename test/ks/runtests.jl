@@ -853,3 +853,116 @@ end
     p = ThreeBody3D.KSPerturbedProblem(1.0, ones(3), zeros(3), (q,v,t)->zeros(3))
     @test_throws ArgumentError ThreeBody3D.integrate_ks_perturbed(p, (0.0,0.0))
 end
+
+@testset "KS pair-centred three-body reconstruction" begin
+    system = ThreeBodySystem((1.2,0.8,0.5); G=0.9)
+    state = statevector(
+        SVector(-0.4,0.2,0.1), SVector(0.1,0.35,-0.05),
+        SVector(0.6,-0.1,-0.2), SVector(-0.2,-0.25,0.08),
+        SVector(4.0,2.0,-1.0), SVector(0.03,-0.04,0.02),
+    )
+    for pair in ((1,2),(1,3),(2,3))
+        p = ThreeBody3D.KSThreeBodyProblem(system,state,pair; initial_time=0.3)
+        y = ThreeBody3D.ks_initial_state(p)
+        reconstructed = ThreeBody3D.ks_three_body_cartesian_state(p,y)
+        @test reconstructed ≈ state rtol=5e-14 atol=5e-14
+        @test y[10] == 0.3
+        @test p.pair == pair
+        @test p.third == 6-pair[1]-pair[2]
+    end
+end
+
+@testset "KS three-body acceleration decomposition" begin
+    system = ThreeBodySystem((1.0,2.0,0.7); G=1.3)
+    state = statevector(
+        SVector(-0.5,0.1,0.2), SVector(0.2,0.3,-0.1),
+        SVector(0.4,-0.2,-0.1), SVector(-0.15,-0.25,0.05),
+        SVector(3.0,1.5,0.7), SVector(0.04,-0.03,0.02),
+    )
+    for pair in ((1,2),(1,3),(2,3))
+        p = ThreeBody3D.KSThreeBodyProblem(system,state,pair)
+        y = ThreeBody3D.ks_initial_state(p)
+        u,w,h,t,R,V,rk,vk = ThreeBody3D.ks_unpack_three_body_state(y)
+        f,aR,ak = ThreeBody3D.ks_three_body_accelerations(p,u,R,rk)
+        du = similar(state); ThreeBody3D.threebody!(du,state,system,0.0)
+        i,j = pair; k = p.third
+        ai = SVector{3,Float64}(du[(6i-2):(6i)])
+        aj = SVector{3,Float64}(du[(6j-2):(6j)])
+        akk = SVector{3,Float64}(du[(6k-2):(6k)])
+        q = body_position(state,i)-body_position(state,j)
+        μ = system.G*(system.masses[i]+system.masses[j])
+        mutual = -μ*q/(norm(q)^3)
+        @test f ≈ (ai-aj)-mutual rtol=2e-14 atol=2e-14
+        @test aR ≈ (system.masses[i]*ai+system.masses[j]*aj)/(system.masses[i]+system.masses[j]) rtol=2e-14 atol=2e-14
+        @test ak ≈ akk rtol=2e-14 atol=2e-14
+        @test norm((system.masses[i]+system.masses[j])*aR + system.masses[k]*ak) <= 5e-14
+    end
+end
+
+@testset "KS coupled three-body RHS and integration" begin
+    system = ThreeBodySystem((1.0,0.4,0.2))
+    state = statevector(
+        SVector(-0.3,0.0,0.0), SVector(0.0,-0.45,0.08),
+        SVector(0.7,0.0,0.0), SVector(0.0,0.65,-0.12),
+        SVector(6.0,1.0,0.5), SVector(-0.03,0.02,0.01),
+    )
+    p = ThreeBody3D.KSThreeBodyProblem(system,state,(1,2))
+    y0 = ThreeBody3D.ks_initial_state(p)
+    rhs = ThreeBody3D.ks_three_body_rhs(y0,p)
+    u,w,h,t,R,V,rk,vk = ThreeBody3D.ks_unpack_three_body_state(y0)
+    du,dw,dh,dt,dR,dV,drk,dvk = ThreeBody3D.ks_unpack_three_body_state(rhs)
+    rho = dot(u,u)
+    @test du == w
+    @test dt == rho
+    @test dR ≈ rho*V
+    @test drk ≈ rho*vk
+    @test ThreeBody3D.ks_scaled_constraint_residual(u,w) <= 1e-14
+    @test ThreeBody3D.ks_energy_consistency_residual(u,w,h,system.G*(system.masses[1]+system.masses[2])) <= 1e-14
+
+    result = ThreeBody3D.integrate_ks_three_body(p,(0.0,0.35); reltol=1e-13,abstol=1e-13)
+    yend = result.solution(0.35)
+    tend = yend[10]
+    regularized = ThreeBody3D.ks_three_body_cartesian_state(p,yend)
+    direct = simulate(system,state,(0.0,tend); solver=:accurate,reltol=1e-13,abstol=1e-13)
+    @test regularized ≈ direct.solution(tend) rtol=2e-10 atol=2e-11
+
+    initial_energy = total_energy(system,state)
+    initial_momentum = linear_momentum(system,state)
+    for s in range(0.0,0.35;length=15)
+        cart = ThreeBody3D.ks_cartesian_state(result,s)
+        @test abs(total_energy(system,cart)-initial_energy) <= 2e-10
+        @test norm(linear_momentum(system,cart)-initial_momentum) <= 2e-11
+        @test norm(body_position(cart,1)-body_position(cart,3)) > 1.0
+        @test norm(body_position(cart,2)-body_position(cart,3)) > 1.0
+        uu,ww,_,_,_,_,_,_ = ThreeBody3D.ks_state(result,s)
+        @test ThreeBody3D.ks_scaled_constraint_residual(uu,ww) <= 2e-10
+    end
+end
+
+@testset "KS three-body precision and validation" begin
+    for T in (Float32,Float64,BigFloat)
+        system = ThreeBodySystem((T(1),T(0.5),T(0.25));G=T(1))
+        state = statevector(
+            SVector{3,T}(-1,0,0),SVector{3,T}(0,-T(0.2),0),
+            SVector{3,T}(1,0,0),SVector{3,T}(0,T(0.4),0),
+            SVector{3,T}(5,1,0),SVector{3,T}(0,0,0),
+        )
+        p=ThreeBody3D.KSThreeBodyProblem(system,state,(1,2))
+        y=ThreeBody3D.ks_initial_state(p)
+        dy=ThreeBody3D.ks_three_body_rhs(y,p)
+        @test eltype(y) === T
+        @test eltype(dy) === T
+        @test eltype(ThreeBody3D.ks_three_body_cartesian_state(p,y)) === T
+    end
+    system=ThreeBodySystem((1.0,1.0,1.0))
+    state=statevector(SVector(-1.0,0,0),zeros(3),SVector(1.0,0,0),zeros(3),SVector(4.0,0,0),zeros(3))
+    @test_throws ArgumentError ThreeBody3D.KSThreeBodyProblem(system,state,(1,1))
+    p=ThreeBody3D.KSThreeBodyProblem(system,state,(1,2))
+    @test_throws ArgumentError ThreeBody3D.ks_unpack_three_body_state(zeros(21))
+    @test_throws ArgumentError ThreeBody3D.integrate_ks_three_body(p,(0.0,0.0))
+    y=ThreeBody3D.ks_initial_state(p)
+    u,_,_,_,R,_,_,_=ThreeBody3D.ks_unpack_three_body_state(y)
+    ri,_=ThreeBody3D._ks_pair_body_positions(p,u,R)
+    y[17:19].=ri
+    @test_throws DomainError ThreeBody3D.ks_three_body_rhs(y,p)
+end
