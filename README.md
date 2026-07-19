@@ -153,26 +153,76 @@ report = run_validation_benchmark(:figure_eight)
 println(report)
 ```
 
-### Visualization
+### Visualization and GLMakie requirements
+
+ThreeBody3D currently uses `GLMakie` directly for all plotting and animation.
+`GLMakie` is a package dependency, so ordinary users need only load
+ThreeBody3D:
+
+```julia
+using ThreeBody3D
+```
 
 The visualization functions accept a `SimulationResult` and also support an
 `ExperimentalSwitchingTrajectory`:
 
-- `plot_trajectory(result; kwargs...)` creates a three-dimensional trajectory
-  plot;
-- `animate(result; fps=30, duration=10, kwargs...)` creates an interactive
-  animation;
-- `record_animation(result, filename; fps=30, duration=10, kwargs...)` writes an
-  animation, normally as MP4.
+- `plot_trajectory(result; show=true, kwargs...)` creates and returns a
+  three-dimensional `Makie.Figure`;
+- `animate(result; fps=30, duration=10, kwargs...)` displays and plays an
+  interactive animation, then returns its figure;
+- `record_animation(result, filename; fps=30, duration=10, kwargs...)` records
+  an MP4 file and returns its absolute path. The filename must end in `.mp4`,
+  and its output directory must already exist.
 
 ```julia
 plot_trajectory(result; margin = 0.05)
 animate(result; duration = 12)
-record_animation(result, "three_body.mp4"; duration = 12)
+output = record_animation(result, "three_body.mp4"; duration = 12)
+println(output)
 ```
 
-Graphics display and video encoding depend on the local plotting environment.
-The trajectory data are not changed by visualization options.
+These calls may be launched from PowerShell in the same way as numerical
+examples:
+
+```powershell
+julia --project=. examples\basic_usage.jl
+```
+
+A normal Windows desktop session with functioning OpenGL graphics is required.
+Launching Julia from PowerShell does not itself make the process headless:
+interactive windows can still open, and `record_animation` can render directly
+to an MP4 file. Video recording also requires the Makie-provided FFMPEG
+components to initialize successfully.
+
+The expected command-line behaviour is:
+
+| Function | PowerShell in a desktop session | Opens a window | Produces a file |
+|---|---:|---:|---:|
+| `plot_trajectory(result)` | Yes | Yes, by default | No |
+| `plot_trajectory(result; show=false)` | Yes | No | No |
+| `animate(result)` | Yes | Yes | No |
+| `record_animation(result, "orbit.mp4")` | Yes | Not required | Yes, MP4 |
+
+`show=false` suppresses display of a static plot, which is useful for tests, but
+the current GLMakie implementation may still require a working OpenGL context.
+Consequently, server, CI, SSH, container, and other genuinely headless
+environments are not claimed to be supported for visualization. `CairoMakie`
+is not currently a supported substitute because the visualization module
+imports `GLMakie` directly.
+
+To save a returned static figure, load `GLMakie` explicitly to use its `save`
+function:
+
+```julia
+using ThreeBody3D
+using GLMakie
+
+fig = plot_trajectory(result; show = false)
+save("three_body.png", fig)
+```
+
+Visualization options affect only presentation; they do not modify the
+calculated trajectory data.
 
 ## Development research API
 
