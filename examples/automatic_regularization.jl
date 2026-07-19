@@ -37,7 +37,8 @@ samples = sample_experimental_switching(
     trajectory;
     dt=0.1,
     regularized_kwargs=(
-        initial_step=trajectory.segments[2].location.fictitious_time / 4,
+        tolerance=1e-12,
+        max_iterations=256,
     ),
 )
 
