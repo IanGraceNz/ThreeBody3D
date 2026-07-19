@@ -19,13 +19,6 @@ using Pkg
 Pkg.develop(path = raw"C:\path\to\ThreeBody3D")
 ```
 
-From a Git repository:
-
-```julia
-using Pkg
-Pkg.add(url = "https://.../ThreeBody3D.jl")
-```
-
 After registration, installation will be:
 
 ```julia
@@ -451,6 +444,8 @@ The detailed stability classification is in `API_STABILITY.md`:
 - `V0_4_RELEASE_READINESS.md` defines the release gates;
 - `CHANGELOG.md` records user-visible changes.
 
-## License
+## Licence
 
-See the repository license for licensing information.
+A software licence has not yet been selected for this project.
+
+Licensing information will be added before the first public release.
