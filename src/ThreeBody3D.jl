@@ -7,14 +7,48 @@ using SciMLBase
 
 include("Types.jl")
 include("StateVector.jl")
+include("Regularization/Regularization.jl")
 include("Physics.jl")
 include("Integrator.jl")
 include("Diagnostics.jl")
 include("Validation.jl")
+include("ValidationBenchmarks/ValidationBenchmarks.jl")
 include("Visualization.jl")
 
 export ThreeBodySystem,
        STATE_SIZE, statevector, body_position, velocity,
+       PairCoordinates, to_pair_coordinates, from_pair_coordinates,
+       LeviCivitaCoordinates, levi_civita_position,
+       levi_civita_velocity, to_levi_civita, from_levi_civita,
+       LeviCivitaOscillator, LeviCivitaFictitiousResult,
+       levi_civita_fictitious_state, levi_civita_cartesian_state,
+       integrate_levi_civita_fictitious,
+       LeviCivitaSundmanResult, levi_civita_physical_time,
+       levi_civita_fictitious_time, levi_civita_state_at_time,
+       levi_civita_sundman_state, integrate_levi_civita_sundman,
+       PerturbedLeviCivitaProblem, PerturbedLeviCivitaResult,
+       integrate_perturbed_levi_civita, perturbed_levi_civita_state,
+       perturbed_levi_civita_fictitious_time,
+       perturbed_levi_civita_state_at_time,
+       RegularizationTransitionDiagnostics, ExplicitRegularizedSegment,
+       propagate_regularized_segment,
+       SegmentSolverStatistics, ComposedRegularizedTrajectory,
+       compose_regularized_trajectory, composed_regularized_state,
+       ExperimentalSwitchingMode, CartesianSwitchingMode,
+       RegularizedSwitchingMode, AutomaticSwitchingParameters,
+       AutomaticSwitchingFailure, RegularizationSwitchEvent,
+       PairObservables, pair_observables, pair_separations,
+       pair_radial_rates, AutomaticSwitchingDecision,
+       automatic_entry_decision, automatic_exit_decision,
+       CartesianEntryLocationResult, locate_cartesian_entry_event,
+       RegularizedExitLocationResult, locate_regularized_exit_event,
+       AutomaticCartesianSegment, AutomaticRegularizedSegment,
+       ExperimentalSwitchingTrajectory, simulate_experimental_switching,
+       experimental_switching_state, ExperimentalSwitchingSamples,
+       sample_experimental_switching,
+       KeplerReference, kepler_state, kepler_specific_energy,
+       kepler_angular_momentum, radial_free_fall_time,
+       radial_free_fall_state,
        AccuracyProfile, accuracy_profile,
        CloseApproachEvent, SimulationResult, simulate,
        terminated_by_close_approach,
@@ -22,9 +56,11 @@ export ThreeBodySystem,
        linear_momentum, angular_momentum,
        kinetic_energy, potential_energy, total_energy,
        minimum_separation, relative_energy_error,
-       DiagnosticsReport, diagnostics_report,
+       DiagnosticsReport, ExperimentalSwitchingDiagnosticsReport, diagnostics_report,
        periodicity_error, CloseApproachReport, close_approach_report,
        SolverBenchmark, benchmark_solvers, benchmark_extreme_solvers,
+       FIGURE_EIGHT_PERIOD, HIERARCHICAL_TRIPLE_DURATION, ValidationBenchmarkReport,
+       validation_benchmark_names, run_validation_benchmark,
        plot_trajectory, animate, record_animation
 
 end
