@@ -1,11 +1,11 @@
 ﻿# ThreeBody3D fresh-environment test
 
-- Date: 2026-07-19 21:04:17 +12:00
+- Date: 2026-07-20 00:12:17 +12:00
 - Branch: v0.4-development
-- Commit: f682458
+- Commit: 8aaef44
 - Working tree dirty: false
-- Temporary project: C:\Users\ian_g\AppData\Local\Temp\ThreeBody3D-fresh-11d95f8f94f94f5c89717c43984375af
-- Elapsed seconds: 20.136
+- Temporary project: C:\Users\ian_g\AppData\Local\Temp\ThreeBody3D-fresh-7d62c77b2e6b49ca948ecb6ef275a10d
+- Elapsed seconds: 22.173
 - Overall status: **PASS**
 
 ## Scope
@@ -24,19 +24,19 @@ The test used a newly created Julia project and verified that a fresh user can:
 ```text
 ThreeBody3D fresh-environment test
   Julia version:                 1.12.5
-  temporary project:             C:\Users\ian_g\AppData\Local\Temp\ThreeBody3D-fresh-11d95f8f94f94f5c89717c43984375af\Project.toml
-  package version:               0.4.0-DEV
+  temporary project:             C:\Users\ian_g\AppData\Local\Temp\ThreeBody3D-fresh-7d62c77b2e6b49ca948ecb6ef275a10d\Project.toml
+  package version:               0.4.0
   saved states:                  11
   final integration time:        0.2
   maximum relative energy drift: 1.8976077773855786e-15
   minimum pair separation:       0.820333610356794
   trajectory figure type:        Makie.Figure
   status:                         PASS
-  Activating new project at `C:\Users\ian_g\AppData\Local\Temp\ThreeBody3D-fresh-11d95f8f94f94f5c89717c43984375af`
+  Activating new project at `C:\Users\ian_g\AppData\Local\Temp\ThreeBody3D-fresh-7d62c77b2e6b49ca948ecb6ef275a10d`
    Resolving package versions...
-    Updating `C:\Users\ian_g\AppData\Local\Temp\ThreeBody3D-fresh-11d95f8f94f94f5c89717c43984375af\Project.toml`
-  [56809431] + ThreeBody3D v0.4.0-DEV `C:\Users\ian_g\OneDrive\Documents\JuliaProjects\ThreeBody3D`
-    Updating `C:\Users\ian_g\AppData\Local\Temp\ThreeBody3D-fresh-11d95f8f94f94f5c89717c43984375af\Manifest.toml`
+    Updating `C:\Users\ian_g\AppData\Local\Temp\ThreeBody3D-fresh-7d62c77b2e6b49ca948ecb6ef275a10d\Project.toml`
+  [56809431] + ThreeBody3D v0.4.0 `C:\Users\ian_g\OneDrive\Documents\JuliaProjects\ThreeBody3D`
+    Updating `C:\Users\ian_g\AppData\Local\Temp\ThreeBody3D-fresh-7d62c77b2e6b49ca948ecb6ef275a10d\Manifest.toml`
   [47edcb42] + ADTypes v1.22.2
   [14f7f29c] + AMD v0.5.3
   [621f4979] + AbstractFFTs v1.5.0
@@ -269,7 +269,7 @@ ThreeBody3D fresh-environment test
   [bd369af6] + Tables v1.13.0
   [62fd8b95] + TensorCore v0.1.1
   [8290d209] + ThreadingUtilities v0.5.6
-  [56809431] + ThreeBody3D v0.4.0-DEV `C:\Users\ian_g\OneDrive\Documents\JuliaProjects\ThreeBody3D`
+  [56809431] + ThreeBody3D v0.4.0 `C:\Users\ian_g\OneDrive\Documents\JuliaProjects\ThreeBody3D`
   [731e570b] + TiffImages v0.11.9
   [a759f4b9] + TimerOutputs v0.5.29
   [3bb67fe8] + TranscodingStreams v0.11.3
