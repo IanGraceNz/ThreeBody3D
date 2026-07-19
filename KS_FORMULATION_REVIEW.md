@@ -2,10 +2,15 @@
 
 ## Recommendation for ThreeBody3D Stage 10A
 
-**Status:** Design review  
-**Target branch:** `v0.4-development`  
-**Proposed next artifact:** `KS_REGULARIZATION_DESIGN.md`  
-**Implementation status:** No KS implementation is authorized by this review alone.
+**Status:** Historical design review; recommendation implemented and validated
+
+**Target branch:** `v0.4-development`
+
+**Resulting normative artifact:** `KS_REGULARIZATION_DESIGN.md`
+
+**Implementation status:** The recommended fixed-convention KS formulation
+completed Stages KS-1 through KS-12 and remains internal research
+infrastructure.
 
 ---
 
@@ -1062,3 +1067,23 @@ consistent notation.
 8. S. Mikkola and D. Merritt, *Implementing few-body algorithmic
    regularization with post-Newtonian terms*, The Astronomical Journal 135
    (2008); arXiv:0709.3367.
+
+---
+
+## 20. Review outcome
+
+The recommendation in Section 18 was adopted without changing the selected
+mathematical convention. The implementation now includes the algebraic,
+dynamical, coupled three-body, explicit-segment, automatic-switching, testing,
+and scientific-validation stages specified by the subsequent frozen
+implementation plan.
+
+The review did not authorize, and the implementation does not claim, general
+three-body collision regularization. The validated capability applies to one
+selected binary pair. Simultaneous triple collision, loss of pair isolation,
+and general multiparticle close encounters remain separate research problems.
+
+For API purposes, the KS implementation is retained as internal research
+infrastructure. Only its selection through the existing experimental
+automatic-switching controller is externally visible, and that controller
+remains explicitly experimental.

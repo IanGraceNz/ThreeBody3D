@@ -24,8 +24,8 @@ The project is designed around four principles:
 -   Continuous close-approach monitoring
 -   Arbitrary-precision (`BigFloat`) reference integrations
 -   Pair-centred coordinate transformations
--   Levi--Civita regularization research tools
--   Experimental automatic regularization switching
+-   Levi--Civita and spatial KS regularization research infrastructure
+-   Experimental automatic regularization switching with selectable backends
 -   Comprehensive scientific validation suite
 
 ------------------------------------------------------------------------
@@ -135,21 +135,30 @@ Research capabilities currently include:
 
 -   Pair-centred coordinates
 -   Analytic Kepler reference solutions
--   Planar Levi--Civita mappings
--   Sundman time transformations
+-   Planar Levi--Civita regularization
+-   Spatial Kustaanheimo--Stiefel (KS) regularization for one selected pair
+-   Sundman physical-time reconstruction
 -   Explicit regularized segment propagation
 -   Manual regularized trajectory composition
+-   Experimental automatic switching between Cartesian and regularized segments
 
-See `REGULARIZATION_DESIGN.md` for details.
+The KS implementation is retained as internal research infrastructure during
+the first implementation cycle. It is exercised through repository tests,
+validation programs, and the existing experimental switching interface; no
+stable public KS API is introduced in v0.4 development. See
+`KS_REGULARIZATION_DESIGN.md`, `KS_FORMULATION_REVIEW.md`, and
+`REGULARIZATION_DESIGN.md` for the mathematical scope and design decisions.
 
 ------------------------------------------------------------------------
 
 # Experimental Automatic Switching
 
 An experimental controller can automatically alternate between Cartesian
-integration and planar Levi--Civita regularization for isolated binary
-encounters. This research interface is separate from the stable
-production API.
+integration and a selected regularized backend for isolated binary encounters.
+The validated backends are planar Levi--Civita and spatial KS. KS is selected
+with `regularization_backend=:ks` in the experimental controller. This research
+interface is separate from the stable production `simulate` API and may change
+without deprecation while v0.4 remains in development.
 
 ------------------------------------------------------------------------
 
@@ -163,8 +172,33 @@ The repository includes validation benchmarks covering:
 -   Close-encounter regularization
 -   Equilateral triple collision
 -   Randomized regression
+-   Exact Kepler propagation in KS coordinates
+-   KS continuation through radial binary collision
+-   Independent KS and Levi--Civita cross-validation
+-   Coupled KS propagation in a hierarchical triple
+-   KS and Levi--Civita automatic-switching comparison
 
-Each benchmark contains explicit quantitative acceptance criteria.
+Each benchmark contains explicit quantitative acceptance criteria. Run the
+complete suite from the repository root with:
+
+``` julia
+julia --project=. examples/validation/run_validation_suite.jl
+```
+
+The suite runs each case in a separate Julia process and reports an overall
+pass or failure result.
+
+------------------------------------------------------------------------
+
+# Regularization Limitations
+
+The validated regularization scope is one explicitly selected Newtonian binary
+pair at a time. It does not regularize a simultaneous triple collision, a
+non-selected pair that independently becomes singular, or general compact
+few-body dynamics. Pair isolation, switching thresholds, gauge diagnostics,
+and transition residuals remain part of the experimental research workflow.
+Exact Newtonian point-mass collisions outside the selected regularized pair
+remain singular.
 
 ------------------------------------------------------------------------
 

@@ -51,6 +51,20 @@ This level includes the exported names from `PairCoordinates` through
 Call documented functions rather than depending directly on struct field order
 or undocumented internal state.
 
+### KS research infrastructure
+
+The spatial Kustaanheimo--Stiefel implementation remains internal research
+infrastructure for the first implementation cycle. Its transformation,
+dynamics, coupled three-body, segment, and validation names are intentionally
+not exported from `ThreeBody3D`. They may be accessed by repository tests and
+validation programs using qualified internal names, but external users should
+not treat those names, constructors, fields, or source paths as an API.
+
+The experimental switching controller may select the validated KS backend with
+`regularization_backend=:ks`. That keyword value is covered by the
+experimental automatic-switching tier below; it does not make the underlying KS
+types stable or public.
+
 ### Experimental automatic-switching API
 
 All exported names whose purpose is automatic threshold switching remain
@@ -65,9 +79,10 @@ explicitly experimental, including:
 - `ExperimentalSwitchingSamples` and `sample_experimental_switching`;
 - `ExperimentalSwitchingDiagnosticsReport`.
 
-These interfaces are scientifically validated for the documented isolated,
-planar binary-encounter scope, but they are not yet part of the production
-`simulate` API. Names, constructors, fields, thresholds, failure records, and
+These interfaces are scientifically validated for the documented isolated
+binary-encounter scope. The Levi--Civita backend is planar; the KS backend is
+spatial and still regularizes only the selected pair. They are not yet part of
+the production `simulate` API. Names, constructors, fields, thresholds, failure records, and
 return structures may change without deprecation while v0.4 remains in
 development.
 

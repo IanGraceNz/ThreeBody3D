@@ -2,9 +2,14 @@
 
 ## ThreeBody3D Spatial Binary Regularization Specification
 
-**Status:** Proposed normative design  
-**Target branch:** `v0.4-development`  
-**Implementation authorization:** Transformation and dynamics implementation may begin only after the algebraic test fixtures defined here are accepted.  
+**Status:** Implemented and scientifically validated normative design
+
+**Target branch:** `v0.4-development`
+
+**Implementation status:** Stages KS-1 through KS-12 are complete. The
+implementation remains internal research infrastructure during the first
+implementation cycle.
+
 **Scope:** One selected Newtonian binary pair in a spatial three-body system.
 
 ---
@@ -1303,3 +1308,47 @@ into a small independent Julia or symbolic verification script and checked for:
 
 These identities were independently algebraically checked while preparing this
 design. The committed package tests remain the authoritative verification.
+
+---
+
+## 26. Implemented and validated status
+
+The first implementation cycle now conforms to the frozen decisions in this
+document. The repository contains:
+
+- algebraic KS transformations, analytic Jacobians, gauge transformations, and
+  deterministic inverse lifts;
+- physical-velocity transformations and scale-aware diagnostics;
+- unperturbed and perturbed KS relative dynamics;
+- pair-centred coupling to the complete Newtonian three-body state;
+- explicit KS regularized segments;
+- integration with the experimental automatic-switching controller; and
+- scientific validation benchmarks for exact Kepler motion, radial collision
+  continuation, Levi--Civita cross-validation, hierarchical triples, and
+  automatic switching.
+
+The complete package test suite and the complete scientific validation suite
+pass at the Stage KS-12 checkpoint. Near a binary collision, physical velocity
+differences between independently propagated KS and Levi--Civita states are
+assessed against the first-order conditioning amplification of the Cartesian
+velocity reconstruction rather than by weakening ordinary-sample tolerances.
+
+### 26.1 API decision
+
+KS remains internal research infrastructure. No KS implementation type or
+low-level KS function is exported from `ThreeBody3D` in the first cycle. The
+existing experimental automatic-switching interface may select the KS backend,
+but that interface retains its experimental compatibility status.
+
+### 26.2 Validated scope and limitations
+
+The implementation regularizes one selected Newtonian binary pair. It does not
+claim to regularize:
+
+- a simultaneous triple collision;
+- a singularity in a non-selected pair;
+- a compact interaction in which no isolated binary description remains valid;
+- arbitrary velocity-dependent or non-Newtonian perturbations; or
+- general multiparticle close encounters.
+
+Those cases require separate formulation, implementation, and validation.

@@ -10,6 +10,25 @@
 - Added ordered-pair orientation, third-body metadata, Float64/BigFloat round-trip tests, and the v0.4 regularization design specification.
 - No integration equations or existing simulation behaviour changed in Stage 1.
 
+### Spatial KS regularization research infrastructure
+
+- Implemented the fixed KS1 coordinate convention, analytic Jacobians, gauge
+  transformations, deterministic inverse lift, velocity maps, and scale-aware
+  algebraic diagnostics.
+- Added isolated and perturbed KS dynamics with Sundman physical time, coupled
+  the selected pair to pair-centred three-body coordinates, and added explicit
+  KS regularized segments.
+- Integrated KS as a selectable backend of the experimental automatic-switching
+  controller without changing the stable production `simulate` API.
+- Added Float32, Float64, and BigFloat tests together with exact Kepler, radial
+  collision continuation, Levi--Civita cross-validation, hierarchical-triple,
+  automatic-switching, and independent high-precision validation benchmarks.
+- Retained KS implementation names as internal research infrastructure for the
+  first implementation cycle; no stable public KS API is introduced.
+- Documented the validated limitation to one selected binary pair at a time.
+  Simultaneous triple collision and general multiparticle regularization remain
+  outside the implemented scope.
+
 ## 0.3.0-DEV
 
 - Added named `:fast`, `:accurate`, and `:extreme` integration profiles.
