@@ -271,7 +271,7 @@ function animate_collision_ejection_reference(
     fig = Figure(size=(1000, 800))
     frame = Observable(1)
     title = @lift(
-        "Analytic triple-collision reference — physical time = " *
+        "Analytic triple-collision reference - physical time = " *
         string(round(times[$frame]; digits=6)),
     )
     ax = Axis3(

@@ -19,7 +19,7 @@ u_exact, uprime_exact = levi_civita_fictitious_state(oscillator, π)
 u_numeric, uprime_numeric = levi_civita_fictitious_state(result, π)
 q, qdot = levi_civita_cartesian_state(oscillator, π)
 
-println("Isolated Levi-Civita oscillator at s = π")
+println("Isolated Levi-Civita oscillator at s = pi")
 println("  specific energy:             ", oscillator.specific_energy)
 println("  regularized position error:  ", norm(u_numeric - u_exact))
 println("  regularized velocity error:  ", norm(uprime_numeric - uprime_exact))

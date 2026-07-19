@@ -24,7 +24,7 @@ result = compose_regularized_trajectory(
     regularized_abstol=1e-13,
 )
 
-println("Manual Cartesian → Levi-Civita → Cartesian composition")
+println("Manual Cartesian -> Levi-Civita -> Cartesian composition")
 println("  full interval:          ", result.tspan)
 println("  regularized interval:   ", result.regularized_interval)
 println("  selected pair:          ", result.pair)

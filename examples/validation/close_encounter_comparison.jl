@@ -229,10 +229,10 @@ function periapsis_state(
     fa = pair_radial_numerator(state_at_time(a))
     fb = pair_radial_numerator(state_at_time(b))
     fa < zero(fa) || error(
-        "Periapsis bracket must start on the inbound branch; r⋅v=$(fa).",
+        "Periapsis bracket must start on the inbound branch; r dot v=$(fa).",
     )
     fb > zero(fb) || error(
-        "Periapsis bracket must end on the outbound branch; r⋅v=$(fb).",
+        "Periapsis bracket must end on the outbound branch; r dot v=$(fb).",
     )
 
     for _ in 1:iterations

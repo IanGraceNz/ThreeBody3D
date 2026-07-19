@@ -17,7 +17,7 @@ segment = propagate_regularized_segment(
     abstol=1e-13,
 )
 
-println("Explicit Cartesian → Levi-Civita → Cartesian segment")
+println("Explicit Cartesian -> Levi-Civita -> Cartesian segment")
 println("  selected pair:          ", segment.pair)
 println("  physical interval:      ", (segment.entry_time, segment.exit_time))
 println("  exit fictitious time:   ", segment.exit_fictitious_time)

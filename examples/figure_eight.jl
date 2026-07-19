@@ -10,7 +10,9 @@ u0 = statevector(
 
 result = simulate(system, u0, (0.0, 6.4); saveat=0.01)
 println(diagnostics_report(result))
-plot_trajectory(result)
+show_plot = lowercase(get(ENV, "THREEBODY3D_SHOW_PLOTS", "true")) == "true"
+figure = plot_trajectory(result; show=show_plot)
+println("Trajectory figure: ", typeof(figure))
 
 # Uncomment either line for playback or MP4 output.
 # animate(result; duration=12)

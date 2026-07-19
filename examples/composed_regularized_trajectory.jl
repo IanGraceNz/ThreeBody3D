@@ -17,13 +17,13 @@ result = compose_regularized_trajectory(
     saveat=0.05,
     cartesian_reltol=1e-13,
     cartesian_abstol=1e-13,
-    initial_step=0.5,
-    tolerance=1e-11,
-    reltol=1e-13,
-    abstol=1e-13,
+    regularized_initial_step=0.5,
+    regularized_tolerance=1e-11,
+    regularized_reltol=1e-13,
+    regularized_abstol=1e-13,
 )
 
-println(result)
+println("Composed regularized trajectory")
 println("\nEntry continuity")
 println(result.entry_continuity)
 println("\nExit continuity")
@@ -36,4 +36,7 @@ reference = simulate(
 println("\nFinal-state discrepancy from all-Cartesian reference: ",
         maximum(abs, result.states[end] .- reference.solution(1.0)))
 println("State samples: ", length(result))
-println("Segment statistics: ", composed_segment_statistics(result))
+println("\nSegment statistics")
+for statistics in result.solver_statistics
+    println(statistics)
+end
