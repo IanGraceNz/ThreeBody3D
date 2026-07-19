@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.4.0-DEV
+## 0.4.0 — 2026-07-19
 
 ### Stage 1 — Regularization infrastructure
 

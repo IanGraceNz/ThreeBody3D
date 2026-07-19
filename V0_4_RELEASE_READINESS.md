@@ -1,6 +1,6 @@
 # ThreeBody3D v0.4 Release-Readiness Plan
 
-**Status:** Proposed release-preparation checklist  
+**Status:** RP-6 release candidate accepted; release metadata prepared; RP-7 pending
 **Target branch:** `v0.4-development`  
 **Starting commit:** `724f745`  
 **Scope:** Release preparation only; no new mathematics or numerical features
@@ -303,8 +303,11 @@ A release metadata commit shall never conceal a functional correction.
 
 ## 7. Immediate next action
 
-Begin with RP-1 only: repository and metadata audit.
+The RP-6 release candidate at commit `fcfd55f` passed the complete package test
+suite and all 11 scientific validation cases. Release metadata has now been
+prepared for v0.4.0.
 
-Do not change the package version, changelog release heading, or Git tag until
-all earlier gates have passed and the final release candidate has been
-explicitly accepted.
+Rerun the complete package test suite, scientific validation suite, and fresh-
+environment validation against the release metadata commit. If all checks pass
+and the working tree is clean, proceed to RP-7 only after explicit acceptance
+of the final release commit.

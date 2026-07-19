@@ -1,7 +1,7 @@
 name = "ThreeBody3D"
 uuid = "56809431-d508-4869-b2a1-a7090c02118e"
 authors = ["Ian Grace"]
-version = "0.4.0-DEV"
+version = "0.4.0"
 
 [deps]
 GLMakie = "e9467ef8-e4e7-5192-8a1a-b1aee30e663a"

@@ -446,6 +446,12 @@ The detailed stability classification is in `API_STABILITY.md`:
 
 ## Licence
 
-A software licence has not yet been selected for this project.
+ThreeBody3D is released under the MIT License.
 
-Licensing information will be added before the first public release.
+See the [`LICENCE`](LICENCE) file for the full licence text.
+
+## Citation
+
+If you use ThreeBody3D in research or published work, please cite the software
+using the metadata in [`CITATION.cff`](CITATION.cff). GitHub also exposes this
+metadata through its **Cite this repository** feature.

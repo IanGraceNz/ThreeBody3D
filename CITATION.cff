@@ -1,0 +1,31 @@
+cff-version: 1.2.0
+message: >-
+  If you use ThreeBody3D in research or published work, please cite this
+  software.
+title: ThreeBody3D
+type: software
+authors:
+  - family-names: Grace
+    given-names: Ian
+repository-code: https://github.com/IanGraceNz/ThreeBody3D
+repository-artifact: https://github.com/IanGraceNz/ThreeBody3D/releases
+url: https://github.com/IanGraceNz/ThreeBody3D
+license: MIT
+version: 0.4.0
+date-released: 2026-07-19
+abstract: >-
+  ThreeBody3D is a Julia package for numerical integration and scientific
+  validation of the Newtonian three-body problem in three spatial dimensions.
+  It provides high-accuracy numerical integration, validation benchmarks,
+  Levi-Civita regularization, Kustaanheimo-Stiefel regularization, and
+  experimental automatic regularization switching for close encounters.
+keywords:
+  - Julia
+  - three-body problem
+  - celestial mechanics
+  - numerical integration
+  - orbital dynamics
+  - regularization
+  - Levi-Civita
+  - Kustaanheimo-Stiefel
+  - scientific computing
