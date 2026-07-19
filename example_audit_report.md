@@ -49,11 +49,11 @@ The following validation programs are exercised by the suite:
 
 These checks require a Windows desktop session with a working OpenGL environment. MP4 recording also requires the bundled or system FFmpeg path to function.
 
-- [ ] `julia --project=. examples/figure_eight.jl` displays a trajectory figure.
-- [ ] `julia --project=. examples/hierarchical_triple.jl` displays a trajectory figure.
-- [ ] With `THREEBODY3D_ANIMATE=true`, `examples/automatic_regularization.jl` displays and plays an animation.
-- [ ] With `THREEBODY3D_RECORD_MP4=true`, `examples/automatic_regularization.jl` writes a playable MP4.
-- [ ] `animate_collision_ejection_reference()` works after loading `examples/validation/equilateral_triple_collision_reference.jl` interactively.
+- [x] `julia --project=. examples/figure_eight.jl` displays a trajectory figure.
+- [x] `julia --project=. examples/hierarchical_triple.jl` displays a trajectory figure.
+- [x] With `THREEBODY3D_ANIMATE=true`, `examples/automatic_regularization.jl` displays and plays an animation.
+- [x] With `THREEBODY3D_RECORD_MP4=true`, `examples/automatic_regularization.jl` writes a playable MP4.
+- [x] `animate_collision_ejection_reference()` works after loading `examples/validation/equilateral_triple_collision_reference.jl` interactively.
 
 ## Overall batch status
 
