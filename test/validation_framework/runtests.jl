@@ -12,3 +12,5 @@ include("case_results.jl")
 include("suite_results.jl")
 
 include("serialization.jl")
+
+include("console_presentation.jl")

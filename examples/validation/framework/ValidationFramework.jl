@@ -18,6 +18,7 @@ include("Criteria.jl")
 include("CaseResults.jl")
 include("SuiteResults.jl")
 include("Serialization.jl")
+include("ConsolePresentation.jl")
 
 export AbstractValidationMetric,
        actual_completed,
@@ -107,6 +108,8 @@ export AbstractValidationMetric,
        record_configuration!,
        record_metric!,
        record_solver_statistics!,
+       render_case_result,
+       render_suite_result,
        record_case_result!,
        severity_advisory,
        severity_required,
