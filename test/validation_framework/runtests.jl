@@ -9,4 +9,6 @@ include("criteria.jl")
 
 include("case_results.jl")
 
+include("suite_results.jl")
+
 include("serialization.jl")
