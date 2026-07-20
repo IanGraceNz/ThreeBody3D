@@ -8,8 +8,8 @@
 ## 1. Purpose
 
 This document defines the remaining verification and release-preparation work
-for ThreeBody3D v0.4 after completion of the Levi--Civita and KS
-regularization research programme.
+for ThreeBody3D v0.4 after completion of the Levi-Civita and
+Kustaanheimo–Stiefel transformation (KS) regularization research programme.
 
 The release-preparation phase shall preserve the project's governing
 priorities:

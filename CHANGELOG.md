@@ -97,7 +97,7 @@
   interpolated Sundman time component.
 - Removed an unused duplicate composition source file.
 
-### Spatial KS regularization research infrastructure
+### Spatial Kustaanheimo–Stiefel transformation (KS) regularization research infrastructure
 
 - Implemented the fixed KS1 coordinate convention, analytic Jacobians, gauge
   transformations, deterministic inverse lift, velocity maps, and scale-aware
@@ -108,7 +108,7 @@
 - Integrated KS as a selectable backend of the experimental automatic-switching
   controller without changing the stable production `simulate` API.
 - Added Float32, Float64, and BigFloat tests together with exact Kepler, radial
-  collision continuation, Levi--Civita cross-validation, hierarchical-triple,
+  collision continuation, Levi-Civita cross-validation, hierarchical-triple,
   automatic-switching, and independent high-precision validation benchmarks.
 - Retained KS implementation names as internal research infrastructure for the
   first implementation cycle; no stable public KS API is introduced.

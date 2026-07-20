@@ -1,6 +1,6 @@
 # IMPLEMENTATION_PLAN_KS
 
-## ThreeBody3D KS Regularization Implementation Plan
+## ThreeBody3D Kustaanheimo–Stiefel Transformation (KS) Regularization Implementation Plan
 
 **Status:** Proposed implementation roadmap  
 **Target branch:** `v0.4-development`  

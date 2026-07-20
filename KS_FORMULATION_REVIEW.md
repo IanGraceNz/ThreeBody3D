@@ -8,7 +8,7 @@
 
 **Resulting normative artifact:** `KS_REGULARIZATION_DESIGN.md`
 
-**Implementation status:** The recommended fixed-convention KS formulation
+**Implementation status:** The recommended fixed-convention Kustaanheimo–Stiefel transformation (KS) formulation
 completed Stages KS-1 through KS-12 and remains internal research
 infrastructure.
 
@@ -62,11 +62,11 @@ Stage 10 objective.
 
 ## 3. Mathematical problem
 
-For a selected pair with relative position \(\mathbf r\), relative velocity
-\(\mathbf v\), and gravitational parameter \(\mu\), the perturbed relative
+For a selected pair with relative position $\mathbf r$, relative velocity
+$\mathbf v$, and gravitational parameter $\mu$, the perturbed relative
 equation may be written schematically as
 
-\[
+$$
 \ddot{\mathbf r}
 =
 -\mu\frac{\mathbf r}{r^3}
@@ -74,13 +74,13 @@ equation may be written schematically as
 \mathbf f(\mathbf r,\mathbf v,t),
 \qquad
 r=\lVert\mathbf r\rVert ,
-\]
+$$
 
-where \(\mathbf f\) is the perturbation induced by the third body and any
+where $\mathbf f$ is the perturbation induced by the third body and any
 future supported forces.
 
-Direct Cartesian integration becomes increasingly difficult as \(r\) becomes
-small because the Newtonian acceleration scales as \(r^{-2}\), while the
+Direct Cartesian integration becomes increasingly difficult as $r$ becomes
+small because the Newtonian acceleration scales as $r^{-2}$, while the
 natural physical timescale of the encounter becomes very short.
 
 A useful regularization should:
@@ -100,25 +100,25 @@ A useful regularization should:
 The KS transformation represents a three-dimensional relative position by a
 four-dimensional variable. In common notation,
 
-\[
+$$
 \mathbf r = \mathcal K(\mathbf u),
 \qquad
 \mathbf u\in\mathbb R^4,
-\]
+$$
 
 with the fundamental radial identity
 
-\[
+$$
 r = \lVert\mathbf u\rVert^2
-\]
+$$
 
 for the selected convention.
 
 Together with a Sundman transformation such as
 
-\[
+$$
 \frac{dt}{ds}=r,
-\]
+$$
 
 the unperturbed Kepler problem becomes a four-dimensional harmonic-oscillator
 problem. Perturbations add regular forcing terms.
@@ -187,13 +187,13 @@ component-level tests straightforward.
 ### 4.3 Matrix formulation of KS
 
 The matrix formulation expresses the Cartesian map and its differential with
-an explicit convention-dependent matrix \(L(\mathbf u)\). Schematically,
+an explicit convention-dependent matrix $L(\mathbf u)$. Schematically,
 
-\[
+$$
 \mathbf r = \Pi L(\mathbf u)\mathbf u,
-\]
+$$
 
-where \(\Pi\) selects the physical three components from an associated
+where $\Pi$ selects the physical three components from an associated
 four-dimensional expression.
 
 #### Strengths
@@ -416,9 +416,9 @@ geometry, but it should not require a public quaternion abstraction.
 
 4. **Time transformation**  
    Begin with the classical Sundman relation
-   \[
+   $$
    dt/ds=r.
-   \]
+   $$
    Any constant scaling must be fixed once and included consistently in every
    derivative and momentum formula.
 
@@ -461,39 +461,39 @@ all of the following in one place.
 
 Specify exactly:
 
-- \(\mathbf u=(u_1,u_2,u_3,u_4)\);
-- the Cartesian ordering \((x,y,z)\);
+- $\mathbf u=(u_1,u_2,u_3,u_4)$;
+- the Cartesian ordering $(x,y,z)$;
 - the selected defining vector;
 - the sign convention;
-- the associated \(4\times4\) or \(3\times4\) matrices.
+- the associated $4\times4$ or $3\times4$ matrices.
 
 ### 7.2 Forward map
 
 State the complete polynomial map
 
-\[
+$$
 \mathbf r=\mathcal K(\mathbf u)
-\]
+$$
 
 and prove or verify computationally that
 
-\[
+$$
 \lVert\mathbf r\rVert=\lVert\mathbf u\rVert^2.
-\]
+$$
 
 ### 7.3 Differential map
 
 Define the Jacobian
 
-\[
+$$
 D\mathcal K(\mathbf u)
-\]
+$$
 
 and the exact relation among:
 
-- Cartesian physical velocity \(d\mathbf r/dt\);
-- fictitious-time derivative \(d\mathbf r/ds\);
-- KS derivative \(d\mathbf u/ds\); and
+- Cartesian physical velocity $d\mathbf r/dt$;
+- fictitious-time derivative $d\mathbf r/ds$;
+- KS derivative $d\mathbf u/ds$; and
 - any canonical KS momentum.
 
 These quantities must never share an ambiguous variable name.
@@ -522,9 +522,9 @@ Document a deterministic Cartesian-to-KS lift, including:
 
 State whether
 
-\[
+$$
 dt/ds=r
-\]
+$$
 
 or a scaled equivalent is used. Include dimensions and scaling.
 
@@ -597,17 +597,17 @@ viable, not evidence that unverified spatial formulas are correct.
 
 ## 10. Perturbation model
 
-For a selected pair \(i,j\), the regularized relative subsystem must include
-the differential acceleration exerted by the third body \(k\):
+For a selected pair $i,j$, the regularized relative subsystem must include
+the differential acceleration exerted by the third body $k$:
 
-\[
+$$
 \mathbf f_{\mathrm{pert}}
 =
 \mathbf a_i^{(k)}-\mathbf a_j^{(k)}.
-\]
+$$
 
 The design must derive this perturbation in a form that remains regular after
-multiplication by the required powers of \(r\) from the Sundman and KS
+multiplication by the required powers of $r$ from the Sundman and KS
 transformations.
 
 The pair centre of mass and third body may continue to evolve in Cartesian

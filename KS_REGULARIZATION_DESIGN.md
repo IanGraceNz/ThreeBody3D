@@ -6,9 +6,9 @@
 
 **Target branch:** `v0.4-development`
 
-**Implementation status:** Stages KS-1 through KS-12 are complete. The
-implementation remains internal research infrastructure during the first
-implementation cycle.
+**Implementation status:** The Kustaanheimo–Stiefel transformation (KS)
+implementation completed Stages KS-1 through KS-12 and remains internal
+research infrastructure during the first implementation cycle.
 
 **Scope:** One selected Newtonian binary pair in a spatial three-body system.
 
@@ -16,8 +16,8 @@ implementation cycle.
 
 ## 1. Purpose
 
-This document specifies the mathematical and software design of the
-Kustaanheimo–Stiefel (KS) regularization subsystem for ThreeBody3D.
+This document specifies the mathematical and software design of the KS
+regularization subsystem for ThreeBody3D.
 
 The design extends the existing planar Levi–Civita work to arbitrary
 three-dimensional close encounters. It fixes one KS convention and derives,
@@ -1324,12 +1324,12 @@ document. The repository contains:
 - explicit KS regularized segments;
 - integration with the experimental automatic-switching controller; and
 - scientific validation benchmarks for exact Kepler motion, radial collision
-  continuation, Levi--Civita cross-validation, hierarchical triples, and
+  continuation, Levi-Civita cross-validation, hierarchical triples, and
   automatic switching.
 
 The complete package test suite and the complete scientific validation suite
 pass at the Stage KS-12 checkpoint. Near a binary collision, physical velocity
-differences between independently propagated KS and Levi--Civita states are
+differences between independently propagated KS and Levi-Civita states are
 assessed against the first-order conditioning amplification of the Cartesian
 velocity reconstruction rather than by weakening ordinary-sample tolerances.
 

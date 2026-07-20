@@ -81,7 +81,7 @@ Reconstruction is
 
 with analogous velocity relations. This isolates the singular internal binary motion in `q`, nonsingular binary-centre translation, and third-body perturbation.
 
-This pair-coordinate layer must be shared by Levi–Civita and KS methods.
+This pair-coordinate layer must be shared by Levi–Civita and Kustaanheimo–Stiefel transformation (KS) methods.
 
 ## 5. Levi–Civita regularization
 

@@ -51,9 +51,9 @@ This level includes the exported names from `PairCoordinates` through
 Call documented functions rather than depending directly on struct field order
 or undocumented internal state.
 
-### KS research infrastructure
+### Kustaanheimo–Stiefel transformation (KS) research infrastructure
 
-The spatial Kustaanheimo--Stiefel implementation remains internal research
+The spatial Kustaanheimo–Stiefel implementation remains internal research
 infrastructure for the first implementation cycle. Its transformation,
 dynamics, coupled three-body, segment, and validation names are intentionally
 not exported from `ThreeBody3D`. They may be accessed by repository tests and
@@ -80,7 +80,7 @@ explicitly experimental, including:
 - `ExperimentalSwitchingDiagnosticsReport`.
 
 These interfaces are scientifically validated for the documented isolated
-binary-encounter scope. The Levi--Civita backend is planar; the KS backend is
+binary-encounter scope. The Levi-Civita backend is planar; the KS backend is
 spatial and still regularizes only the selected pair. They are not yet part of
 the production `simulate` API. Names, constructors, fields, thresholds, failure records, and
 return structures may change without deprecation while v0.4 remains in

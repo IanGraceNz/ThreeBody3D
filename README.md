@@ -237,9 +237,9 @@ coordinates = to_pair_coordinates(system, u0, (1, 2))
 reconstructed = from_pair_coordinates(system, coordinates)
 ```
 
-### Levi--Civita coordinate maps
+### Levi-Civita coordinate maps
 
-- `LeviCivitaCoordinates` stores planar Levi--Civita coordinates.
+- `LeviCivitaCoordinates` stores planar Levi-Civita coordinates.
 - `levi_civita_position(u)` maps the two-dimensional regularized position to
   physical relative position.
 - `levi_civita_velocity(u, w)` maps regularized variables to physical relative
@@ -247,7 +247,7 @@ reconstructed = from_pair_coordinates(system, coordinates)
 - `to_levi_civita(r, v; kwargs...)` performs the inverse lift.
 - `from_levi_civita(coordinates)` returns physical planar position and velocity.
 
-### Isolated Levi--Civita propagation
+### Isolated Levi-Civita propagation
 
 - `LeviCivitaOscillator` defines an isolated regularized two-body problem.
 - `integrate_levi_civita_fictitious(problem, sspan; kwargs...)` returns a
@@ -266,7 +266,7 @@ reconstructed = from_pair_coordinates(system, coordinates)
 - `levi_civita_sundman_state(result, s)` evaluates the augmented Sundman state.
 - `levi_civita_state_at_time(result, t; kwargs...)` evaluates at physical time.
 
-### Perturbed planar Levi--Civita propagation
+### Perturbed planar Levi-Civita propagation
 
 - `PerturbedLeviCivitaProblem(system, state, pair; kwargs...)` defines a selected
   pair coupled to the third body.
@@ -304,7 +304,7 @@ See `examples/explicit_regularized_segment.jl` and
 ## Experimental automatic-switching API
 
 This API automatically alternates between Cartesian propagation and one
-selected regularized backend. It is scientifically validated for isolated
+selected regularized backend. It is validated for isolated
 binary encounters but remains separate from production `simulate` and may
 change without deprecation.
 
@@ -340,7 +340,8 @@ samples = sample_experimental_switching(trajectory; dt = 0.02)
 println(diagnostics_report(trajectory, samples))
 ```
 
-The spatial KS implementation itself remains internal; selecting
+The spatial Kustaanheimo–Stiefel transformation (KS) implementation itself
+remains internal; selecting
 `regularization_backend=:ks` does not make its low-level names public.
 
 ### Switching states, events, and helpers
@@ -373,7 +374,7 @@ pair at a time. The implementation does not regularize:
 - a non-selected pair that independently becomes singular;
 - general multiparticle or compact few-body singular configurations.
 
-The Levi--Civita backend is planar. The KS backend is spatial but remains
+The Levi-Civita backend is planar. The KS backend is spatial but remains
 internal research infrastructure. Pair isolation, switching thresholds, gauge
 diagnostics, and transition residuals remain part of the experimental workflow.
 
@@ -401,7 +402,7 @@ Run any standalone example from the repository root:
 julia --project=. examples/figure_eight.jl
 ```
 
-The `examples/validation/` directory contains the quantitative scientific
+The `examples/validation/` directory contains the quantitative
 benchmarks and support code. Run the complete suite with:
 
 ```powershell
@@ -411,7 +412,7 @@ julia --project=. examples/validation/run_validation_suite.jl
 The suite currently covers figure-eight and hierarchical-triple benchmarks,
 automatic switching, independent high-precision close-encounter comparison,
 equilateral triple collision, randomized regression, KS Kepler propagation,
-collision continuation, KS/Levi--Civita cross-validation, coupled KS
+collision continuation, KS/Levi-Civita cross-validation, coupled KS
 hierarchical propagation, and backend switching comparison.
 
 ## Testing
@@ -428,14 +429,13 @@ The detailed stability classification is in `API_STABILITY.md`:
 
 - ordinary simulation, diagnostics, validation, and visualization are the
   stable public API for the current development line;
-- Levi--Civita and selected regularization tools are development research API;
+- Levi-Civita and selected regularization tools are development research API;
 - automatic switching is experimental;
 - unexported KS internals are not public API.
 
 ## Design and validation documents
 
-- `REGULARIZATION_DESIGN.md` and
-  `ThreeBody3D-v0.4-Regularization-Design.md` describe the regularization
+- `REGULARIZATION_DESIGN.md` describes the regularization
   programme;
 - `KS_REGULARIZATION_DESIGN.md` and `KS_FORMULATION_REVIEW.md` document the KS
   formulation and review;
