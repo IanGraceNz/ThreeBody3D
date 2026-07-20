@@ -7,4 +7,6 @@ include("types.jl")
 
 include("criteria.jl")
 
+include("case_results.jl")
+
 include("serialization.jl")

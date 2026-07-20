@@ -15,6 +15,7 @@ not included in, or exported from, the public `ThreeBody3D` package API.
 
 include("Types.jl")
 include("Criteria.jl")
+include("CaseResults.jl")
 include("Serialization.jl")
 
 export AbstractValidationMetric,
@@ -42,6 +43,11 @@ export AbstractValidationMetric,
        criterion_error,
        criterion_fail,
        criterion_pass,
+       build_case_result,
+       CaseBuilderState,
+       declare_criterion!,
+       evaluate_criteria!,
+       finish_execution!,
        evaluate_criteria,
        evaluate_criterion,
        ExecutionOutcome,
@@ -71,6 +77,7 @@ export AbstractValidationMetric,
        SolverStatistics,
        ValidationCaseDefinition,
        ValidationCaseResult,
+       ValidationCaseResultBuilder,
        ValidationCaseStatus,
        case_error,
        case_fail,
@@ -93,6 +100,9 @@ export AbstractValidationMetric,
        relation_less_than,
        relation_less_than_or_equal,
        relation_true,
+       record_configuration!,
+       record_metric!,
+       record_solver_statistics!,
        severity_advisory,
        severity_required,
        VALIDATION_SCHEMA_IDENTITY,
