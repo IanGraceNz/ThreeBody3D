@@ -14,6 +14,7 @@ not included in, or exported from, the public `ThreeBody3D` package API.
 """
 
 include("Types.jl")
+include("Criteria.jl")
 
 export AbstractValidationMetric,
        actual_completed,
@@ -40,6 +41,8 @@ export AbstractValidationMetric,
        criterion_error,
        criterion_fail,
        criterion_pass,
+       evaluate_criteria,
+       evaluate_criterion,
        ExecutionOutcome,
        ExpectedExecutionOutcome,
        expected_completed,

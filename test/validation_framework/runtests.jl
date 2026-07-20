@@ -4,3 +4,5 @@ include(joinpath(@__DIR__, "..", "..", "examples", "validation", "framework", "V
 using .ValidationFramework
 
 include("types.jl")
+
+include("criteria.jl")
