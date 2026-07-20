@@ -2155,3 +2155,5 @@ end
 end
 
 include("ks/runtests.jl")
+
+include("validation_framework/runtests.jl")
