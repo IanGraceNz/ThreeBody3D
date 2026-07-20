@@ -15,6 +15,7 @@ not included in, or exported from, the public `ThreeBody3D` package API.
 
 include("Types.jl")
 include("Criteria.jl")
+include("Serialization.jl")
 
 export AbstractValidationMetric,
        actual_completed,
@@ -94,6 +95,14 @@ export AbstractValidationMetric,
        relation_true,
        severity_advisory,
        severity_required,
+       VALIDATION_SCHEMA_IDENTITY,
+       case_report_text,
+       read_case_report,
+       read_suite_report,
+       suite_report_text,
+       write_case_report,
+       write_report_atomic,
+       write_suite_report,
        stable_string
 
 end

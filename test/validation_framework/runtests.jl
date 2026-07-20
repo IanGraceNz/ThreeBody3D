@@ -6,3 +6,5 @@ using .ValidationFramework
 include("types.jl")
 
 include("criteria.jl")
+
+include("serialization.jl")
