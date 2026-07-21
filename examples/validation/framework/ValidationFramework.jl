@@ -22,6 +22,7 @@ include("ConsolePresentation.jl")
 include("CaseProtocol.jl")
 include("CoreBenchmarkCases.jl")
 include("CloseEncounterCase.jl")
+include("TripleCollisionCase.jl")
 
 export AbstractValidationMetric,
        actual_completed,
@@ -47,6 +48,7 @@ export AbstractValidationMetric,
        CriterionStatus,
        CORE_BENCHMARK_DEFINITION_VERSION,
        CLOSE_ENCOUNTER_DEFINITION_VERSION,
+       TRIPLE_COLLISION_DEFINITION_VERSION,
        current_validation_environment,
        criterion_error,
        criterion_fail,
@@ -55,6 +57,7 @@ export AbstractValidationMetric,
        build_figure_eight_case_result,
        build_hierarchical_triple_case_result,
        build_close_encounter_case_result,
+       build_triple_collision_case_result,
        build_suite_result,
        CaseBuilderState,
        declare_criterion!,
@@ -70,6 +73,7 @@ export AbstractValidationMetric,
        expected_stop,
        hierarchical_triple_case_definition,
        close_encounter_case_definition,
+       triple_collision_case_definition,
        MetricKind,
        metric_boolean,
        metric_integer,

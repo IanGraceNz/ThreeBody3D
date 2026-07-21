@@ -20,3 +20,5 @@ include("case_protocol.jl")
 include("core_benchmark_cases.jl")
 
 include("close_encounter_case.jl")
+
+include("triple_collision_case.jl")

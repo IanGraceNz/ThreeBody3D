@@ -1,6 +1,9 @@
 using ThreeBody3D
 using LinearAlgebra
 
+include(joinpath(@__DIR__, "framework", "ValidationFramework.jl"))
+using .ValidationFramework
+
 # RESEARCH VALIDATION REFERENCE — NOT A SOLVER CAPABILITY EXAMPLE
 #
 # ThreeBody3D does not currently regularize or numerically continue through a
@@ -32,6 +35,8 @@ const MASS = 1.0
 const SIDE_LENGTH = 1.0
 const CLOSE_APPROACH_THRESHOLD = 1.0e-5
 const VALIDATION_MINIMUM_SEPARATION = 1.0e-3
+
+protocol = resolve_case_protocol(triple_collision_case_definition(), VALIDATION_SCHEMA_VERSION)
 
 system = ThreeBodySystem((MASS, MASS, MASS); G=G)
 
@@ -339,7 +344,43 @@ triple_collision_criteria = (
     ),
 )
 
-validate_acceptance_criteria(
-    "Equilateral triple-collision validation acceptance criteria",
-    triple_collision_criteria,
-)
+if report_requested(protocol)
+    statistics = numerical.solution.stats
+    structured_result = build_triple_collision_case_result(
+        terminated_by_close_approach(numerical),
+        event.time,
+        event.separation,
+        maximum_scaled_position_error,
+        maximum_scaled_velocity_error,
+        length(validation_indices),
+        SolverStatistics(
+            accepted_steps=Int(statistics.naccept),
+            rejected_steps=Int(statistics.nreject),
+            rhs_evaluations=Int(statistics.nf),
+            saved_states=length(numerical.solution.t),
+        ),
+        current_validation_environment();
+        collision_time=collision_time,
+        return_time=return_time,
+        final_time=final_time,
+        close_approach_threshold=CLOSE_APPROACH_THRESHOLD,
+        validation_minimum_separation=VALIDATION_MINIMUM_SEPARATION,
+        position_error_limit=TRIPLE_COLLISION_POSITION_ERROR_LIMIT,
+        velocity_error_limit=TRIPLE_COLLISION_VELOCITY_ERROR_LIMIT,
+        event_separation_relative_limit=TRIPLE_COLLISION_EVENT_SEPARATION_RELATIVE_LIMIT,
+        solver=:accurate,
+        absolute_tolerance=1e-13,
+        relative_tolerance=1e-13,
+        saveat=collision_time / 500,
+        masses=system.masses,
+        gravitational_constant=system.G,
+        side_length=SIDE_LENGTH,
+    )
+    exit_code = publish_case_result(protocol, structured_result; render=false)
+    exit_code == 0 || exit(exit_code)
+else
+    validate_acceptance_criteria(
+        "Equilateral triple-collision validation acceptance criteria",
+        triple_collision_criteria,
+    )
+end
