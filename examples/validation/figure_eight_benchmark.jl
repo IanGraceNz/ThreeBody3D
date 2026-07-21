@@ -1,7 +1,12 @@
 using ThreeBody3D
 
+include(joinpath(@__DIR__, "framework", "ValidationFramework.jl"))
+using .ValidationFramework
+
 # Stage 9 common-format baseline for the equal-mass figure-eight choreography.
 # Increase `periods` to study long-duration phase and conservation behaviour.
+protocol = resolve_case_protocol(figure_eight_case_definition(), VALIDATION_SCHEMA_VERSION)
+
 report = run_validation_benchmark(
     :figure_eight;
     periods=10,
@@ -65,7 +70,22 @@ figure_eight_criteria = (
     ),
 )
 
-validate_acceptance_criteria(
-    "Figure-eight validation acceptance criteria",
-    figure_eight_criteria,
-)
+if report_requested(protocol)
+    structured_result = build_figure_eight_case_result(
+        report,
+        current_validation_environment();
+        energy_limit=FIGURE_EIGHT_ENERGY_DRIFT_LIMIT,
+        momentum_limit=FIGURE_EIGHT_MOMENTUM_DRIFT_LIMIT,
+        angular_momentum_limit=FIGURE_EIGHT_ANGULAR_MOMENTUM_DRIFT_LIMIT,
+        center_of_mass_limit=FIGURE_EIGHT_COM_RESIDUAL_LIMIT,
+        periodicity_limit=FIGURE_EIGHT_PERIODICITY_ERROR_LIMIT,
+        final_time_limit=FIGURE_EIGHT_FINAL_TIME_RESIDUAL_LIMIT,
+    )
+    exit_code = publish_case_result(protocol, structured_result; render=false)
+    exit_code == 0 || exit(exit_code)
+else
+    validate_acceptance_criteria(
+        "Figure-eight validation acceptance criteria",
+        figure_eight_criteria,
+    )
+end

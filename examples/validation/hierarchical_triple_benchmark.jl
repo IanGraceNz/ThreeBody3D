@@ -1,9 +1,14 @@
 using ThreeBody3D
 
+include(joinpath(@__DIR__, "framework", "ValidationFramework.jl"))
+using .ValidationFramework
+
 # Long-duration weakly perturbed hierarchical system. The benchmark tracks the
 # ratio of the outer-body distance from the inner-binary centre of mass to the
 # instantaneous inner separation. A ratio comfortably above one indicates that
 # the system remains hierarchical throughout the integration.
+protocol = resolve_case_protocol(hierarchical_triple_case_definition(), VALIDATION_SCHEMA_VERSION)
+
 report = run_validation_benchmark(
     :hierarchical_triple;
     duration=100.0,
@@ -68,7 +73,22 @@ hierarchical_criteria = (
     ),
 )
 
-validate_acceptance_criteria(
-    "Hierarchical-triple validation acceptance criteria",
-    hierarchical_criteria,
-)
+if report_requested(protocol)
+    structured_result = build_hierarchical_triple_case_result(
+        report,
+        current_validation_environment();
+        energy_limit=HIERARCHICAL_ENERGY_DRIFT_LIMIT,
+        momentum_limit=HIERARCHICAL_MOMENTUM_DRIFT_LIMIT,
+        angular_momentum_limit=HIERARCHICAL_ANGULAR_MOMENTUM_DRIFT_LIMIT,
+        center_of_mass_limit=HIERARCHICAL_COM_RESIDUAL_LIMIT,
+        minimum_ratio_limit=HIERARCHICAL_MINIMUM_RATIO_LIMIT,
+        final_time_limit=HIERARCHICAL_FINAL_TIME_RESIDUAL_LIMIT,
+    )
+    exit_code = publish_case_result(protocol, structured_result; render=false)
+    exit_code == 0 || exit(exit_code)
+else
+    validate_acceptance_criteria(
+        "Hierarchical-triple validation acceptance criteria",
+        hierarchical_criteria,
+    )
+end
