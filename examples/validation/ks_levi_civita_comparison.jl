@@ -1,6 +1,17 @@
 using ThreeBody3D
 using LinearAlgebra
 
+include(joinpath(@__DIR__, "framework", "ValidationFramework.jl"))
+using .ValidationFramework
+
+const KS_LEVI_CIVITA_DISCREPANCY_LIMIT = 5e-10
+const KS_LEVI_CIVITA_CONDITIONING_RATIO_LIMIT = 2.0
+
+protocol = resolve_case_protocol(
+    ks_levi_civita_comparison_case_definition(),
+    VALIDATION_SCHEMA_VERSION,
+)
+
 # Cross-validate the independent planar Levi-Civita and spatial KS
 # regularizations in physical Cartesian variables.
 include(joinpath(@__DIR__, "AcceptanceCriteria.jl"))
@@ -54,7 +65,7 @@ absolute_position_difference = norm(
 # of this reproducible radial benchmark rather than to an absolute unit.
 initial_radius = norm(report.initial_position)
 near_collision_radius = initial_radius * 1e-3
-conditioning_ratio_limit = 2.0
+conditioning_ratio_limit = KS_LEVI_CIVITA_CONDITIONING_RATIO_LIMIT
 roundoff_floor = 64eps(report.numeric_type)
 
 ordinary_velocity_errors = report.numeric_type[]
@@ -127,7 +138,7 @@ for diagnostic in near_collision_diagnostics
     println("    conditioning ratio:            ", diagnostic.conditioning_ratio)
 end
 
-limit = 5e-10
+limit = KS_LEVI_CIVITA_DISCREPANCY_LIMIT
 criteria = (
     validation_criterion("maximum scaled position discrepancy", report.maximum_position_error,
         "<= $(limit)", report.maximum_position_error <= limit),
@@ -150,7 +161,35 @@ criteria = (
     validation_criterion("final transition velocity discrepancy", report.final_transition_velocity_error,
         "<= $(limit)", report.final_transition_velocity_error <= limit),
 )
-validate_acceptance_criteria("KS/Levi-Civita comparison acceptance criteria", criteria)
+if report_requested(protocol)
+    structured_result = build_ks_levi_civita_comparison_case_result(
+        report.maximum_position_error,
+        maximum_ordinary_velocity_error,
+        maximum_near_collision_conditioning_ratio,
+        report.maximum_time_error,
+        report.maximum_energy_error,
+        report.maximum_ks_energy_drift,
+        report.maximum_levi_civita_energy_drift,
+        report.final_transition_position_error,
+        report.final_transition_velocity_error,
+        SolverStatistics(),
+        current_validation_environment();
+        gravitational_parameter=mu,
+        initial_position=(q[1], q[2]),
+        initial_velocity=(v[1], v[2]),
+        collision_time=collision_time,
+        sample_times=Tuple(times),
+        near_collision_radius=near_collision_radius,
+        ordinary_sample_count=length(ordinary_velocity_errors),
+        near_collision_sample_count=length(near_collision_conditioning_ratios),
+        discrepancy_limit=KS_LEVI_CIVITA_DISCREPANCY_LIMIT,
+        conditioning_ratio_limit=KS_LEVI_CIVITA_CONDITIONING_RATIO_LIMIT,
+    )
+    exit_code = publish_case_result(protocol, structured_result; render=false)
+    exit_code == 0 || exit(exit_code)
+else
+    validate_acceptance_criteria("KS/Levi-Civita comparison acceptance criteria", criteria)
+end
 end
 
 main()

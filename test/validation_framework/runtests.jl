@@ -28,3 +28,5 @@ include("randomized_regression_case.jl")
 include("ks_kepler_case.jl")
 
 include("ks_collision_continuation_case.jl")
+
+include("ks_levi_civita_comparison_case.jl")
