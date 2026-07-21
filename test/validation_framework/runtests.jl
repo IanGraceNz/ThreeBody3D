@@ -26,3 +26,5 @@ include("triple_collision_case.jl")
 include("randomized_regression_case.jl")
 
 include("ks_kepler_case.jl")
+
+include("ks_collision_continuation_case.jl")

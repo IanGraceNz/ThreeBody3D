@@ -25,6 +25,7 @@ include("CloseEncounterCase.jl")
 include("TripleCollisionCase.jl")
 include("RandomizedRegressionCase.jl")
 include("KSKeplerCase.jl")
+include("KSCollisionContinuationCase.jl")
 
 export AbstractValidationMetric,
        actual_completed,
@@ -53,6 +54,7 @@ export AbstractValidationMetric,
        TRIPLE_COLLISION_DEFINITION_VERSION,
        RANDOMIZED_REGRESSION_DEFINITION_VERSION,
        KS_KEPLER_DEFINITION_VERSION,
+       KS_COLLISION_CONTINUATION_DEFINITION_VERSION,
        current_validation_environment,
        criterion_error,
        criterion_fail,
@@ -64,6 +66,7 @@ export AbstractValidationMetric,
        build_triple_collision_case_result,
        build_randomized_regression_case_result,
        build_ks_kepler_case_result,
+       build_ks_collision_continuation_case_result,
        build_suite_result,
        CaseBuilderState,
        declare_criterion!,
@@ -82,6 +85,7 @@ export AbstractValidationMetric,
        triple_collision_case_definition,
        randomized_regression_case_definition,
        ks_kepler_case_definition,
+       ks_collision_continuation_case_definition,
        MetricKind,
        metric_boolean,
        metric_integer,
