@@ -2,6 +2,9 @@ using LinearAlgebra
 using Printf
 using ThreeBody3D
 
+include(joinpath(@__DIR__, "framework", "ValidationFramework.jl"))
+using .ValidationFramework
+
 # Publication-oriented comparison for one controlled planar close encounter.
 #
 # The three Float64 methods use the same physical problem, output epochs,
@@ -26,6 +29,8 @@ const EXIT_THRESHOLD = 0.25
 const CARTESIAN_TOLERANCE = 1e-13
 const REGULARIZED_TOLERANCE = 1e-12
 const EVALUATION_TOLERANCE = 1e-14
+
+protocol = resolve_case_protocol(close_encounter_case_definition(), VALIDATION_SCHEMA_VERSION)
 
 @inline decimal(::Type{Float64}, value::AbstractString) = parse(Float64, value)
 @inline decimal(::Type{BigFloat}, value::AbstractString) = parse(BigFloat, value)
@@ -674,6 +679,15 @@ println("Regularized endpoint physical-time consistency")
 @printf("  explicit Sundman-time residual:          %.3e\n", endpoint_times.explicit_time_residual)
 
 
+const CLOSE_ENCOUNTER_AUTOMATIC_MAXIMUM_STATE_ERROR_LIMIT = 1.0e-9
+const CLOSE_ENCOUNTER_EXPLICIT_MAXIMUM_STATE_ERROR_LIMIT = 1.0e-9
+const CLOSE_ENCOUNTER_EXIT_STATE_AGREEMENT_LIMIT = 1.0e-10
+const CLOSE_ENCOUNTER_EXPLICIT_EXIT_TIME_RESIDUAL_LIMIT = 5.0e-12
+const CLOSE_ENCOUNTER_AUTOMATIC_PERIAPSIS_ERROR_LIMIT = 1.0e-10
+const CLOSE_ENCOUNTER_EXPLICIT_PERIAPSIS_ERROR_LIMIT = 1.0e-10
+const CLOSE_ENCOUNTER_CARTESIAN_UNDER_RESOLUTION_MINIMUM = 1.0e-3
+const CLOSE_ENCOUNTER_AUTOMATIC_IMPROVEMENT_RATIO_LIMIT = 0.5
+
 function validate_close_encounter_comparison(
     cartesian,
     automatic,
@@ -691,25 +705,25 @@ function validate_close_encounter_comparison(
     checks = (
         (
             "automatic maximum state error",
-            automatic.errors.maximum_combined <= 1.0e-9,
+            automatic.errors.maximum_combined <= CLOSE_ENCOUNTER_AUTOMATIC_MAXIMUM_STATE_ERROR_LIMIT,
             automatic.errors.maximum_combined,
             "<= 1e-9",
         ),
         (
             "explicit maximum state error",
-            explicit.errors.maximum_combined <= 1.0e-9,
+            explicit.errors.maximum_combined <= CLOSE_ENCOUNTER_EXPLICIT_MAXIMUM_STATE_ERROR_LIMIT,
             explicit.errors.maximum_combined,
             "<= 1e-9",
         ),
         (
             "automatic-explicit exit-state agreement",
-            exit_difference.state <= 1.0e-10,
+            exit_difference.state <= CLOSE_ENCOUNTER_EXIT_STATE_AGREEMENT_LIMIT,
             exit_difference.state,
             "<= 1e-10",
         ),
         (
             "explicit Sundman exit-time residual",
-            abs(endpoint_times.explicit_time_residual) <= 5.0e-12,
+            abs(endpoint_times.explicit_time_residual) <= CLOSE_ENCOUNTER_EXPLICIT_EXIT_TIME_RESIDUAL_LIMIT,
             abs(endpoint_times.explicit_time_residual),
             "<= 5e-12",
         ),
@@ -717,7 +731,7 @@ function validate_close_encounter_comparison(
             "automatic periapsis separation error",
             abs(Float64(
                 automatic_periapsis.separation - reference_periapsis.separation,
-            )) <= 1.0e-10,
+            )) <= CLOSE_ENCOUNTER_AUTOMATIC_PERIAPSIS_ERROR_LIMIT,
             abs(Float64(
                 automatic_periapsis.separation - reference_periapsis.separation,
             )),
@@ -727,7 +741,7 @@ function validate_close_encounter_comparison(
             "explicit periapsis separation error",
             abs(Float64(
                 explicit_periapsis.separation - reference_periapsis.separation,
-            )) <= 1.0e-10,
+            )) <= CLOSE_ENCOUNTER_EXPLICIT_PERIAPSIS_ERROR_LIMIT,
             abs(Float64(
                 explicit_periapsis.separation - reference_periapsis.separation,
             )),
@@ -737,7 +751,7 @@ function validate_close_encounter_comparison(
             "Cartesian under-resolution is exposed",
             abs(Float64(
                 cartesian_periapsis.separation - reference_periapsis.separation,
-            )) >= 1.0e-3,
+            )) >= CLOSE_ENCOUNTER_CARTESIAN_UNDER_RESOLUTION_MINIMUM,
             abs(Float64(
                 cartesian_periapsis.separation - reference_periapsis.separation,
             )),
@@ -745,7 +759,7 @@ function validate_close_encounter_comparison(
         ),
         (
             "automatic regularization improves maximum state error",
-            automatic.errors.maximum_combined <= 0.5 * cartesian.errors.maximum_combined,
+            automatic.errors.maximum_combined <= CLOSE_ENCOUNTER_AUTOMATIC_IMPROVEMENT_RATIO_LIMIT * cartesian.errors.maximum_combined,
             automatic.errors.maximum_combined / cartesian.errors.maximum_combined,
             "<= 0.5 times Cartesian",
         ),
@@ -771,12 +785,44 @@ function validate_close_encounter_comparison(
     nothing
 end
 
-validate_close_encounter_comparison(
-    cartesian,
-    automatic,
-    explicit,
-    exit_difference,
-    reference_periapsis,
-    periapses,
-    endpoint_times,
-)
+if report_requested(protocol)
+    structured_result = build_close_encounter_case_result(
+        cartesian,
+        automatic,
+        explicit,
+        exit_difference,
+        reference_periapsis,
+        periapses,
+        endpoint_times,
+        current_validation_environment();
+        automatic_maximum_state_error_limit=CLOSE_ENCOUNTER_AUTOMATIC_MAXIMUM_STATE_ERROR_LIMIT,
+        explicit_maximum_state_error_limit=CLOSE_ENCOUNTER_EXPLICIT_MAXIMUM_STATE_ERROR_LIMIT,
+        exit_state_agreement_limit=CLOSE_ENCOUNTER_EXIT_STATE_AGREEMENT_LIMIT,
+        explicit_exit_time_residual_limit=CLOSE_ENCOUNTER_EXPLICIT_EXIT_TIME_RESIDUAL_LIMIT,
+        automatic_periapsis_separation_error_limit=CLOSE_ENCOUNTER_AUTOMATIC_PERIAPSIS_ERROR_LIMIT,
+        explicit_periapsis_separation_error_limit=CLOSE_ENCOUNTER_EXPLICIT_PERIAPSIS_ERROR_LIMIT,
+        cartesian_under_resolution_minimum=CLOSE_ENCOUNTER_CARTESIAN_UNDER_RESOLUTION_MINIMUM,
+        automatic_improvement_ratio_limit=CLOSE_ENCOUNTER_AUTOMATIC_IMPROVEMENT_RATIO_LIMIT,
+        reference_precision=REFERENCE_PRECISION,
+        sample_step=SAMPLE_STEP,
+        selected_pair=SELECTED_PAIR,
+        entry_threshold=ENTRY_THRESHOLD,
+        exit_threshold=EXIT_THRESHOLD,
+        cartesian_tolerance=CARTESIAN_TOLERANCE,
+        regularized_tolerance=REGULARIZED_TOLERANCE,
+        evaluation_tolerance=EVALUATION_TOLERANCE,
+        time_interval=problem.tspan,
+    )
+    exit_code = publish_case_result(protocol, structured_result; render=false)
+    exit_code == 0 || exit(exit_code)
+else
+    validate_close_encounter_comparison(
+        cartesian,
+        automatic,
+        explicit,
+        exit_difference,
+        reference_periapsis,
+        periapses,
+        endpoint_times,
+    )
+end
