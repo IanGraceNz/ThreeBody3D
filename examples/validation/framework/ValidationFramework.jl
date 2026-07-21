@@ -28,6 +28,7 @@ include("KSKeplerCase.jl")
 include("KSCollisionContinuationCase.jl")
 include("KSLeviCivitaComparisonCase.jl")
 include("KSHierarchicalTripleCase.jl")
+include("KSSwitchingComparisonCase.jl")
 
 export AbstractValidationMetric,
        actual_completed,
@@ -59,6 +60,7 @@ export AbstractValidationMetric,
        KS_COLLISION_CONTINUATION_DEFINITION_VERSION,
        KS_LEVI_CIVITA_COMPARISON_DEFINITION_VERSION,
        KS_HIERARCHICAL_TRIPLE_DEFINITION_VERSION,
+       KS_SWITCHING_COMPARISON_DEFINITION_VERSION,
        current_validation_environment,
        criterion_error,
        criterion_fail,
@@ -73,6 +75,7 @@ export AbstractValidationMetric,
        build_ks_collision_continuation_case_result,
        build_ks_levi_civita_comparison_case_result,
        build_ks_hierarchical_triple_case_result,
+       build_ks_switching_comparison_case_result,
        build_suite_result,
        CaseBuilderState,
        declare_criterion!,
@@ -94,6 +97,7 @@ export AbstractValidationMetric,
        ks_collision_continuation_case_definition,
        ks_levi_civita_comparison_case_definition,
        ks_hierarchical_triple_case_definition,
+       ks_switching_comparison_case_definition,
        MetricKind,
        metric_boolean,
        metric_integer,

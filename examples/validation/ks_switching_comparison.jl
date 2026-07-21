@@ -1,6 +1,18 @@
 using LinearAlgebra
 using ThreeBody3D
 
+include(joinpath(@__DIR__, "framework", "ValidationFramework.jl"))
+using .ValidationFramework
+
+const KS_SWITCHING_STATE_DIFFERENCE_LIMIT = 2e-8
+const KS_SWITCHING_EVENT_TIME_DIFFERENCE_LIMIT = 2e-6
+const KS_SWITCHING_TRANSITION_RESIDUAL_LIMIT = 1e-11
+
+protocol = resolve_case_protocol(
+    ks_switching_comparison_case_definition(),
+    VALIDATION_SCHEMA_VERSION,
+)
+
 # Compare the legacy Levi-Civita and new KS automatic-switching backends on the
 # same controlled planar encounter. The tiny masses make the expected motion
 # nearly ballistic while still exercising entry and exit events.
@@ -73,17 +85,52 @@ criteria = (
     validation_criterion("Levi-Civita switch count", length(lc.switch_events),
         "== 2", length(lc.switch_events) == 2),
     validation_criterion("maximum scaled backend state discrepancy", maximum_state_difference,
-        "<= 2e-8", maximum_state_difference <= 2e-8),
+        "<= 2e-8", maximum_state_difference <= KS_SWITCHING_STATE_DIFFERENCE_LIMIT),
     validation_criterion("entry-event time discrepancy", entry_time_difference,
-        "<= 2e-6", entry_time_difference <= 2e-6),
+        "<= 2e-6", entry_time_difference <= KS_SWITCHING_EVENT_TIME_DIFFERENCE_LIMIT),
     validation_criterion("exit-event time discrepancy", exit_time_difference,
-        "<= 2e-6", exit_time_difference <= 2e-6),
+        "<= 2e-6", exit_time_difference <= KS_SWITCHING_EVENT_TIME_DIFFERENCE_LIMIT),
     validation_criterion("maximum KS transition residual", ks_transition_residual,
-        "<= 1e-11", ks_transition_residual <= 1e-11),
+        "<= 1e-11", ks_transition_residual <= KS_SWITCHING_TRANSITION_RESIDUAL_LIMIT),
     validation_criterion("maximum Levi-Civita transition residual", lc_transition_residual,
-        "<= 1e-11", lc_transition_residual <= 1e-11),
+        "<= 1e-11", lc_transition_residual <= KS_SWITCHING_TRANSITION_RESIDUAL_LIMIT),
 )
-validate_acceptance_criteria("KS switching-comparison acceptance criteria", criteria)
+if report_requested(protocol)
+    structured_result = build_ks_switching_comparison_case_result(
+        ks.status,
+        lc.status,
+        length(ks.switch_events),
+        length(lc.switch_events),
+        maximum_state_difference,
+        entry_time_difference,
+        exit_time_difference,
+        ks_transition_residual,
+        lc_transition_residual,
+        SolverStatistics(
+            segment_count=length(ks.segments) + length(lc.segments),
+            switch_count=length(ks.switch_events) + length(lc.switch_events),
+        ),
+        current_validation_environment();
+        masses=Tuple(system.masses),
+        gravitational_constant=system.G,
+        initial_state=Tuple(state),
+        physical_time_interval=tspan,
+        comparison_sample_count=length(times),
+        enter_threshold=parameters.enter_threshold,
+        exit_threshold=parameters.exit_threshold,
+        ambiguity_threshold=parameters.ambiguity_threshold,
+        minimum_separation_ratio=parameters.minimum_separation_ratio,
+        maximum_switches=parameters.maximum_switches,
+        minimum_time_progress=parameters.minimum_time_progress,
+        state_difference_limit=KS_SWITCHING_STATE_DIFFERENCE_LIMIT,
+        event_time_difference_limit=KS_SWITCHING_EVENT_TIME_DIFFERENCE_LIMIT,
+        transition_residual_limit=KS_SWITCHING_TRANSITION_RESIDUAL_LIMIT,
+    )
+    exit_code = publish_case_result(protocol, structured_result; render=false)
+    exit_code == 0 || exit(exit_code)
+else
+    validate_acceptance_criteria("KS switching-comparison acceptance criteria", criteria)
+end
 end
 
 main()

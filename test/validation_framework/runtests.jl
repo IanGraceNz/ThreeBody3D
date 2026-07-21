@@ -32,3 +32,5 @@ include("ks_collision_continuation_case.jl")
 include("ks_levi_civita_comparison_case.jl")
 
 include("ks_hierarchical_triple_case.jl")
+
+include("ks_switching_comparison_case.jl")
