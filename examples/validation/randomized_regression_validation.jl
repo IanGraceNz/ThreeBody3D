@@ -2,6 +2,9 @@ using Random
 using LinearAlgebra
 using ThreeBody3D
 
+include(joinpath(@__DIR__, "framework", "ValidationFramework.jl"))
+using .ValidationFramework
+
 # Stage 9 randomized regression validation.
 #
 # This is deliberately an example-level research validation rather than a
@@ -24,6 +27,8 @@ const RANDOMIZED_VALIDATION_ENERGY_DRIFT_LIMIT = 1e-8
 const RANDOMIZED_VALIDATION_MOMENTUM_DRIFT_LIMIT = 1e-10
 const RANDOMIZED_VALIDATION_ANGULAR_MOMENTUM_DRIFT_LIMIT = 1e-9
 const RANDOMIZED_VALIDATION_COM_LIMIT = 1e-10
+
+protocol = resolve_case_protocol(randomized_regression_case_definition(), VALIDATION_SCHEMA_VERSION)
 
 struct RandomizedTrialResult
     trial::Int
@@ -270,7 +275,24 @@ randomized_criteria = (
     ),
 )
 
-validate_acceptance_criteria(
-    "Randomized-regression validation acceptance criteria",
-    randomized_criteria,
-)
+if report_requested(protocol)
+    structured_result = build_randomized_regression_case_result(
+        randomized_validation,
+        current_validation_environment();
+        duration=RANDOMIZED_VALIDATION_DURATION,
+        saveat=RANDOMIZED_VALIDATION_SAVEAT,
+        minimum_initial_separation=RANDOMIZED_VALIDATION_MINIMUM_INITIAL_SEPARATION,
+        energy_drift_limit=RANDOMIZED_VALIDATION_ENERGY_DRIFT_LIMIT,
+        momentum_drift_limit=RANDOMIZED_VALIDATION_MOMENTUM_DRIFT_LIMIT,
+        angular_momentum_drift_limit=RANDOMIZED_VALIDATION_ANGULAR_MOMENTUM_DRIFT_LIMIT,
+        center_of_mass_limit=RANDOMIZED_VALIDATION_COM_LIMIT,
+        solver=:accurate,
+    )
+    exit_code = publish_case_result(protocol, structured_result; render=false)
+    exit_code == 0 || exit(exit_code)
+else
+    validate_acceptance_criteria(
+        "Randomized-regression validation acceptance criteria",
+        randomized_criteria,
+    )
+end
