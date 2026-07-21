@@ -19,6 +19,7 @@ include("CaseResults.jl")
 include("SuiteResults.jl")
 include("Serialization.jl")
 include("ConsolePresentation.jl")
+include("CaseProtocol.jl")
 
 export AbstractValidationMetric,
        actual_completed,
@@ -114,6 +115,15 @@ export AbstractValidationMetric,
        severity_advisory,
        severity_required,
        VALIDATION_SCHEMA_IDENTITY,
+       VALIDATION_REPORT_ENV,
+       VALIDATION_CASE_ID_ENV,
+       VALIDATION_SCHEMA_VERSION_ENV,
+       ValidationCaseProtocol,
+       publish_case_result,
+       report_requested,
+       resolve_case_protocol,
+       validation_exit_code,
+       write_requested_report,
        case_report_text,
        read_case_report,
        read_suite_report,

@@ -14,3 +14,5 @@ include("suite_results.jl")
 include("serialization.jl")
 
 include("console_presentation.jl")
+
+include("case_protocol.jl")
