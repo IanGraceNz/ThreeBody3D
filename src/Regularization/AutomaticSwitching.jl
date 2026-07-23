@@ -1025,6 +1025,32 @@ end
     )
 end
 
+function _failed_switching_trajectory(
+    converted_system,
+    tspan,
+    parameters,
+    segments,
+    events,
+    current_time,
+    current_state,
+    reason::Symbol,
+    message::String;
+    pair=nothing,
+)
+    failure = AutomaticSwitchingFailure(current_time, reason, message; pair=pair)
+    ExperimentalSwitchingTrajectory(
+        converted_system,
+        tspan,
+        parameters,
+        segments,
+        events,
+        :failure,
+        current_time,
+        copy(current_state),
+        failure,
+    )
+end
+
 function _entry_transition_diagnostics(system, state, time, pair)
     problem = PerturbedLeviCivitaProblem(system, state, pair; initial_time=time)
     reconstructed = Vector{eltype(state)}(
@@ -1095,14 +1121,6 @@ function simulate_experimental_switching(
     switch_count = 0
     ks_gauge_references = Dict{Tuple{Int,Int},Any}()
 
-    function failed(reason::Symbol, message::String; pair=nothing)
-        failure = AutomaticSwitchingFailure(current_time, reason, message; pair=pair)
-        ExperimentalSwitchingTrajectory(
-            converted_system, (t0, tf), parameters, segments, events,
-            :failure, current_time, copy(current_state), failure,
-        )
-    end
-
     while current_time < tf
         segment_start = current_time
         segment_entry_state = copy(current_state)
@@ -1136,14 +1154,28 @@ function simulate_experimental_switching(
             end
 
             current_time - segment_start >= parameters.minimum_time_progress ||
-                return failed(
+                return _failed_switching_trajectory(
+                    converted_system,
+                    (t0, tf),
+                    parameters,
+                    segments,
+                    events,
+                    current_time,
+                    current_state,
                     :insufficient_time_progress,
                     "Cartesian entry event did not advance physical time sufficiently.";
                     pair=located.decision.pair,
                 )
             switch_count += 1
             switch_count <= parameters.maximum_switches ||
-                return failed(
+                return _failed_switching_trajectory(
+                    converted_system,
+                    (t0, tf),
+                    parameters,
+                    segments,
+                    events,
+                    current_time,
+                    current_state,
                     :maximum_switches_exceeded,
                     "The configured maximum number of switch events was exceeded.";
                     pair=located.decision.pair,
@@ -1203,14 +1235,28 @@ function simulate_experimental_switching(
             end
 
             current_time - segment_start >= parameters.minimum_time_progress ||
-                return failed(
+                return _failed_switching_trajectory(
+                    converted_system,
+                    (t0, tf),
+                    parameters,
+                    segments,
+                    events,
+                    current_time,
+                    current_state,
                     :insufficient_time_progress,
                     "Regularized exit event did not advance physical time sufficiently.";
                     pair=pair,
                 )
             switch_count += 1
             switch_count <= parameters.maximum_switches ||
-                return failed(
+                return _failed_switching_trajectory(
+                    converted_system,
+                    (t0, tf),
+                    parameters,
+                    segments,
+                    events,
+                    current_time,
+                    current_state,
                     :maximum_switches_exceeded,
                     "The configured maximum number of switch events was exceeded.";
                     pair=pair,

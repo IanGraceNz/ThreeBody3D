@@ -422,6 +422,11 @@ function perturbed_levi_civita_state_at_time(
     fictitious_time, result = perturbed_levi_civita_fictitious_time(
         problem, target; kwargs...,
     )
+    isnothing(result) && throw(
+        ErrorException(
+            "Internal error: noninitial physical-time targeting returned no integration result.",
+        ),
+    )
     state = perturbed_levi_civita_state(result, fictitious_time)
     return (; fictitious_time=fictitious_time, state...)
 end

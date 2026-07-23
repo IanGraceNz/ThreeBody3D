@@ -130,9 +130,15 @@ function propagate_regularized_segment(
         converted_system, entry, entry_reconstructed, t_entry, (i, j),
     )
 
-    exit_s, regularized_result = perturbed_levi_civita_fictitious_time(
+    exit_s, targeted_result = perturbed_levi_civita_fictitious_time(
         problem, t_exit; kwargs...,
     )
+    isnothing(targeted_result) && throw(
+        ErrorException(
+            "Internal error: a nonzero regularized segment returned no integration result.",
+        ),
+    )
+    regularized_result = targeted_result
     exit_regularized = perturbed_levi_civita_state(regularized_result, exit_s)
     exit_state = Vector{T}(exit_regularized.physical_state)
 
