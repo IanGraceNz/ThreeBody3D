@@ -274,6 +274,36 @@ function write_suite_report(io::IO, result::ValidationSuiteResult)
     nothing
 end
 
+"""Write one reviewed reference record in deterministic schema-1 TOML text."""
+function write_reference_record(io::IO, record::ValidationReferenceRecord)
+    _write_key_value(io, "schema_identity", VALIDATION_SCHEMA_IDENTITY)
+    _write_key_value(io, "report_kind", "reference")
+    _write_key_value(io, "schema_version", record.schema_version)
+    _write_key_value(io, "suite_id", record.suite_id)
+    _write_key_value(io, "source_commit", record.source_commit)
+    _write_key_value(io, "provenance", record.provenance)
+    println(io)
+    for metric in record.metrics
+        println(io, "[[metrics]]")
+        _write_key_value(io, "case_id", metric.case_id)
+        _write_key_value(io, "metric_id", metric.metric_id)
+        _write_key_value(io, "comparison", stable_string(metric.comparison))
+        _write_tagged_value(io, metric.value)
+        !isnothing(metric.absolute_tolerance) && _write_tagged_value(
+            io,
+            metric.absolute_tolerance;
+            prefix="absolute_tolerance",
+        )
+        !isnothing(metric.relative_tolerance) && _write_tagged_value(
+            io,
+            metric.relative_tolerance;
+            prefix="relative_tolerance",
+        )
+        println(io)
+    end
+    nothing
+end
+
 function _report_text(writer, result)
     io = IOBuffer()
     writer(io, result)
@@ -282,8 +312,17 @@ end
 
 case_report_text(result::ValidationCaseResult) = _report_text(write_case_report, result)
 suite_report_text(result::ValidationSuiteResult) = _report_text(write_suite_report, result)
+reference_record_text(record::ValidationReferenceRecord) =
+    _report_text(write_reference_record, record)
 
-function write_report_atomic(path::AbstractString, result::Union{ValidationCaseResult,ValidationSuiteResult})
+function write_report_atomic(
+    path::AbstractString,
+    result::Union{
+        ValidationCaseResult,
+        ValidationSuiteResult,
+        ValidationReferenceRecord,
+    },
+)
     final_path = abspath(path)
     parent = dirname(final_path)
     isdir(parent) || mkpath(parent)
@@ -291,7 +330,13 @@ function write_report_atomic(path::AbstractString, result::Union{ValidationCaseR
     isfile(temporary_path) && rm(temporary_path; force=true)
     try
         open(temporary_path, "w") do io
-            result isa ValidationCaseResult ? write_case_report(io, result) : write_suite_report(io, result)
+            if result isa ValidationCaseResult
+                write_case_report(io, result)
+            elseif result isa ValidationSuiteResult
+                write_suite_report(io, result)
+            else
+                write_reference_record(io, result)
+            end
             flush(io)
         end
         mv(temporary_path, final_path; force=true)
@@ -423,4 +468,31 @@ function read_suite_report(source)
     result.failed_count == derived["failed_count"] || throw(ArgumentError("Stored failed_count is inconsistent."))
     result.error_count == derived["error_count"] || throw(ArgumentError("Stored error_count is inconsistent."))
     result
+end
+
+function _read_reference_metric(table)
+    comparison = _enum_from_string(ReferenceComparisonKind, table["comparison"])
+    policy = ValidationMetricReferencePolicy(
+        Symbol(table["case_id"]),
+        Symbol(table["metric_id"]),
+        comparison;
+        absolute_tolerance=haskey(table, "absolute_tolerance_kind") ?
+            _read_tagged_value(table; prefix="absolute_tolerance") : nothing,
+        relative_tolerance=haskey(table, "relative_tolerance_kind") ?
+            _read_tagged_value(table; prefix="relative_tolerance") : nothing,
+    )
+    ValidationMetricReference(policy, _read_tagged_value(table))
+end
+
+"""Read and validate one deterministic reviewed-reference TOML report."""
+function read_reference_record(source)
+    data = source isa IO ? TOML.parse(read(source, String)) : TOML.parsefile(source)
+    _validate_report_header(data, "reference")
+    ValidationReferenceRecord(
+        Symbol(data["suite_id"]),
+        data["schema_version"],
+        data["source_commit"],
+        data["provenance"],
+        Tuple(_read_reference_metric(value) for value in get(data, "metrics", Any[])),
+    )
 end

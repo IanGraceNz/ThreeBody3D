@@ -144,3 +144,80 @@ end
         provenance="Missing metric test.",
     )
 end
+
+@testset "Deterministic validation reference record reports" begin
+    suite = _reference_record_suite()
+    policies = (
+        ValidationMetricReferencePolicy(
+            :reference_case,
+            :energy_drift,
+            reference_tolerance;
+            absolute_tolerance=1.0e-14,
+            relative_tolerance=1.0e-2,
+        ),
+        ValidationMetricReferencePolicy(
+            :reference_case,
+            :completed,
+            reference_exact,
+        ),
+        ValidationMetricReferencePolicy(
+            :reference_case,
+            :saved_states,
+            reference_exact,
+        ),
+    )
+    record = build_reference_record(
+        suite,
+        policies;
+        source_commit="58d35b4",
+        provenance="Reviewed synthetic baseline.",
+    )
+
+    first_text = reference_record_text(record)
+    second_text = reference_record_text(record)
+    @test first_text == second_text
+    @test occursin("report_kind = \"reference\"", first_text)
+    @test occursin("comparison = \"tolerance\"", first_text)
+    @test occursin("absolute_tolerance_kind = \"float64\"", first_text)
+
+    restored = read_reference_record(IOBuffer(first_text))
+    @test restored.suite_id == record.suite_id
+    @test restored.schema_version == record.schema_version
+    @test restored.source_commit == "58d35b4"
+    @test restored.provenance == record.provenance
+    @test map(metric -> (metric.case_id, metric.metric_id), restored.metrics) == (
+        (:reference_case, :energy_drift),
+        (:reference_case, :completed),
+        (:reference_case, :saved_states),
+    )
+    @test restored.metrics[1].value === 1.25e-12
+    @test restored.metrics[1].absolute_tolerance === 1.0e-14
+    @test restored.metrics[1].relative_tolerance === 1.0e-2
+    @test restored.metrics[2].value === true
+    @test restored.metrics[3].value === 101
+    @test reference_record_text(restored) == first_text
+
+    mktempdir() do directory
+        path = joinpath(directory, "reference.toml")
+        @test write_report_atomic(path, record) == abspath(path)
+        @test isfile(path)
+        @test !isfile(path * ".tmp")
+        @test reference_record_text(read_reference_record(path)) == first_text
+    end
+
+    @test_throws ArgumentError read_reference_record(IOBuffer(replace(
+        first_text,
+        "report_kind = \"reference\"" => "report_kind = \"suite\"",
+    )))
+    @test_throws ArgumentError read_reference_record(IOBuffer(replace(
+        first_text,
+        "comparison = \"tolerance\"" => "comparison = \"unknown\"";
+        count=1,
+    )))
+    without_tolerances = replace(
+        first_text,
+        "absolute_tolerance_kind = \"float64\"\nabsolute_tolerance_text = \"1.0e-14\"\n" => "",
+        "relative_tolerance_kind = \"float64\"\nrelative_tolerance_text = \"0.01\"\n" => "",
+    )
+    @test_throws ArgumentError read_reference_record(IOBuffer(without_tolerances))
+end

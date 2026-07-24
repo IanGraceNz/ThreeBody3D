@@ -17,11 +17,11 @@ include("Types.jl")
 include("Criteria.jl")
 include("CaseResults.jl")
 include("SuiteResults.jl")
+include("ReferenceRecords.jl")
 include("Serialization.jl")
 include("ConsolePresentation.jl")
 include("CaseProtocol.jl")
 include("SuiteRunner.jl")
-include("ReferenceRecords.jl")
 include("CoreBenchmarkCases.jl")
 include("CloseEncounterCase.jl")
 include("TripleCollisionCase.jl")
@@ -186,6 +186,9 @@ export AbstractValidationMetric,
        ValidationMetricReferencePolicy,
        ValidationMetricReference,
        ValidationReferenceRecord,
-       build_reference_record
+       build_reference_record,
+       reference_record_text,
+       read_reference_record,
+       write_reference_record
 
 end
