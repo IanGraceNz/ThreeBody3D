@@ -21,6 +21,8 @@ include("suite_runner.jl")
 
 include("reference_records.jl")
 
+include("reference_comparison.jl")
+
 include("core_benchmark_cases.jl")
 
 include("close_encounter_case.jl")

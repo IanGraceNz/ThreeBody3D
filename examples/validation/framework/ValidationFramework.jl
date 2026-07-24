@@ -18,6 +18,7 @@ include("Criteria.jl")
 include("CaseResults.jl")
 include("SuiteResults.jl")
 include("ReferenceRecords.jl")
+include("ReferenceComparison.jl")
 include("Serialization.jl")
 include("ConsolePresentation.jl")
 include("CaseProtocol.jl")
@@ -189,6 +190,14 @@ export AbstractValidationMetric,
        build_reference_record,
        reference_record_text,
        read_reference_record,
-       write_reference_record
+       write_reference_record,
+       ReferenceComparisonStatus,
+       reference_comparison_pass,
+       reference_comparison_fail,
+       reference_comparison_error,
+       ValidationMetricReferenceComparison,
+       ValidationCaseReferenceComparison,
+       ValidationSuiteReferenceComparison,
+       compare_reference
 
 end
