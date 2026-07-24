@@ -17,6 +17,8 @@ include("console_presentation.jl")
 
 include("case_protocol.jl")
 
+include("suite_runner.jl")
+
 include("core_benchmark_cases.jl")
 
 include("close_encounter_case.jl")

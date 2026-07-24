@@ -20,6 +20,7 @@ include("SuiteResults.jl")
 include("Serialization.jl")
 include("ConsolePresentation.jl")
 include("CaseProtocol.jl")
+include("SuiteRunner.jl")
 include("CoreBenchmarkCases.jl")
 include("CloseEncounterCase.jl")
 include("TripleCollisionCase.jl")
@@ -159,6 +160,9 @@ export AbstractValidationMetric,
        VALIDATION_CASE_ID_ENV,
        VALIDATION_SCHEMA_VERSION_ENV,
        ValidationCaseProtocol,
+       ValidationProcessRecord,
+       ValidationSuiteEntry,
+       build_validation_suite_result,
        publish_case_result,
        report_requested,
        resolve_case_protocol,
