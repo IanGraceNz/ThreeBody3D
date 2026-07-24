@@ -1,5 +1,27 @@
 # Isolated-process orchestration for the complete structured validation suite.
 
+const VALIDATION_SUITE_REPORT_ENV = "THREEBODY3D_VALIDATION_SUITE_REPORT"
+
+"""Resolve the optional absolute output path requested for the complete suite report."""
+function resolve_validation_suite_report_path(; environment=ENV)
+    value = get(environment, VALIDATION_SUITE_REPORT_ENV, nothing)
+    isnothing(value) && return nothing
+    text = String(value)
+    isempty(strip(text)) && throw(ArgumentError(
+        "Environment variable $VALIDATION_SUITE_REPORT_ENV must not be empty.",
+    ))
+    abspath(text)
+end
+
+"""Atomically write a complete suite report when an output path was requested."""
+function write_validation_suite_report(
+    result::ValidationSuiteResult,
+    report_path::Union{Nothing,AbstractString},
+)
+    isnothing(report_path) && return nothing
+    write_report_atomic(String(report_path), result)
+end
+
 """One registered validation script executed by the suite runner."""
 struct ValidationSuiteEntry
     case_id::Symbol

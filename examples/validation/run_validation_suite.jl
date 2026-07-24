@@ -218,7 +218,10 @@ function print_validation_suite_summary(
     result.status == suite_pass
 end
 
-function run_validation_suite(entries=VALIDATION_SUITE_ENTRIES)
+function run_validation_suite(
+    entries=VALIDATION_SUITE_ENTRIES;
+    report_path=resolve_validation_suite_report_path(),
+)
     isempty(entries) && throw(ArgumentError("The validation suite must contain at least one case."))
 
     environment = current_validation_environment()
@@ -229,8 +232,10 @@ function run_validation_suite(entries=VALIDATION_SUITE_ENTRIES)
         cases = first.(executed)
         process_records = last.(executed)
         result = build_validation_suite_result(cases, environment)
+        written_report = write_validation_suite_report(result, report_path)
         passed = print_validation_suite_summary(result, process_records)
-        (; passed, result, process_records)
+        !isnothing(written_report) && println("Structured report: ", written_report)
+        (; passed, result, process_records, report_path=written_report)
     end
 end
 
