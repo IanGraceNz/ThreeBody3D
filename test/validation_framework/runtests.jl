@@ -23,6 +23,8 @@ include("reference_records.jl")
 
 include("reference_comparison.jl")
 
+include("reference_workflow.jl")
+
 include("core_benchmark_cases.jl")
 
 include("close_encounter_case.jl")

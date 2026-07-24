@@ -21,6 +21,7 @@ include("ReferenceRecords.jl")
 include("ReferenceComparison.jl")
 include("Serialization.jl")
 include("ConsolePresentation.jl")
+include("ReferenceWorkflow.jl")
 include("CaseProtocol.jl")
 include("SuiteRunner.jl")
 include("CoreBenchmarkCases.jl")
@@ -203,6 +204,7 @@ export AbstractValidationMetric,
        render_reference_case,
        render_reference_suite,
        render_reference_summary,
-       render_reference_report
+       render_reference_report,
+       run_reference_comparison
 
 end
