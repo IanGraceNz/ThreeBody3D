@@ -21,6 +21,7 @@ include("Serialization.jl")
 include("ConsolePresentation.jl")
 include("CaseProtocol.jl")
 include("SuiteRunner.jl")
+include("ReferenceRecords.jl")
 include("CoreBenchmarkCases.jl")
 include("CloseEncounterCase.jl")
 include("TripleCollisionCase.jl")
@@ -178,6 +179,13 @@ export AbstractValidationMetric,
        write_case_report,
        write_report_atomic,
        write_suite_report,
-       stable_string
+       stable_string,
+       ReferenceComparisonKind,
+       reference_exact,
+       reference_tolerance,
+       ValidationMetricReferencePolicy,
+       ValidationMetricReference,
+       ValidationReferenceRecord,
+       build_reference_record
 
 end
