@@ -3,6 +3,7 @@
 _status_label(status::CriterionStatus) = uppercase(stable_string(status))
 _status_label(status::ValidationCaseStatus) = uppercase(stable_string(status))
 _status_label(status::ValidationSuiteStatus) = uppercase(stable_string(status))
+_status_label(status::ReferenceComparisonStatus) = uppercase(stable_string(status))
 
 function _display_value(value)
     value isa Tuple && return "[" * join((_display_value(item) for item in value), ", ") * "]"
@@ -102,3 +103,101 @@ function render_suite_result(io::IO, result::ValidationSuiteResult)
 end
 
 render_suite_result(result::ValidationSuiteResult) = render_suite_result(stdout, result)
+
+"""Render one immutable reference metric comparison to `io`."""
+function render_reference_metric(io::IO, metric::ValidationMetricReferenceComparison)
+    println(io, "[", _status_label(metric.status), "] ", metric.metric_id)
+    println(io, "  Reference: ", _display_value(metric.reference_value))
+    println(io, "  Observed: ", _display_value(metric.observed_value))
+    if metric.comparison == reference_tolerance
+        !isnothing(metric.absolute_difference) && println(io, "  Difference: ", metric.absolute_difference)
+        !isnothing(metric.allowed_difference) && println(io, "  Allowed: ", metric.allowed_difference)
+    end
+    !isnothing(metric.message) && println(io, "  Message: ", metric.message)
+    nothing
+end
+
+render_reference_metric(metric::ValidationMetricReferenceComparison) =
+    render_reference_metric(stdout, metric)
+
+
+"""Render one immutable reference case comparison to `io` in retained metric order."""
+function render_reference_case(io::IO, case_result::ValidationCaseReferenceComparison)
+    println(io, "Reference case: ", case_result.case_id)
+    println(io, "Case status: ", _status_label(case_result.status))
+    println(io, "Metrics")
+    if isempty(case_result.metrics)
+        println(io, "  (none)")
+    else
+        for metric in case_result.metrics
+            metric_io = IOBuffer()
+            render_reference_metric(metric_io, metric)
+            metric_text = String(take!(metric_io))
+            for line in split(chomp(metric_text), '\n')
+                println(io, "  ", line)
+            end
+        end
+    end
+    nothing
+end
+
+render_reference_case(case_result::ValidationCaseReferenceComparison) =
+    render_reference_case(stdout, case_result)
+
+
+
+"""Render one immutable reference suite comparison to `io` in retained case order."""
+function render_reference_suite(io::IO, suite::ValidationSuiteReferenceComparison)
+    println(io, "Reference suite: ", suite.suite_id)
+    println(io, "Schema version: ", suite.schema_version)
+    println(io, "Reference source commit: ", suite.reference_source_commit)
+    println(io, "Reference provenance: ", suite.reference_provenance)
+    println(io, "Suite status: ", _status_label(suite.status))
+    println(io, "Cases")
+    if isempty(suite.cases)
+        println(io, "  (none)")
+    else
+        for case_result in suite.cases
+            case_io = IOBuffer()
+            render_reference_case(case_io, case_result)
+            case_text = String(take!(case_io))
+            for line in split(chomp(case_text), '\n')
+                println(io, "  ", line)
+            end
+        end
+    end
+    nothing
+end
+
+render_reference_suite(suite::ValidationSuiteReferenceComparison) =
+    render_reference_suite(stdout, suite)
+
+
+"""Render a compact summary of one immutable reference suite comparison to `io`."""
+function render_reference_summary(io::IO, suite::ValidationSuiteReferenceComparison)
+    passed = count(c -> c.status == reference_comparison_pass, suite.cases)
+    failed = count(c -> c.status == reference_comparison_fail, suite.cases)
+    errored = count(c -> c.status == reference_comparison_error, suite.cases)
+
+    println(io, "Summary")
+    println(io, "  Passed: ", passed)
+    println(io, "  Failed: ", failed)
+    println(io, "  Errors: ", errored)
+    println(io, "  Overall: ", _status_label(suite.status))
+    nothing
+end
+
+render_reference_summary(suite::ValidationSuiteReferenceComparison) =
+    render_reference_summary(stdout, suite)
+
+
+"""Render a complete immutable reference comparison report to `io`."""
+function render_reference_report(io::IO, suite::ValidationSuiteReferenceComparison)
+    render_reference_suite(io, suite)
+    println(io)
+    render_reference_summary(io, suite)
+    nothing
+end
+
+render_reference_report(suite::ValidationSuiteReferenceComparison) =
+    render_reference_report(stdout, suite)

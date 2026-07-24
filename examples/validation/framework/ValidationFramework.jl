@@ -198,6 +198,11 @@ export AbstractValidationMetric,
        ValidationMetricReferenceComparison,
        ValidationCaseReferenceComparison,
        ValidationSuiteReferenceComparison,
-       compare_reference
+       compare_reference,
+       render_reference_metric,
+       render_reference_case,
+       render_reference_suite,
+       render_reference_summary,
+       render_reference_report
 
 end
