@@ -218,9 +218,26 @@ function print_validation_suite_summary(
     result.status == suite_pass
 end
 
+"""
+    run_validation_suite(entries=VALIDATION_SUITE_ENTRIES;
+        report_path=resolve_validation_suite_report_path(),
+        reference_source=resolve_validation_reference_path(),
+        comparison_io=stdout)
+
+Execute the selected validation cases, assemble the structured suite result,
+optionally write the deterministic suite report, and optionally compare the
+completed suite with one immutable reviewed reference.
+
+A requested reference comparison participates in the returned `passed` value.
+The returned named tuple also contains the structured `comparison`, or
+`nothing` when no reference was requested. Reviewed references are never
+created, updated, or rewritten by this runner.
+"""
 function run_validation_suite(
     entries=VALIDATION_SUITE_ENTRIES;
     report_path=resolve_validation_suite_report_path(),
+    reference_source=resolve_validation_reference_path(),
+    comparison_io::IO=stdout,
 )
     isempty(entries) && throw(ArgumentError("The validation suite must contain at least one case."))
 
@@ -232,10 +249,22 @@ function run_validation_suite(
         cases = first.(executed)
         process_records = last.(executed)
         result = build_validation_suite_result(cases, environment)
-        written_report = write_validation_suite_report(result, report_path)
-        passed = print_validation_suite_summary(result, process_records)
-        !isnothing(written_report) && println("Structured report: ", written_report)
-        (; passed, result, process_records, report_path=written_report)
+        print_validation_suite_summary(result, process_records)
+        finalized = finalize_validation_suite(
+            comparison_io,
+            result;
+            report_path,
+            reference_source,
+        )
+        !isnothing(finalized.report_path) &&
+            println("Structured report: ", finalized.report_path)
+        (
+            passed=finalized.passed,
+            result,
+            process_records,
+            report_path=finalized.report_path,
+            comparison=finalized.comparison,
+        )
     end
 end
 

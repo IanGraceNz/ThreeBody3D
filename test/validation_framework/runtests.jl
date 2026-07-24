@@ -25,6 +25,10 @@ include("reference_comparison.jl")
 
 include("reference_workflow.jl")
 
+include("validation_run_workflow.jl")
+
+include("validation_runner.jl")
+
 include("core_benchmark_cases.jl")
 
 include("close_encounter_case.jl")

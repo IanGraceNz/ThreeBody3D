@@ -22,6 +22,7 @@ include("ReferenceComparison.jl")
 include("Serialization.jl")
 include("ConsolePresentation.jl")
 include("ReferenceWorkflow.jl")
+include("ValidationRunWorkflow.jl")
 include("CaseProtocol.jl")
 include("SuiteRunner.jl")
 include("CoreBenchmarkCases.jl")
@@ -205,6 +206,9 @@ export AbstractValidationMetric,
        render_reference_suite,
        render_reference_summary,
        render_reference_report,
-       run_reference_comparison
+       run_reference_comparison,
+       VALIDATION_REFERENCE_ENV,
+       resolve_validation_reference_path,
+       finalize_validation_suite
 
 end
