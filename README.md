@@ -415,6 +415,22 @@ equilateral triple collision, randomized regression, KS Kepler propagation,
 collision continuation, KS/Levi-Civita cross-validation, coupled KS
 hierarchical propagation, and backend switching comparison.
 
+To run the canonical scientific regression workflow against an immutable,
+human-reviewed reference and optionally retain deterministic CI artifacts, use
+the following command after an approved reference record exists:
+
+```powershell
+julia --project=. examples/validation/reviewed_reference_workflow.jl `
+    path/to/reviewed-reference.toml `
+    validation_reports/current-suite.toml `
+    validation_reports/reference-comparison.toml
+```
+
+Run the example with `--help` to display its prerequisite without executing the
+suite. See `VALIDATION_WORKFLOW.md` for candidate-reference preparation,
+approval rules, programmatic use, status interpretation, and CI guidance. The
+workflow never updates reference baselines automatically.
+
 ## Testing
 
 From the repository root:
@@ -442,6 +458,8 @@ The detailed stability classification is in `API_STABILITY.md`:
 - `IMPLEMENTATION_PLAN_KS.md` records the completed frozen KS implementation
   plan;
 - `V0_4_RELEASE_READINESS.md` defines the release gates;
+- `VALIDATION_WORKFLOW.md` defines the canonical reviewed-reference validation
+  and CI workflow;
 - `CHANGELOG.md` records user-visible changes.
 
 ## Licence

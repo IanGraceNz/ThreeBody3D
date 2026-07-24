@@ -304,6 +304,46 @@ function write_reference_record(io::IO, record::ValidationReferenceRecord)
     nothing
 end
 
+"""Write one deterministic reference-comparison report for CI artifacts."""
+function write_reference_comparison(
+    io::IO,
+    comparison::ValidationSuiteReferenceComparison,
+)
+    _write_key_value(io, "schema_identity", VALIDATION_SCHEMA_IDENTITY)
+    _write_key_value(io, "report_kind", "reference_comparison")
+    _write_key_value(io, "schema_version", comparison.schema_version)
+    _write_key_value(io, "suite_id", comparison.suite_id)
+    _write_key_value(io, "reference_source_commit", comparison.reference_source_commit)
+    _write_key_value(io, "reference_provenance", comparison.reference_provenance)
+    _write_key_value(io, "status", stable_string(comparison.status))
+    println(io)
+
+    for case_result in comparison.cases
+        println(io, "[[cases]]")
+        _write_key_value(io, "case_id", case_result.case_id)
+        _write_key_value(io, "status", stable_string(case_result.status))
+        println(io)
+        for metric in case_result.metrics
+            println(io, "[[cases.metrics]]")
+            _write_key_value(io, "case_id", metric.case_id)
+            _write_key_value(io, "metric_id", metric.metric_id)
+            _write_key_value(io, "comparison", stable_string(metric.comparison))
+            _write_key_value(io, "status", stable_string(metric.status))
+            _write_tagged_value(io, metric.reference_value; prefix="reference")
+            _write_key_value(io, "observed_present", !isnothing(metric.observed_value))
+            !isnothing(metric.observed_value) &&
+                _write_tagged_value(io, metric.observed_value; prefix="observed")
+            !isnothing(metric.absolute_difference) &&
+                _write_tagged_value(io, metric.absolute_difference; prefix="absolute_difference")
+            !isnothing(metric.allowed_difference) &&
+                _write_tagged_value(io, metric.allowed_difference; prefix="allowed_difference")
+            !isnothing(metric.message) && _write_key_value(io, "message", metric.message)
+            println(io)
+        end
+    end
+    nothing
+end
+
 function _report_text(writer, result)
     io = IOBuffer()
     writer(io, result)
@@ -314,6 +354,8 @@ case_report_text(result::ValidationCaseResult) = _report_text(write_case_report,
 suite_report_text(result::ValidationSuiteResult) = _report_text(write_suite_report, result)
 reference_record_text(record::ValidationReferenceRecord) =
     _report_text(write_reference_record, record)
+reference_comparison_text(comparison::ValidationSuiteReferenceComparison) =
+    _report_text(write_reference_comparison, comparison)
 
 function write_report_atomic(
     path::AbstractString,
@@ -321,6 +363,7 @@ function write_report_atomic(
         ValidationCaseResult,
         ValidationSuiteResult,
         ValidationReferenceRecord,
+        ValidationSuiteReferenceComparison,
     },
 )
     final_path = abspath(path)
@@ -334,8 +377,10 @@ function write_report_atomic(
                 write_case_report(io, result)
             elseif result isa ValidationSuiteResult
                 write_suite_report(io, result)
-            else
+            elseif result isa ValidationReferenceRecord
                 write_reference_record(io, result)
+            else
+                write_reference_comparison(io, result)
             end
             flush(io)
         end
@@ -495,4 +540,51 @@ function read_reference_record(source)
         data["provenance"],
         Tuple(_read_reference_metric(value) for value in get(data, "metrics", Any[])),
     )
+end
+function _read_reference_comparison_metric(table)
+    observed_present = get(table, "observed_present", false)
+    observed = observed_present ? _read_tagged_value(table; prefix="observed") : nothing
+    ValidationMetricReferenceComparison(
+        Symbol(table["case_id"]),
+        Symbol(table["metric_id"]),
+        _enum_from_string(ReferenceComparisonKind, table["comparison"]),
+        _enum_from_string(ReferenceComparisonStatus, table["status"]),
+        _read_tagged_value(table; prefix="reference"),
+        observed;
+        absolute_difference=haskey(table, "absolute_difference_kind") ?
+            _read_tagged_value(table; prefix="absolute_difference") : nothing,
+        allowed_difference=haskey(table, "allowed_difference_kind") ?
+            _read_tagged_value(table; prefix="allowed_difference") : nothing,
+        message=get(table, "message", nothing),
+    )
+end
+
+function _read_reference_comparison_case(table)
+    result = ValidationCaseReferenceComparison(
+        Symbol(table["case_id"]),
+        Tuple(_read_reference_comparison_metric(value) for value in get(table, "metrics", Any[])),
+    )
+    stored_status = _enum_from_string(ReferenceComparisonStatus, table["status"])
+    result.status == stored_status || throw(ArgumentError(
+        "Stored reference case status is inconsistent with derived status.",
+    ))
+    result
+end
+
+"""Read and validate one deterministic reference-comparison TOML report."""
+function read_reference_comparison(source)
+    data = source isa IO ? TOML.parse(read(source, String)) : TOML.parsefile(source)
+    _validate_report_header(data, "reference_comparison")
+    result = ValidationSuiteReferenceComparison(
+        Symbol(data["suite_id"]),
+        data["schema_version"],
+        data["reference_source_commit"],
+        data["reference_provenance"],
+        Tuple(_read_reference_comparison_case(value) for value in get(data, "cases", Any[])),
+    )
+    stored_status = _enum_from_string(ReferenceComparisonStatus, data["status"])
+    result.status == stored_status || throw(ArgumentError(
+        "Stored reference suite status is inconsistent with derived status.",
+    ))
+    result
 end

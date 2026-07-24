@@ -23,11 +23,17 @@ include("reference_records.jl")
 
 include("reference_comparison.jl")
 
+include("reference_comparison_serialization.jl")
+
 include("reference_workflow.jl")
 
 include("validation_run_workflow.jl")
 
 include("validation_runner.jl")
+
+include("reviewed_reference_workflow.jl")
+
+include("candidate_reference_examples.jl")
 
 include("core_benchmark_cases.jl")
 
