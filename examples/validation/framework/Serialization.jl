@@ -304,6 +304,53 @@ function write_reference_record(io::IO, record::ValidationReferenceRecord)
     nothing
 end
 
+"""Write one approved scientific reference in deterministic schema-1 TOML text."""
+function write_approved_scientific_reference(
+    io::IO,
+    reference::ApprovedScientificReference,
+)
+    _write_key_value(io, "schema_identity", VALIDATION_SCHEMA_IDENTITY)
+    _write_key_value(io, "report_kind", "approved_scientific_reference")
+    _write_key_value(io, "schema_version", reference.reference_schema_version)
+    _write_key_value(io, "reference_id", reference.reference_id)
+    _write_key_value(io, "benchmark_scope", reference.benchmark_scope)
+    _write_key_value(io, "methodology", reference.methodology)
+    _write_key_value(io, "reviewer", reference.reviewer)
+    _write_key_value(io, "approval_date", reference.approval_date)
+    _write_key_value(io, "approval_rationale", reference.approval_rationale)
+    !isnothing(reference.known_limitations) &&
+        _write_key_value(io, "known_limitations", reference.known_limitations)
+    println(io)
+
+    observation = reference.observation
+    println(io, "[observation]")
+    _write_key_value(io, "schema_version", observation.schema_version)
+    _write_key_value(io, "suite_id", observation.suite_id)
+    _write_key_value(io, "source_commit", observation.source_commit)
+    _write_key_value(io, "provenance", observation.provenance)
+    println(io)
+
+    for metric in observation.metrics
+        println(io, "[[observation.metrics]]")
+        _write_key_value(io, "case_id", metric.case_id)
+        _write_key_value(io, "metric_id", metric.metric_id)
+        _write_key_value(io, "comparison", stable_string(metric.comparison))
+        _write_tagged_value(io, metric.value)
+        !isnothing(metric.absolute_tolerance) && _write_tagged_value(
+            io,
+            metric.absolute_tolerance;
+            prefix="absolute_tolerance",
+        )
+        !isnothing(metric.relative_tolerance) && _write_tagged_value(
+            io,
+            metric.relative_tolerance;
+            prefix="relative_tolerance",
+        )
+        println(io)
+    end
+    nothing
+end
+
 """Write one deterministic reference-comparison report for CI artifacts."""
 function write_reference_comparison(
     io::IO,
@@ -354,6 +401,8 @@ case_report_text(result::ValidationCaseResult) = _report_text(write_case_report,
 suite_report_text(result::ValidationSuiteResult) = _report_text(write_suite_report, result)
 reference_record_text(record::ValidationReferenceRecord) =
     _report_text(write_reference_record, record)
+approved_scientific_reference_text(reference::ApprovedScientificReference) =
+    _report_text(write_approved_scientific_reference, reference)
 reference_comparison_text(comparison::ValidationSuiteReferenceComparison) =
     _report_text(write_reference_comparison, comparison)
 
@@ -363,6 +412,7 @@ function write_report_atomic(
         ValidationCaseResult,
         ValidationSuiteResult,
         ValidationReferenceRecord,
+        ApprovedScientificReference,
         ValidationSuiteReferenceComparison,
     },
 )
@@ -379,6 +429,8 @@ function write_report_atomic(
                 write_suite_report(io, result)
             elseif result isa ValidationReferenceRecord
                 write_reference_record(io, result)
+            elseif result isa ApprovedScientificReference
+                write_approved_scientific_reference(io, result)
             else
                 write_reference_comparison(io, result)
             end
@@ -541,6 +593,44 @@ function read_reference_record(source)
         Tuple(_read_reference_metric(value) for value in get(data, "metrics", Any[])),
     )
 end
+"""Read and validate one deterministic approved-scientific-reference TOML report."""
+function read_approved_scientific_reference(source)
+    data = source isa IO ? TOML.parse(read(source, String)) : TOML.parsefile(source)
+    _validate_report_header(data, "approved_scientific_reference")
+    observation_table = get(data, "observation", nothing)
+    isnothing(observation_table) && throw(ArgumentError("Missing approved-reference observation."))
+    required_observation_fields = (
+        "suite_id",
+        "schema_version",
+        "source_commit",
+        "provenance",
+    )
+    all(field -> haskey(observation_table, field), required_observation_fields) || throw(
+        ArgumentError("Approved-reference observation is missing required fields."),
+    )
+    observation = ValidationReferenceRecord(
+        Symbol(observation_table["suite_id"]),
+        observation_table["schema_version"],
+        observation_table["source_commit"],
+        observation_table["provenance"],
+        Tuple(
+            _read_reference_metric(value)
+            for value in get(observation_table, "metrics", Any[])
+        ),
+    )
+    ApprovedScientificReference(
+        data["reference_id"],
+        data["schema_version"],
+        observation;
+        benchmark_scope=data["benchmark_scope"],
+        methodology=data["methodology"],
+        reviewer=data["reviewer"],
+        approval_date=data["approval_date"],
+        approval_rationale=data["approval_rationale"],
+        known_limitations=get(data, "known_limitations", nothing),
+    )
+end
+
 function _read_reference_comparison_metric(table)
     observed_present = get(table, "observed_present", false)
     observed = observed_present ? _read_tagged_value(table; prefix="observed") : nothing
