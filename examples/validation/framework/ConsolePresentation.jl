@@ -201,3 +201,53 @@ end
 
 render_reference_report(suite::ValidationSuiteReferenceComparison) =
     render_reference_report(stdout, suite)
+
+"""Render the human approval metadata attached to one scientific reference."""
+function render_approved_scientific_reference(
+    io::IO,
+    reference::ApprovedScientificReference,
+)
+    println(io, "Approved scientific reference: ", reference.reference_id)
+    println(io, "Reference schema version: ", reference.reference_schema_version)
+    println(io, "Benchmark scope: ", reference.benchmark_scope)
+    println(io, "Methodology: ", reference.methodology)
+    println(io, "Reviewer: ", reference.reviewer)
+    println(io, "Approval date: ", reference.approval_date)
+    println(io, "Approval rationale: ", reference.approval_rationale)
+    println(
+        io,
+        "Known limitations: ",
+        isnothing(reference.known_limitations) ? "(none recorded)" : reference.known_limitations,
+    )
+    println(
+        io,
+        "Interpretation: metric comparison reports numerical agreement only; scientific approval remains an explicit human judgement.",
+    )
+    nothing
+end
+
+render_approved_scientific_reference(reference::ApprovedScientificReference) =
+    render_approved_scientific_reference(stdout, reference)
+
+"""Render approval metadata followed by the existing immutable comparison report."""
+function render_approved_scientific_reference_report(
+    io::IO,
+    reference::ApprovedScientificReference,
+    comparison::ValidationSuiteReferenceComparison,
+)
+    reference.observation.suite_id == comparison.suite_id || throw(ArgumentError(
+        "Approved reference suite identifier does not match comparison suite identifier.",
+    ))
+    reference.observation.schema_version == comparison.schema_version || throw(ArgumentError(
+        "Approved reference schema version does not match comparison schema version.",
+    ))
+    render_approved_scientific_reference(io, reference)
+    println(io)
+    render_reference_report(io, comparison)
+    nothing
+end
+
+render_approved_scientific_reference_report(
+    reference::ApprovedScientificReference,
+    comparison::ValidationSuiteReferenceComparison,
+) = render_approved_scientific_reference_report(stdout, reference, comparison)

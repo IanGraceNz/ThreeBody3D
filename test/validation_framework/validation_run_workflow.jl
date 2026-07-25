@@ -32,11 +32,13 @@ end
     @test passing.suite === passing_suite
     @test passing.report_path === nothing
     @test passing.comparison === nothing
+    @test passing.approved_reference === nothing
     @test isempty(String(take!(output)))
 
     failing = finalize_validation_suite(IOBuffer(), failing_suite)
     @test !failing.passed
     @test failing.comparison === nothing
+    @test failing.approved_reference === nothing
 end
 
 @testset "Validation suite finalization writes reports and compares references" begin
@@ -59,6 +61,7 @@ end
         @test passing.passed
         @test passing.report_path == abspath(report_path)
         @test passing.comparison.status == reference_comparison_pass
+        @test passing.approved_reference === nothing
         @test read(report_path, String) == suite_report_text(passing_suite)
         @test occursin("Overall: PASS", String(take!(output)))
         @test read(reference_path, String) == reference_text
@@ -71,6 +74,7 @@ end
         )
         @test !failing.passed
         @test failing.comparison.status == reference_comparison_fail
+        @test failing.approved_reference === nothing
         @test occursin("Overall: FAIL", String(take!(output)))
         @test read(reference_path, String) == reference_text
     end

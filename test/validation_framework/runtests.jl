@@ -29,6 +29,8 @@ include("reference_comparison_serialization.jl")
 
 include("reference_workflow.jl")
 
+include("approved_scientific_reference_workflow.jl")
+
 include("validation_run_workflow.jl")
 
 include("validation_runner.jl")

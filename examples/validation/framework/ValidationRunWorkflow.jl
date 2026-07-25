@@ -14,29 +14,61 @@ function resolve_validation_reference_path(; environment=ENV)
 end
 
 """
-    finalize_validation_suite(io, suite; report_path=nothing, reference_source=nothing)
-    finalize_validation_suite(suite; report_path=nothing, reference_source=nothing)
+    finalize_validation_suite(
+        io,
+        suite;
+        report_path=nothing,
+        reference_source=nothing,
+        approved_reference_source=nothing,
+    )
+    finalize_validation_suite(
+        suite;
+        report_path=nothing,
+        reference_source=nothing,
+        approved_reference_source=nothing,
+    )
 
 Finalize one completed validation suite by optionally writing its deterministic
-suite report and optionally comparing it with an immutable reviewed reference.
+suite report and optionally comparing it with either an immutable reviewed
+reference or an approved scientific reference.
 
 The returned named tuple contains the overall `passed` decision, the original
-`suite`, the written `report_path`, and the structured reference `comparison`
-(or `nothing` when no reference was requested). A requested reference
-comparison participates in the overall pass/fail decision and is rendered to
-`io` through the established reference-presentation API.
+`suite`, the written `report_path`, and the structured reference `comparison` (or `nothing` when no reference was requested), and the loaded
+`approved_reference` (or `nothing` unless an approved reference was requested).
+A requested comparison participates in the overall pass/fail decision and is
+rendered to `io` through the established presentation APIs.
 
-This workflow never creates, updates, or writes a reference record.
+`reference_source` and `approved_reference_source` are mutually exclusive. This
+workflow never creates, approves, updates, or writes a reference record.
 """
 function finalize_validation_suite(
     io::IO,
     suite::ValidationSuiteResult;
     report_path=nothing,
     reference_source=nothing,
+    approved_reference_source=nothing,
 )
+    !isnothing(reference_source) && !isnothing(approved_reference_source) && throw(
+        ArgumentError(
+            "reference_source and approved_reference_source are mutually exclusive.",
+        ),
+    )
+
     written_report = write_validation_suite_report(suite, report_path)
-    comparison = isnothing(reference_source) ? nothing :
-                 run_reference_comparison(io, suite, reference_source)
+    approved_reference = nothing
+    comparison = if !isnothing(approved_reference_source)
+        result = run_approved_scientific_reference_comparison(
+            io,
+            suite,
+            approved_reference_source,
+        )
+        approved_reference = result.approved_reference
+        result.comparison
+    elseif !isnothing(reference_source)
+        run_reference_comparison(io, suite, reference_source)
+    else
+        nothing
+    end
     reference_passed = isnothing(comparison) ||
                        comparison.status == reference_comparison_pass
     (
@@ -44,6 +76,7 @@ function finalize_validation_suite(
         suite,
         report_path=written_report,
         comparison,
+        approved_reference,
     )
 end
 
@@ -51,9 +84,11 @@ finalize_validation_suite(
     suite::ValidationSuiteResult;
     report_path=nothing,
     reference_source=nothing,
+    approved_reference_source=nothing,
 ) = finalize_validation_suite(
     stdout,
     suite;
     report_path,
     reference_source,
+    approved_reference_source,
 )

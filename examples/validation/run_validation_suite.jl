@@ -222,21 +222,24 @@ end
     run_validation_suite(entries=VALIDATION_SUITE_ENTRIES;
         report_path=resolve_validation_suite_report_path(),
         reference_source=resolve_validation_reference_path(),
+        approved_reference_source=nothing,
         comparison_io=stdout)
 
 Execute the selected validation cases, assemble the structured suite result,
 optionally write the deterministic suite report, and optionally compare the
-completed suite with one immutable reviewed reference.
+completed suite with either one immutable reviewed reference or one approved
+scientific reference.
 
-A requested reference comparison participates in the returned `passed` value.
-The returned named tuple also contains the structured `comparison`, or
-`nothing` when no reference was requested. Reviewed references are never
-created, updated, or rewritten by this runner.
+A requested comparison participates in the returned `passed` value. The
+returned named tuple also contains the structured `comparison` and the loaded
+`approved_reference` when applicable. Reference sources are mutually exclusive
+and are never created, approved, updated, or rewritten by this runner.
 """
 function run_validation_suite(
     entries=VALIDATION_SUITE_ENTRIES;
     report_path=resolve_validation_suite_report_path(),
     reference_source=resolve_validation_reference_path(),
+    approved_reference_source=nothing,
     comparison_io::IO=stdout,
 )
     isempty(entries) && throw(ArgumentError("The validation suite must contain at least one case."))
@@ -255,6 +258,7 @@ function run_validation_suite(
             result;
             report_path,
             reference_source,
+            approved_reference_source,
         )
         !isnothing(finalized.report_path) &&
             println("Structured report: ", finalized.report_path)
@@ -264,6 +268,7 @@ function run_validation_suite(
             process_records,
             report_path=finalized.report_path,
             comparison=finalized.comparison,
+            approved_reference=finalized.approved_reference,
         )
     end
 end
