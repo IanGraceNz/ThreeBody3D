@@ -122,6 +122,64 @@ struct ValidationReferenceRecord
     end
 end
 
+const _APPROVAL_DATE_PATTERN = r"^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+
+function _validated_approval_date(value)
+    date = _nonempty_string(value, "approval_date")
+    occursin(_APPROVAL_DATE_PATTERN, date) || throw(ArgumentError(
+        "approval_date must use ISO calendar-date form YYYY-MM-DD.",
+    ))
+    date
+end
+
+"""
+Immutable scientific approval metadata wrapped around one retained observation.
+
+`ValidationReferenceRecord` preserves the selected numerical evidence and
+comparison policies. `ApprovedScientificReference` records the explicit human
+scientific decision that makes that observation an authoritative future
+comparison point. Construction performs validation only; it does not approve,
+select, serialize, replace, or interpret a reference automatically.
+"""
+struct ApprovedScientificReference
+    reference_id::String
+    reference_schema_version::String
+    observation::ValidationReferenceRecord
+    benchmark_scope::String
+    methodology::String
+    reviewer::String
+    approval_date::String
+    approval_rationale::String
+    known_limitations::Union{Nothing,String}
+
+    function ApprovedScientificReference(
+        reference_id,
+        reference_schema_version,
+        observation::ValidationReferenceRecord;
+        benchmark_scope,
+        methodology,
+        reviewer,
+        approval_date,
+        approval_rationale,
+        known_limitations=nothing,
+    )
+        normalized_limitations = isnothing(known_limitations) ?
+            nothing :
+            _nonempty_string(known_limitations, "known_limitations")
+        new(
+            _nonempty_string(reference_id, "reference_id"),
+            _validated_version(reference_schema_version, "reference_schema_version"),
+            observation,
+            _nonempty_string(benchmark_scope, "benchmark_scope"),
+            _nonempty_string(methodology, "methodology"),
+            _nonempty_string(reviewer, "reviewer"),
+            _validated_approval_date(approval_date),
+            _nonempty_string(approval_rationale, "approval_rationale"),
+            normalized_limitations,
+        )
+    end
+end
+
 function _metric_lookup(result::ValidationCaseResult, metric_id::Symbol)
     matches = filter(metric -> metric.metric_id == metric_id, result.metrics)
     isempty(matches) && throw(ArgumentError(

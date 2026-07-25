@@ -221,3 +221,130 @@ end
     )
     @test_throws ArgumentError read_reference_record(IOBuffer(without_tolerances))
 end
+
+
+@testset "Approved scientific reference representation" begin
+    suite = _reference_record_suite()
+    observation = build_reference_record(
+        suite,
+        (
+            ValidationMetricReferencePolicy(
+                :reference_case,
+                :energy_drift,
+                reference_tolerance;
+                absolute_tolerance=1.0e-14,
+                relative_tolerance=1.0e-2,
+            ),
+            ValidationMetricReferencePolicy(
+                :reference_case,
+                :completed,
+                reference_exact,
+            ),
+        );
+        source_commit="fc865e5",
+        provenance="Candidate generated from the reviewed synthetic validation case.",
+    )
+
+    approved = ApprovedScientificReference(
+        "reference-suite-v1",
+        "1.0.0",
+        observation;
+        benchmark_scope="Synthetic reference-record behaviour.",
+        methodology="Structured validation suite with deliberately retained metrics.",
+        reviewer="Scientific reviewer",
+        approval_date="2026-07-25",
+        approval_rationale="The observation and comparison policies were reviewed and accepted.",
+        known_limitations="Synthetic data exercise framework behaviour only.",
+    )
+
+    @test approved.reference_id == "reference-suite-v1"
+    @test approved.reference_schema_version == "1.0.0"
+    @test approved.observation === observation
+    @test approved.benchmark_scope == "Synthetic reference-record behaviour."
+    @test approved.methodology ==
+          "Structured validation suite with deliberately retained metrics."
+    @test approved.reviewer == "Scientific reviewer"
+    @test approved.approval_date == "2026-07-25"
+    @test approved.approval_rationale ==
+          "The observation and comparison policies were reviewed and accepted."
+    @test approved.known_limitations ==
+          "Synthetic data exercise framework behaviour only."
+
+    without_limitations = ApprovedScientificReference(
+        "reference-suite-v1-no-limitations",
+        "1.0.0",
+        observation;
+        benchmark_scope="Synthetic reference-record behaviour.",
+        methodology="Structured validation suite with deliberately retained metrics.",
+        reviewer="Scientific reviewer",
+        approval_date="2026-07-25",
+        approval_rationale="No material limitations were identified for the stated scope.",
+    )
+    @test isnothing(without_limitations.known_limitations)
+end
+
+@testset "Approved scientific reference invariants" begin
+    suite = _reference_record_suite()
+    observation = build_reference_record(
+        suite,
+        (ValidationMetricReferencePolicy(
+            :reference_case,
+            :completed,
+            reference_exact,
+        ),);
+        source_commit="fc865e5",
+        provenance="Candidate for approved-reference invariant tests.",
+    )
+
+    valid_keywords = (
+        benchmark_scope="Synthetic benchmark scope.",
+        methodology="Synthetic validation methodology.",
+        reviewer="Scientific reviewer",
+        approval_date="2026-07-25",
+        approval_rationale="Reviewed and accepted for invariant testing.",
+    )
+
+    @test_throws ArgumentError ApprovedScientificReference(
+        "",
+        "1.0.0",
+        observation;
+        valid_keywords...,
+    )
+    @test_throws ArgumentError ApprovedScientificReference(
+        "reference-suite-v1",
+        "1.0",
+        observation;
+        valid_keywords...,
+    )
+    invalid_date_keywords = merge(
+        valid_keywords,
+        (approval_date="25-07-2026",),
+    )
+    @test_throws ArgumentError ApprovedScientificReference(
+        "reference-suite-v1",
+        "1.0.0",
+        observation;
+        invalid_date_keywords...,
+    )
+    for field in (
+        :benchmark_scope,
+        :methodology,
+        :reviewer,
+        :approval_rationale,
+    )
+        invalid_keywords = merge(valid_keywords, NamedTuple{(field,)}(("",)))
+        @test_throws ArgumentError ApprovedScientificReference(
+            "reference-suite-v1",
+            "1.0.0",
+            observation;
+            invalid_keywords...,
+        )
+    end
+    @test_throws ArgumentError ApprovedScientificReference(
+        "reference-suite-v1",
+        "1.0.0",
+        observation;
+        valid_keywords...,
+        known_limitations=" ",
+    )
+end
