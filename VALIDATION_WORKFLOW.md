@@ -25,8 +25,9 @@ Render PASS / FAIL / ERROR report
 Optionally write deterministic CI artifacts
 ```
 
-The workflow never creates or updates a reviewed baseline automatically.
-Reference approval is a separate, explicit scientific review operation.
+The workflow never creates or updates a reviewed scientific reference
+automatically. Reference approval is a separate, explicit scientific review
+operation.
 
 ## Prerequisite: an approved reference
 
@@ -148,8 +149,8 @@ An `ERROR` takes precedence over `FAIL`, and `FAIL` takes precedence over
 
 Reference creation is deliberately not part of the routine regression command.
 There is no command that silently promotes the latest suite result to an
-approved baseline. A contributor preparing a candidate baseline must complete
-all seven review steps below.
+approved scientific reference. A contributor preparing a candidate scientific
+reference must complete all seven review steps below.
 
 ### 1. Run and retain the full suite report
 
@@ -246,7 +247,7 @@ generated artifacts instead:
 Remove-Item -Recurse -Force validation_reports/vf4-temporary
 ```
 
-Confirm that no temporary baseline or report is staged:
+Confirm that no temporary scientific reference or report is staged:
 
 ```powershell
 git status --short

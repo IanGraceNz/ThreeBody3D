@@ -7,13 +7,67 @@ preserving the validated v0.4.0 numerical baseline.
 
 The release has three primary workstreams:
 
-1. strengthen scientific validation;
+1. provide scientifically defensible validation that enables continued
+   improvement of regularization methods, numerical algorithms, and solver
+   accuracy;
 2. improve experimental automatic switching; and
 3. advance regularization robustness.
 
 Work proceeds in that order. Validation infrastructure must be capable of
 measuring and detecting regressions before switching or regularization
 algorithms are changed.
+
+### Scientific objective
+
+The primary objective of ThreeBody3D is to improve the scientific accuracy,
+robustness, and reproducibility of numerical solutions of the Newtonian
+three-body problem.
+
+Every development stage should contribute directly to one or more of the
+following objectives:
+
+- improve numerical accuracy;
+- improve robustness during close encounters and other challenging dynamical
+  regimes; and
+- increase scientific confidence that reported improvements are genuine,
+  reproducible, and quantitatively supported.
+
+The validation framework is not an end in itself. Its purpose is to provide
+sufficient scientific evidence that improvements to regularization methods,
+numerical algorithms, and solver strategies represent genuine advances rather
+than incidental numerical variation.
+
+Accordingly, the validation framework should remain as simple as possible while
+meeting the standards of scientific acceptability and reproducibility required
+for trustworthy scientific software.
+
+### Validation design priorities
+
+The validation framework follows three priorities, in this order:
+
+1. scientific acceptability;
+2. ease of use; and
+3. simplicity.
+
+Scientific correctness takes precedence over convenience, implementation
+complexity, or feature count. Routine validation should be straightforward to
+execute, understand, and reproduce. Additional infrastructure should be added
+only when it demonstrably improves the project's scientific capability.
+
+### Scientific return test
+
+Before introducing new validation functionality, ask:
+
+> Will this feature help determine whether a new numerical method is
+> scientifically better than the previous one?
+
+If the answer is yes, the feature supports the project's primary objective. If
+the answer is no, implementation should normally be deferred.
+
+The purpose of "not fooling ourselves" is practical: to produce better, more
+accurate software. Validation should be capable of disproving an expected
+improvement as readily as confirming one, while remaining focused on advancing
+the quality of the numerical solution.
 
 ## 2. Development principles
 
@@ -32,6 +86,17 @@ The following requirements apply to every stage:
 - `main` remains stable while work proceeds on `v0.5-development`.
 
 ## 3. Workstream A: Scientific validation
+
+This workstream provides scientifically defensible evidence that enables
+continued improvement of regularization methods, numerical algorithms, solver
+strategies, and overall numerical accuracy. It is not intended to build an
+increasingly sophisticated validation framework.
+
+ThreeBody3D follows the principle of scientific minimalism: validation
+infrastructure should implement only the minimum capability required to support
+scientifically rigorous development. Features that primarily add
+administrative, architectural, or organisational sophistication without
+improving scientific capability should normally be deferred.
 
 ### Stage V5-V0: Validation inventory and schema design
 
@@ -229,23 +294,32 @@ classified reproducible ensembles, including deliberately difficult systems.
 1. `Refactor randomized validation into reproducible ensembles`
 2. `Add close-encounter stress ensembles`
 
-### Stage V5-V5: Reproducibility testing and reference archive
+### Stage V5-V5: Scientific reference support
 
 #### Objective
 
-Detect unintended numerical changes by comparing current structured results
-with reviewed reference records.
+Define and implement the minimum scientifically defensible support required to
+preserve approved scientific references and compare current structured results
+with them.
+
+An approved scientific reference represents a reviewed scientific observation,
+not software state. The validation framework preserves, compares, and reports
+that evidence; scientific interpretation remains the responsibility of the
+reviewer.
 
 #### Deliverables
 
-- a compact repository-managed reference dataset for selected deterministic
-  cases;
-- documented rules distinguishing exact, tolerance-based, and trend-based
-  comparisons;
-- provenance recorded for each reference dataset;
-- an explicit review procedure for accepting changed references;
-- a comparison tool that reports every changed metric;
-- no automatic rewriting of accepted references during validation.
+- a compact repository-managed set of approved scientific references for
+  selected deterministic cases;
+- a concise design defining scientific acceptance, minimum metadata,
+  immutability, comparison, and replacement rules;
+- documented rules distinguishing exact and tolerance-based comparisons;
+- provenance and scientific rationale recorded for each approved reference;
+- an explicit human review procedure for accepting a candidate reference;
+- a comparison tool that reports every retained metric and observed
+  difference; and
+- no automatic selection, approval, or rewriting of approved references during
+  validation.
 
 #### Acceptance gate
 
@@ -257,9 +331,9 @@ with reviewed reference records.
 
 #### Suggested commits
 
-1. `Add validation reference record format`
-2. `Add reproducibility comparison tooling`
-3. `Record initial reviewed validation references`
+1. `Define scientific reference baseline design`
+2. `Add minimal approved scientific reference support`
+3. `Apply approved references to a scientific comparison`
 
 ### Stage V5-V6: Performance benchmarking
 
@@ -370,7 +444,30 @@ source changes.
 
 ## 6. Immediate next action
 
-Begin Stage V5-V0 as a documentation and design task. Do not modify numerical
-algorithms. The first implementation patch should add the validation inventory,
-result-schema design, and reference-update policy, followed by package tests and
-the unchanged v0.4 scientific validation suite.
+Complete Stage V5-V5 design before implementation by adding
+`V0_5_SCIENTIFIC_REFERENCE_BASELINE_DESIGN.md` and reviewing it together with
+this implementation plan and `VALIDATION_WORKFLOW.md`.
+
+The first implementation increment should then introduce only the minimum
+approved-scientific-reference representation required by the accepted design.
+No numerical algorithm should be changed during that increment. Each later
+reference feature must pass the scientific return test and remain subordinate
+to the project's primary goal of improving regularization and numerical
+accuracy.
+
+## 7. Long-term philosophy
+
+ThreeBody3D is fundamentally a scientific computing project rather than a
+validation-framework project. Validation infrastructure exists to support the
+continued development of increasingly accurate and robust numerical methods.
+
+The framework should collect, preserve, and present scientific evidence without
+substituting automated conclusions for scientific judgement. Every iteration
+should either improve the numerical methods or improve confidence in their
+behaviour, with the overall purpose of producing better, more accurate
+software.
+
+As the project matures, validation infrastructure should stabilise while
+scientific capability continues to expand. The approved scientific reference
+system exists to provide confidence that each successive iteration genuinely
+improves accuracy and quality.
