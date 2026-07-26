@@ -29,6 +29,7 @@ include("ReferenceWorkflow.jl")
 include("ValidationRunWorkflow.jl")
 include("CaseProtocol.jl")
 include("PerformanceProtocol.jl")
+include("PerformanceRunner.jl")
 include("SuiteRunner.jl")
 include("CoreBenchmarkCases.jl")
 include("CloseEncounterCase.jl")
@@ -72,6 +73,11 @@ export AbstractValidationMetric,
        write_requested_performance_report,
        performance_exit_code,
        publish_performance_report,
+       PerformanceBenchmarkEntry,
+       PerformanceProcessRecord,
+       run_performance_entry,
+       build_performance_suite_report,
+       run_performance_suite,
        render_performance_benchmark,
        render_performance_suite,
        actual_completed,
