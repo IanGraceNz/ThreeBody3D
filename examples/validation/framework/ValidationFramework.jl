@@ -14,6 +14,7 @@ not included in, or exported from, the public `ThreeBody3D` package API.
 """
 
 include("Types.jl")
+include("PerformanceTypes.jl")
 include("Criteria.jl")
 include("CaseResults.jl")
 include("SuiteResults.jl")
@@ -37,6 +38,18 @@ include("KSHierarchicalTripleCase.jl")
 include("KSSwitchingComparisonCase.jl")
 
 export AbstractValidationMetric,
+       PerformanceBenchmarkDefinition,
+       PerformanceMeasurementPolicy,
+       PerformanceSample,
+       PerformanceSummary,
+       PerformanceBenchmarkReport,
+       PerformanceSuiteReport,
+       QuickBenchmark,
+       StandardBenchmark,
+       PublicationBenchmark,
+       build_performance_summary,
+       build_performance_benchmark_report,
+       performance_suite_complete,
        actual_completed,
        actual_errored,
        actual_malformed_report,

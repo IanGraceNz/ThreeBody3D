@@ -5,6 +5,8 @@ using .ValidationFramework
 
 include("types.jl")
 
+include("performance_types.jl")
+
 include("criteria.jl")
 
 include("case_results.jl")
