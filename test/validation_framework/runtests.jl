@@ -17,9 +17,15 @@ include("serialization.jl")
 
 include("performance_serialization.jl")
 
+include("performance_measurement.jl")
+
+include("performance_presentation.jl")
+
 include("console_presentation.jl")
 
 include("case_protocol.jl")
+
+include("performance_protocol.jl")
 
 include("suite_runner.jl")
 

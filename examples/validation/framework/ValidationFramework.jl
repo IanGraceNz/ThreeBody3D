@@ -22,11 +22,13 @@ include("ReferenceRecords.jl")
 include("ReferenceComparison.jl")
 include("Serialization.jl")
 include("PerformanceSerialization.jl")
+include("PerformanceMeasurement.jl")
 include("ApprovalWorkflow.jl")
 include("ConsolePresentation.jl")
 include("ReferenceWorkflow.jl")
 include("ValidationRunWorkflow.jl")
 include("CaseProtocol.jl")
+include("PerformanceProtocol.jl")
 include("SuiteRunner.jl")
 include("CoreBenchmarkCases.jl")
 include("CloseEncounterCase.jl")
@@ -57,6 +59,21 @@ export AbstractValidationMetric,
        read_performance_suite,
        write_performance_benchmark,
        write_performance_suite,
+       PerformanceObservation,
+       PerformanceMeasurementResult,
+       measure_performance_sample,
+       run_performance_measurements,
+       PERFORMANCE_REPORT_ENV,
+       PERFORMANCE_BENCHMARK_ID_ENV,
+       PERFORMANCE_SCHEMA_VERSION_ENV,
+       PerformanceBenchmarkProtocol,
+       resolve_performance_protocol,
+       performance_report_requested,
+       write_requested_performance_report,
+       performance_exit_code,
+       publish_performance_report,
+       render_performance_benchmark,
+       render_performance_suite,
        actual_completed,
        actual_errored,
        actual_malformed_report,

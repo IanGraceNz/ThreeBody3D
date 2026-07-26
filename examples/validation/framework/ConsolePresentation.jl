@@ -251,3 +251,66 @@ render_approved_scientific_reference_report(
     reference::ApprovedScientificReference,
     comparison::ValidationSuiteReferenceComparison,
 ) = render_approved_scientific_reference_report(stdout, reference, comparison)
+
+function _performance_value(value)
+    isnothing(value) ? "unavailable" : string(value)
+end
+
+"""Render one immutable performance benchmark report without interpretation."""
+function render_performance_benchmark(io::IO, report::PerformanceBenchmarkReport)
+    definition = report.definition
+    println(io, "Performance benchmark: ", definition.title)
+    println(io, "Benchmark ID: ", definition.benchmark_id)
+    println(io, "Source: ", definition.source_path)
+    println(io, "Definition version: ", definition.definition_version)
+    println(io)
+    println(io, "Measurement policy")
+    println(io, "  Warm-up runs: ", report.policy.warmup_runs)
+    println(io, "  Retained samples: ", report.policy.sample_runs)
+    println(io, "  Process isolation requested: ", report.policy.process_isolation)
+    println(io)
+    println(io, "Summary")
+    println(io, "  Completed samples: ", report.summary.sample_count)
+    println(io, "  Elapsed median seconds: ", _performance_value(report.summary.elapsed_median))
+    println(io, "  Elapsed range seconds: ", _performance_value(report.summary.elapsed_minimum), " to ", _performance_value(report.summary.elapsed_maximum))
+    println(io, "  Elapsed mean seconds: ", _performance_value(report.summary.elapsed_mean))
+    println(io, "  Elapsed standard deviation: ", _performance_value(report.summary.elapsed_standard_deviation))
+    println(io, "  Allocated bytes median: ", _performance_value(report.summary.allocated_bytes_median))
+    println(io, "  Allocation count median: ", _performance_value(report.summary.allocation_count_median))
+    println(io)
+    println(io, "Execution")
+    println(io, "  Actual outcome: ", stable_string(report.execution.actual))
+    !isnothing(report.execution.exit_code) && println(io, "  Exit code: ", report.execution.exit_code)
+    !isnothing(report.execution.elapsed_seconds) && println(io, "  Protocol elapsed seconds: ", report.execution.elapsed_seconds)
+    !isnothing(report.execution.summary) && println(io, "  Summary: ", report.execution.summary)
+    println(io, "Interpretation: descriptive performance evidence only; no scientific PASS/FAIL status is assigned.")
+    nothing
+end
+
+render_performance_benchmark(report::PerformanceBenchmarkReport) =
+    render_performance_benchmark(stdout, report)
+
+"""Render one immutable performance suite in retained benchmark order."""
+function render_performance_suite(io::IO, report::PerformanceSuiteReport)
+    println(io, "Performance suite: ", report.title)
+    println(io, "Suite ID: ", report.suite_id)
+    println(io, "Schema version: ", report.schema_version)
+    println(io)
+    println(io, "Benchmarks")
+    if isempty(report.benchmarks)
+        println(io, "  (none)")
+    else
+        for benchmark in report.benchmarks
+            outcome = uppercase(stable_string(benchmark.execution.actual))
+            median = _performance_value(benchmark.summary.elapsed_median)
+            println(io, "  [", outcome, "] ", benchmark.definition.benchmark_id,
+                " — median elapsed seconds: ", median)
+        end
+    end
+    println(io)
+    println(io, "Execution complete: ", performance_suite_complete(report))
+    println(io, "Interpretation: suite completeness is operational, not scientific acceptance.")
+    nothing
+end
+
+render_performance_suite(report::PerformanceSuiteReport) = render_performance_suite(stdout, report)
