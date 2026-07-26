@@ -21,6 +21,7 @@ include("SuiteResults.jl")
 include("ReferenceRecords.jl")
 include("ReferenceComparison.jl")
 include("Serialization.jl")
+include("PerformanceSerialization.jl")
 include("ApprovalWorkflow.jl")
 include("ConsolePresentation.jl")
 include("ReferenceWorkflow.jl")
@@ -50,6 +51,12 @@ export AbstractValidationMetric,
        build_performance_summary,
        build_performance_benchmark_report,
        performance_suite_complete,
+       performance_benchmark_text,
+       performance_suite_text,
+       read_performance_benchmark,
+       read_performance_suite,
+       write_performance_benchmark,
+       write_performance_suite,
        actual_completed,
        actual_errored,
        actual_malformed_report,
