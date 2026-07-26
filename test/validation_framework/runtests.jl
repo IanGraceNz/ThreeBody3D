@@ -27,6 +27,7 @@ include("case_protocol.jl")
 
 include("performance_protocol.jl")
 include("performance_runner.jl")
+include("performance_benchmarks.jl")
 
 include("suite_runner.jl")
 

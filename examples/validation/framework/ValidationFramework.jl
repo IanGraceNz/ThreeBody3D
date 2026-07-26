@@ -30,6 +30,7 @@ include("ValidationRunWorkflow.jl")
 include("CaseProtocol.jl")
 include("PerformanceProtocol.jl")
 include("PerformanceRunner.jl")
+include("PerformanceBenchmarks.jl")
 include("SuiteRunner.jl")
 include("CoreBenchmarkCases.jl")
 include("CloseEncounterCase.jl")
@@ -54,6 +55,13 @@ export AbstractValidationMetric,
        build_performance_summary,
        build_performance_benchmark_report,
        performance_suite_complete,
+       figure_eight_performance_definition,
+       hierarchical_triple_performance_definition,
+       figure_eight_performance_configuration,
+       hierarchical_triple_performance_configuration,
+       figure_eight_performance_operation,
+       hierarchical_triple_performance_operation,
+       representative_performance_entries,
        performance_benchmark_text,
        performance_suite_text,
        read_performance_benchmark,
