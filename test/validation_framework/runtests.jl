@@ -23,6 +23,8 @@ include("reference_records.jl")
 
 include("approved_scientific_reference_serialization.jl")
 
+include("approval_workflow.jl")
+
 include("reference_comparison.jl")
 
 include("reference_comparison_serialization.jl")

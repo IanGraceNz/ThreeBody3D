@@ -20,6 +20,7 @@ include("SuiteResults.jl")
 include("ReferenceRecords.jl")
 include("ReferenceComparison.jl")
 include("Serialization.jl")
+include("ApprovalWorkflow.jl")
 include("ConsolePresentation.jl")
 include("ReferenceWorkflow.jl")
 include("ValidationRunWorkflow.jl")
@@ -197,6 +198,7 @@ export AbstractValidationMetric,
        approved_scientific_reference_text,
        read_approved_scientific_reference,
        write_approved_scientific_reference,
+       approve_validation_reference,
        write_reference_comparison,
        reference_comparison_text,
        read_reference_comparison,
