@@ -380,7 +380,7 @@ and `:failure` result without recomputing hidden policy state.
 
 **Suggested commit:** `Add automatic-switching decision evidence`
 
-### Stage AS-2 — Scale-policy abstraction
+### Stage AS-2 — Scale-policy abstraction — complete
 
 **Objective:** Introduce an immutable, backwards-compatible abstraction for
 absolute and experimental scale-aware thresholds.
@@ -492,6 +492,11 @@ exit decisions now retain immutable, precision-generic evidence for observables,
 effective absolute thresholds, candidates, selected pairs, and pair competition.
 AS-0 actions, reasons, orientations, boundaries, and precedence remain unchanged.
 
-The next increment is **Stage AS-2 — Scale-policy abstraction**. It should add a
-backwards-compatible immutable abstraction for current absolute thresholds and
-experimental scale-aware thresholds while preserving the AS-0 default behaviour.
+Stage **AS-2 — Scale-policy abstraction** is complete. Immutable absolute and
+experimental characteristic-length policies now resolve once into fixed physical
+thresholds. The existing keyword-only parameter constructor remains the absolute
+default, and decision evidence retains the scale kind and reference scale.
+
+The next increment is **Stage AS-3 — Certified progress and anti-chattering**.
+It should make dwell and progress invariants explicit in controller state and
+failure evidence without suppressing physically distinct repeated encounters.

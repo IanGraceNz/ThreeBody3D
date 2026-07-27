@@ -153,3 +153,24 @@ or precedence rule. The legacy three-argument `AutomaticSwitchingDecision`
 constructor remains available for controller helper outcomes that do not result
 from one complete algebraic policy evaluation; those records have `evidence ===
 nothing`.
+
+## 8. AS-2 threshold policies
+
+AS-2 separates threshold specification from the resolved physical distances used
+by the controller.
+
+`AbsoluteSwitchingThresholdPolicy` stores the existing explicit entry, exit, and
+ambiguity distances. The original keyword-only `AutomaticSwitchingParameters`
+constructor delegates to this policy and therefore retains the AS-0 behaviour.
+
+`ScaleAwareSwitchingThresholdPolicy` is experimental. It stores one positive
+caller-supplied `characteristic_length` and dimensionless entry, exit, and
+ambiguity factors. Construction of `AutomaticSwitchingParameters(policy)`
+multiplies the factors by that immutable reference scale exactly once. The
+resolved physical thresholds remain fixed throughout later event location and
+regularized propagation.
+
+Decision evidence records `scale_kind` and `reference_scale` in addition to the
+resolved physical thresholds. AS-2 supports only the documented scale kinds
+`:absolute` and `:characteristic_length`; it does not infer a dynamical scale,
+change the default policy, or recommend scale factors.

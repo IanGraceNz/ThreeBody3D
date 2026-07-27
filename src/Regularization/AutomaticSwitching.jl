@@ -38,10 +38,141 @@ struct RegularizedSwitchingMode <: ExperimentalSwitchingMode
 end
 
 """
+    AutomaticSwitchingThresholdPolicy
+
+Abstract supertype for immutable threshold policies used by the experimental
+automatic-switching controller.
+
+A threshold policy is resolved once into fixed physical entry, exit, and
+ambiguity distances before event location begins. This prevents thresholds from
+drifting during a Cartesian or regularized segment.
+"""
+abstract type AutomaticSwitchingThresholdPolicy end
+
+"""
+    AbsoluteSwitchingThresholdPolicy(; enter_threshold, exit_threshold,
+                                     ambiguity_threshold=exit_threshold)
+
+Backwards-compatible threshold policy storing explicit physical distances.
+"""
+struct AbsoluteSwitchingThresholdPolicy{T<:AbstractFloat} <:
+       AutomaticSwitchingThresholdPolicy
+    enter_threshold::T
+    exit_threshold::T
+    ambiguity_threshold::T
+end
+
+function AbsoluteSwitchingThresholdPolicy(;
+    enter_threshold::Real,
+    exit_threshold::Real,
+    ambiguity_threshold::Real=exit_threshold,
+)
+    T = float(promote_type(
+        typeof(enter_threshold), typeof(exit_threshold), typeof(ambiguity_threshold),
+    ))
+    enter = T(enter_threshold)
+    exit = T(exit_threshold)
+    ambiguity = T(ambiguity_threshold)
+    all(isfinite, (enter, exit, ambiguity)) ||
+        throw(ArgumentError("automatic-switching thresholds must be finite."))
+    enter > zero(T) || throw(ArgumentError("enter_threshold must be positive."))
+    exit > enter ||
+        throw(ArgumentError("exit_threshold must be greater than enter_threshold."))
+    ambiguity >= enter ||
+        throw(ArgumentError("ambiguity_threshold must be at least enter_threshold."))
+    AbsoluteSwitchingThresholdPolicy{T}(enter, exit, ambiguity)
+end
+
+"""
+    ScaleAwareSwitchingThresholdPolicy(; characteristic_length, enter_factor,
+                                       exit_factor,
+                                       ambiguity_factor=exit_factor)
+
+Experimental scale-aware policy that multiplies dimensionless factors by one
+caller-supplied positive `characteristic_length`.
+
+The characteristic length is immutable and is resolved once when
+[`AutomaticSwitchingParameters`](@ref) is constructed. AS-2 intentionally does
+not infer a local dynamical scale or change the default absolute policy.
+"""
+struct ScaleAwareSwitchingThresholdPolicy{T<:AbstractFloat} <:
+       AutomaticSwitchingThresholdPolicy
+    characteristic_length::T
+    enter_factor::T
+    exit_factor::T
+    ambiguity_factor::T
+end
+
+function ScaleAwareSwitchingThresholdPolicy(;
+    characteristic_length::Real,
+    enter_factor::Real,
+    exit_factor::Real,
+    ambiguity_factor::Real=exit_factor,
+)
+    T = float(promote_type(
+        typeof(characteristic_length), typeof(enter_factor),
+        typeof(exit_factor), typeof(ambiguity_factor),
+    ))
+    scale = T(characteristic_length)
+    enter = T(enter_factor)
+    exit = T(exit_factor)
+    ambiguity = T(ambiguity_factor)
+    all(isfinite, (scale, enter, exit, ambiguity)) ||
+        throw(ArgumentError("scale-aware switching policy values must be finite."))
+    scale > zero(T) ||
+        throw(ArgumentError("characteristic_length must be positive."))
+    enter > zero(T) || throw(ArgumentError("enter_factor must be positive."))
+    exit > enter ||
+        throw(ArgumentError("exit_factor must be greater than enter_factor."))
+    ambiguity >= enter ||
+        throw(ArgumentError("ambiguity_factor must be at least enter_factor."))
+    ScaleAwareSwitchingThresholdPolicy{T}(scale, enter, exit, ambiguity)
+end
+
+"""
+    automatic_switching_thresholds(policy)
+
+Resolve an immutable threshold policy into deterministic physical distances and
+scale evidence. The result contains `enter_threshold`, `exit_threshold`,
+`ambiguity_threshold`, `scale_kind`, and `reference_scale`.
+"""
+function automatic_switching_thresholds(policy::AbsoluteSwitchingThresholdPolicy{T}) where {T}
+    (
+        enter_threshold=policy.enter_threshold,
+        exit_threshold=policy.exit_threshold,
+        ambiguity_threshold=policy.ambiguity_threshold,
+        scale_kind=:absolute,
+        reference_scale=one(T),
+    )
+end
+
+function automatic_switching_thresholds(policy::ScaleAwareSwitchingThresholdPolicy{T}) where {T}
+    scale = policy.characteristic_length
+    enter = scale * policy.enter_factor
+    exit = scale * policy.exit_factor
+    ambiguity = scale * policy.ambiguity_factor
+    all(isfinite, (enter, exit, ambiguity)) ||
+        throw(ArgumentError("resolved scale-aware switching thresholds must be finite."))
+    (
+        enter_threshold=enter,
+        exit_threshold=exit,
+        ambiguity_threshold=ambiguity,
+        scale_kind=:characteristic_length,
+        reference_scale=scale,
+    )
+end
+
+"""
     AutomaticSwitchingParameters(; enter_threshold, exit_threshold, ...)
+    AutomaticSwitchingParameters(policy; ...)
 
 Validated numerical and safety parameters for experimental threshold-driven
 automatic regularization.
+
+The keyword-only form remains the backwards-compatible absolute-threshold API.
+The policy form accepts either [`AbsoluteSwitchingThresholdPolicy`](@ref) or
+[`ScaleAwareSwitchingThresholdPolicy`](@ref) and resolves it once into fixed
+physical thresholds.
 
 Required hysteresis is enforced by
 `0 < enter_threshold < exit_threshold`. `ambiguity_threshold` defaults to the
@@ -50,9 +181,6 @@ exit threshold and must not be smaller than the entry threshold.
 remain larger than the selected separation by a configurable factor.
 `maximum_switches` bounds the total number of entry and exit events, while
 `minimum_time_progress > 0` prevents zero-time switching loops.
-
-This type only stores policy. It does not alter [`simulate`](@ref) or perform
-an integration.
 """
 struct AutomaticSwitchingParameters{T<:AbstractFloat}
     enter_threshold::T
@@ -61,6 +189,8 @@ struct AutomaticSwitchingParameters{T<:AbstractFloat}
     minimum_separation_ratio::T
     maximum_switches::Int
     minimum_time_progress::T
+    threshold_scale_kind::Symbol
+    threshold_reference_scale::T
 end
 
 function AutomaticSwitchingParameters(;
@@ -73,24 +203,44 @@ function AutomaticSwitchingParameters(;
         typeof(enter_threshold), typeof(exit_threshold),
     ))),
 )
+    policy = AbsoluteSwitchingThresholdPolicy(;
+        enter_threshold, exit_threshold, ambiguity_threshold,
+    )
+    AutomaticSwitchingParameters(
+        policy;
+        minimum_separation_ratio,
+        maximum_switches,
+        minimum_time_progress,
+    )
+end
+
+function AutomaticSwitchingParameters(
+    policy::AutomaticSwitchingThresholdPolicy;
+    minimum_separation_ratio::Real=2,
+    maximum_switches::Integer=100,
+    minimum_time_progress::Real=eps(float(typeof(
+        automatic_switching_thresholds(policy).enter_threshold,
+    ))),
+)
+    resolved = automatic_switching_thresholds(policy)
     T = float(promote_type(
-        typeof(enter_threshold),
-        typeof(exit_threshold),
-        typeof(ambiguity_threshold),
+        typeof(resolved.enter_threshold),
+        typeof(resolved.exit_threshold),
+        typeof(resolved.ambiguity_threshold),
+        typeof(resolved.reference_scale),
         typeof(minimum_separation_ratio),
         typeof(minimum_time_progress),
     ))
-
-    enter = T(enter_threshold)
-    exit = T(exit_threshold)
-    ambiguity = T(ambiguity_threshold)
+    enter = T(resolved.enter_threshold)
+    exit = T(resolved.exit_threshold)
+    ambiguity = T(resolved.ambiguity_threshold)
     ratio = T(minimum_separation_ratio)
     progress = T(minimum_time_progress)
+    reference_scale = T(resolved.reference_scale)
 
-    all(isfinite, (enter, exit, ambiguity, ratio, progress)) ||
+    all(isfinite, (enter, exit, ambiguity, ratio, progress, reference_scale)) ||
         throw(ArgumentError("automatic-switching parameters must be finite."))
-    enter > zero(T) ||
-        throw(ArgumentError("enter_threshold must be positive."))
+    enter > zero(T) || throw(ArgumentError("enter_threshold must be positive."))
     exit > enter ||
         throw(ArgumentError("exit_threshold must be greater than enter_threshold."))
     ambiguity >= enter ||
@@ -101,6 +251,10 @@ function AutomaticSwitchingParameters(;
         throw(ArgumentError("maximum_switches must be positive."))
     progress > zero(T) ||
         throw(ArgumentError("minimum_time_progress must be positive."))
+    resolved.scale_kind in (:absolute, :characteristic_length) ||
+        throw(ArgumentError("unsupported automatic-switching threshold scale kind."))
+    reference_scale > zero(T) ||
+        throw(ArgumentError("threshold reference scale must be positive."))
 
     AutomaticSwitchingParameters{T}(
         enter,
@@ -109,6 +263,8 @@ function AutomaticSwitchingParameters(;
         ratio,
         Int(maximum_switches),
         progress,
+        resolved.scale_kind,
+        reference_scale,
     )
 end
 
@@ -332,15 +488,16 @@ Immutable, precision-generic evidence retained for one algebraic automatic-
 switching policy evaluation.
 
 The record preserves the policy phase, all pair observables, the effective
-absolute thresholds, the entry-candidate mask, the selected/candidate pair,
+resolved thresholds and scale evidence, the entry-candidate mask, the selected/candidate pair,
 and pair-competition indices. It is sufficient to explain the decision without
-recomputing hidden policy state. `scale_kind` is `:absolute` in AS-1; later
-scale-aware stages may add other documented values without changing the current
-absolute-threshold semantics.
+recomputing hidden policy state. `scale_kind` is `:absolute` or
+`:characteristic_length`; `reference_scale` is the immutable scale used to
+resolve the physical thresholds.
 """
 struct AutomaticSwitchingDecisionEvidence{T<:AbstractFloat}
     phase::Symbol
     scale_kind::Symbol
+    reference_scale::T
     separations::NTuple{3,T}
     radial_rates::NTuple{3,T}
     collisions::NTuple{3,Bool}
@@ -360,6 +517,7 @@ struct AutomaticSwitchingDecisionEvidence{T<:AbstractFloat}
     function AutomaticSwitchingDecisionEvidence{T}(
         phase::Symbol,
         scale_kind::Symbol,
+        reference_scale::T,
         separations::NTuple{3,T},
         radial_rates::NTuple{3,T},
         collisions::NTuple{3,Bool},
@@ -378,8 +536,10 @@ struct AutomaticSwitchingDecisionEvidence{T<:AbstractFloat}
     ) where {T<:AbstractFloat}
         phase in (:entry, :exit) ||
             throw(ArgumentError("decision-evidence phase must be :entry or :exit."))
-        scale_kind === :absolute ||
-            throw(ArgumentError("AS-1 decision evidence supports only :absolute scale_kind."))
+        scale_kind in (:absolute, :characteristic_length) ||
+            throw(ArgumentError("unsupported decision-evidence scale_kind."))
+        isfinite(reference_scale) && reference_scale > zero(T) ||
+            throw(ArgumentError("decision-evidence reference_scale must be finite and positive."))
         sort(collect(order)) == [1, 2, 3] ||
             throw(ArgumentError("decision-evidence order must be a permutation of 1:3."))
         1 <= second_index <= 3 ||
@@ -414,6 +574,7 @@ struct AutomaticSwitchingDecisionEvidence{T<:AbstractFloat}
         new{T}(
             phase,
             scale_kind,
+            reference_scale,
             separations,
             radial_rates,
             collisions,
@@ -507,7 +668,8 @@ function _decision_evidence(
 ) where {T<:AbstractFloat}
     AutomaticSwitchingDecisionEvidence{T}(
         phase,
-        :absolute,
+        parameters.threshold_scale_kind,
+        T(parameters.threshold_reference_scale),
         observables.separations,
         observables.radial_rates,
         observables.collisions,

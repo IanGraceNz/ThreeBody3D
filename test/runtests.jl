@@ -2156,6 +2156,7 @@ end
 
 include("automatic_switching_policy_inventory.jl")
 include("automatic_switching_decision_evidence.jl")
+include("automatic_switching_threshold_policies.jl")
 
 include("ks/runtests.jl")
 

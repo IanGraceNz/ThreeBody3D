@@ -473,6 +473,8 @@ The detailed stability classification is in `API_STABILITY.md`:
   decision matrix, boundary semantics, reason symbols, and pair conventions;
 - AS-1 decisions retain `AutomaticSwitchingDecisionEvidence` so each algebraic
   outcome is auditable without recomputing candidate or pair-competition state;
+- AS-2 adds immutable absolute and experimental characteristic-length threshold
+  policies while preserving the existing absolute default;
 - `CHANGELOG.md` records user-visible changes.
 
 ## Licence
