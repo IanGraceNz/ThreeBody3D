@@ -390,7 +390,7 @@ thresholds are deterministic, finite, recorded, and unit tested.
 
 **Suggested commit:** `Add scale-aware switching thresholds`
 
-### Stage AS-3 — Certified progress and anti-chattering
+### Stage AS-3 — Certified progress and anti-chattering — complete
 
 **Objective:** Make dwell/progress invariants explicit in controller state and
 failure records.
@@ -497,6 +497,9 @@ experimental characteristic-length policies now resolve once into fixed physical
 thresholds. The existing keyword-only parameter constructor remains the absolute
 default, and decision evidence retains the scale kind and reference scale.
 
-The next increment is **Stage AS-3 — Certified progress and anti-chattering**.
-It should make dwell and progress invariants explicit in controller state and
-failure evidence without suppressing physically distinct repeated encounters.
+Stage **AS-3 — Certified progress and anti-chattering** is complete. Existing
+segment-level time-progress semantics remain unchanged. Immutable progress state
+and evidence now support an opt-in same-pair exit-to-re-entry separation
+excursion, while first switches and pair changes remain unaffected.
+
+The next increment is **Stage AS-4 — Pair-competition robustness**.

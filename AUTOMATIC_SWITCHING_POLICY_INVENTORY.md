@@ -174,3 +174,18 @@ Decision evidence records `scale_kind` and `reference_scale` in addition to the
 resolved physical thresholds. AS-2 supports only the documented scale kinds
 `:absolute` and `:characteristic_length`; it does not infer a dynamical scale,
 change the default policy, or recommend scale factors.
+
+
+## AS-3 certified progress and anti-chattering
+
+The controller now retains immutable progress state after each successful switch.
+The existing segment-level `minimum_time_progress` checks remain unchanged. An
+optional `minimum_separation_excursion` applies only to an entry following a
+successful exit of the same unordered pair. The default value is zero, so the
+AS-0 controller behaviour remains unchanged unless the safeguard is explicitly
+configured. Pair changes are never rejected by the same-pair excursion rule.
+
+Progress failures retain `AutomaticSwitchingProgressEvidence`, including the
+prior switch, elapsed physical time, pair identity, observed excursion, required
+excursion, and the machine-readable certification reason. Event locators remain
+authoritative for crossing direction; AS-3 does not add a second direction test.

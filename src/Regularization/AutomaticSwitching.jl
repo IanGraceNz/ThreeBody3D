@@ -181,6 +181,9 @@ exit threshold and must not be smaller than the entry threshold.
 remain larger than the selected separation by a configurable factor.
 `maximum_switches` bounds the total number of entry and exit events, while
 `minimum_time_progress > 0` prevents zero-time switching loops.
+`minimum_separation_excursion >= 0` optionally requires a completed exit to be
+followed by a sufficiently deep inward excursion before the same unordered pair
+may enter regularization again. The default zero preserves existing behaviour.
 """
 struct AutomaticSwitchingParameters{T<:AbstractFloat}
     enter_threshold::T
@@ -189,6 +192,7 @@ struct AutomaticSwitchingParameters{T<:AbstractFloat}
     minimum_separation_ratio::T
     maximum_switches::Int
     minimum_time_progress::T
+    minimum_separation_excursion::T
     threshold_scale_kind::Symbol
     threshold_reference_scale::T
 end
@@ -202,6 +206,7 @@ function AutomaticSwitchingParameters(;
     minimum_time_progress::Real=eps(float(promote_type(
         typeof(enter_threshold), typeof(exit_threshold),
     ))),
+    minimum_separation_excursion::Real=0,
 )
     policy = AbsoluteSwitchingThresholdPolicy(;
         enter_threshold, exit_threshold, ambiguity_threshold,
@@ -211,6 +216,7 @@ function AutomaticSwitchingParameters(;
         minimum_separation_ratio,
         maximum_switches,
         minimum_time_progress,
+        minimum_separation_excursion,
     )
 end
 
@@ -221,6 +227,7 @@ function AutomaticSwitchingParameters(
     minimum_time_progress::Real=eps(float(typeof(
         automatic_switching_thresholds(policy).enter_threshold,
     ))),
+    minimum_separation_excursion::Real=0,
 )
     resolved = automatic_switching_thresholds(policy)
     T = float(promote_type(
@@ -230,15 +237,17 @@ function AutomaticSwitchingParameters(
         typeof(resolved.reference_scale),
         typeof(minimum_separation_ratio),
         typeof(minimum_time_progress),
+        typeof(minimum_separation_excursion),
     ))
     enter = T(resolved.enter_threshold)
     exit = T(resolved.exit_threshold)
     ambiguity = T(resolved.ambiguity_threshold)
     ratio = T(minimum_separation_ratio)
     progress = T(minimum_time_progress)
+    excursion = T(minimum_separation_excursion)
     reference_scale = T(resolved.reference_scale)
 
-    all(isfinite, (enter, exit, ambiguity, ratio, progress, reference_scale)) ||
+    all(isfinite, (enter, exit, ambiguity, ratio, progress, excursion, reference_scale)) ||
         throw(ArgumentError("automatic-switching parameters must be finite."))
     enter > zero(T) || throw(ArgumentError("enter_threshold must be positive."))
     exit > enter ||
@@ -251,6 +260,8 @@ function AutomaticSwitchingParameters(
         throw(ArgumentError("maximum_switches must be positive."))
     progress > zero(T) ||
         throw(ArgumentError("minimum_time_progress must be positive."))
+    excursion >= zero(T) ||
+        throw(ArgumentError("minimum_separation_excursion must be nonnegative."))
     resolved.scale_kind in (:absolute, :characteristic_length) ||
         throw(ArgumentError("unsupported automatic-switching threshold scale kind."))
     reference_scale > zero(T) ||
@@ -263,9 +274,95 @@ function AutomaticSwitchingParameters(
         ratio,
         Int(maximum_switches),
         progress,
+        excursion,
         resolved.scale_kind,
         reference_scale,
     )
+end
+
+"""
+    AutomaticSwitchingProgressState
+
+Immutable history of the most recent successful automatic switch. It is used
+only to certify later same-pair re-entry cycles; an absent state means that no
+switch has yet completed.
+"""
+struct AutomaticSwitchingProgressState{T<:AbstractFloat}
+    last_switch_time::T
+    last_kind::Symbol
+    last_pair::Tuple{Int,Int}
+    last_separation::T
+    consecutive_same_pair_switches::Int
+end
+
+"""
+    AutomaticSwitchingProgressEvidence
+
+Immutable evidence for one controller-level progress certification.
+`same_pair_reentry` is true only for an entry following a successful exit of the
+same unordered pair. The optional excursion safeguard is applied only then.
+"""
+struct AutomaticSwitchingProgressEvidence{T<:AbstractFloat}
+    switch_kind::Symbol
+    pair::Tuple{Int,Int}
+    physical_time::T
+    separation::T
+    previous_switch_time::Union{Nothing,T}
+    previous_kind::Union{Nothing,Symbol}
+    previous_pair::Union{Nothing,Tuple{Int,Int}}
+    elapsed_time::Union{Nothing,T}
+    same_unordered_pair::Bool
+    same_pair_reentry::Bool
+    observed_separation_excursion::Union{Nothing,T}
+    required_separation_excursion::T
+    time_progress_satisfied::Bool
+    separation_excursion_satisfied::Bool
+    certified::Bool
+    reason::Symbol
+end
+
+@inline _unordered_pair(pair::Tuple{<:Integer,<:Integer}) = minmax(Int(pair[1]), Int(pair[2]))
+
+function _certify_automatic_switching_progress(
+    state::Union{Nothing,AutomaticSwitchingProgressState{T}},
+    switch_kind::Symbol,
+    pair::Tuple{<:Integer,<:Integer},
+    physical_time::T,
+    separation::T,
+    parameters::AutomaticSwitchingParameters,
+) where {T<:AbstractFloat}
+    switch_kind in (:entry, :exit) || throw(ArgumentError("switch_kind must be :entry or :exit."))
+    all(isfinite, (physical_time, separation)) ||
+        throw(ArgumentError("switch progress observables must be finite."))
+    separation >= zero(T) || throw(ArgumentError("switch separation must be nonnegative."))
+    canonical_pair = _unordered_pair(pair)
+
+    previous_time = isnothing(state) ? nothing : state.last_switch_time
+    previous_kind = isnothing(state) ? nothing : state.last_kind
+    previous_pair = isnothing(state) ? nothing : state.last_pair
+    elapsed = isnothing(state) ? nothing : physical_time - state.last_switch_time
+    same_pair = !isnothing(state) && canonical_pair == state.last_pair
+    same_pair_reentry = !isnothing(state) && switch_kind === :entry &&
+        state.last_kind === :exit && same_pair
+    observed_excursion = same_pair_reentry ? state.last_separation - separation : nothing
+    time_ok = isnothing(elapsed) || elapsed >= parameters.minimum_time_progress
+    excursion_ok = !same_pair_reentry || parameters.minimum_separation_excursion == zero(T) ||
+        something(observed_excursion) >= parameters.minimum_separation_excursion
+    certified = time_ok && excursion_ok
+    reason = !time_ok ? :insufficient_time_progress :
+        (!excursion_ok ? :insufficient_separation_excursion : :progress_certified)
+
+    evidence = AutomaticSwitchingProgressEvidence{T}(
+        switch_kind, canonical_pair, physical_time, separation, previous_time,
+        previous_kind, previous_pair, elapsed, same_pair, same_pair_reentry,
+        observed_excursion, T(parameters.minimum_separation_excursion), time_ok,
+        excursion_ok, certified, reason,
+    )
+    next_count = same_pair && !isnothing(state) ? state.consecutive_same_pair_switches + 1 : 1
+    next_state = AutomaticSwitchingProgressState{T}(
+        physical_time, switch_kind, canonical_pair, separation, next_count,
+    )
+    evidence, next_state
 end
 
 """
@@ -284,6 +381,7 @@ struct AutomaticSwitchingFailure{T<:AbstractFloat}
     reason::Symbol
     message::String
     pair::Union{Nothing,Tuple{Int,Int}}
+    progress_evidence::Union{Nothing,AutomaticSwitchingProgressEvidence{T}}
 end
 
 function AutomaticSwitchingFailure(
@@ -291,6 +389,7 @@ function AutomaticSwitchingFailure(
     reason::Symbol,
     message::AbstractString;
     pair::Union{Nothing,Tuple{<:Integer,<:Integer}}=nothing,
+    progress_evidence::Union{Nothing,AutomaticSwitchingProgressEvidence{T}}=nothing,
 ) where {T<:AbstractFloat}
     isfinite(physical_time) ||
         throw(ArgumentError("failure physical_time must be finite."))
@@ -306,6 +405,7 @@ function AutomaticSwitchingFailure(
         reason,
         String(message),
         validated_pair,
+        progress_evidence,
     )
 end
 
@@ -1372,8 +1472,11 @@ function _failed_switching_trajectory(
     reason::Symbol,
     message::String;
     pair=nothing,
+    progress_evidence=nothing,
 )
-    failure = AutomaticSwitchingFailure(current_time, reason, message; pair=pair)
+    failure = AutomaticSwitchingFailure(
+        current_time, reason, message; pair=pair, progress_evidence=progress_evidence,
+    )
     ExperimentalSwitchingTrajectory(
         converted_system,
         tspan,
@@ -1455,6 +1558,7 @@ function simulate_experimental_switching(
     segments = Any[]
     events = Any[]
     switch_count = 0
+    progress_state::Union{Nothing,AutomaticSwitchingProgressState{T}} = nothing
     ks_gauge_references = Dict{Tuple{Int,Int},Any}()
 
     while current_time < tf
@@ -1491,16 +1595,26 @@ function simulate_experimental_switching(
 
             current_time - segment_start >= parameters.minimum_time_progress ||
                 return _failed_switching_trajectory(
-                    converted_system,
-                    (t0, tf),
-                    parameters,
-                    segments,
-                    events,
-                    current_time,
-                    current_state,
-                    :insufficient_time_progress,
+                    converted_system, (t0, tf), parameters, segments, events,
+                    current_time, current_state, :insufficient_time_progress,
                     "Cartesian entry event did not advance physical time sufficiently.";
                     pair=located.decision.pair,
+                )
+
+            pair = something(located.decision.pair)
+            selected_index = _canonical_pair_index(pair)
+            progress_evidence, proposed_progress_state = _certify_automatic_switching_progress(
+                progress_state, :entry, pair, current_time,
+                T(located.observables.separations[selected_index]), parameters,
+            )
+            progress_evidence.certified ||
+                return _failed_switching_trajectory(
+                    converted_system, (t0, tf), parameters, segments, events,
+                    current_time, current_state, progress_evidence.reason,
+                    progress_evidence.reason === :insufficient_time_progress ?
+                        "Cartesian entry event did not advance physical time sufficiently." :
+                        "Same-pair re-entry did not achieve the configured separation excursion.";
+                    pair=pair, progress_evidence=progress_evidence,
                 )
             switch_count += 1
             switch_count <= parameters.maximum_switches ||
@@ -1517,7 +1631,6 @@ function simulate_experimental_switching(
                     pair=located.decision.pair,
                 )
 
-            pair = something(located.decision.pair)
             diagnostics = if regularization_backend === :ks
                 reference = get(ks_gauge_references, pair, nothing)
                 _ks_entry_transition_diagnostics(
@@ -1531,6 +1644,7 @@ function simulate_experimental_switching(
             push!(events, _switch_event(
                 current_time, :entry, pair, located.observables, diagnostics,
             ))
+            progress_state = proposed_progress_state
             mode = RegularizedSwitchingMode(pair)
         else
             pair = mode.pair
@@ -1572,16 +1686,23 @@ function simulate_experimental_switching(
 
             current_time - segment_start >= parameters.minimum_time_progress ||
                 return _failed_switching_trajectory(
-                    converted_system,
-                    (t0, tf),
-                    parameters,
-                    segments,
-                    events,
-                    current_time,
-                    current_state,
-                    :insufficient_time_progress,
+                    converted_system, (t0, tf), parameters, segments, events,
+                    current_time, current_state, :insufficient_time_progress,
                     "Regularized exit event did not advance physical time sufficiently.";
                     pair=pair,
+                )
+
+            selected_index = _canonical_pair_index(pair)
+            progress_evidence, proposed_progress_state = _certify_automatic_switching_progress(
+                progress_state, :exit, pair, current_time,
+                T(located.observables.separations[selected_index]), parameters,
+            )
+            progress_evidence.certified ||
+                return _failed_switching_trajectory(
+                    converted_system, (t0, tf), parameters, segments, events,
+                    current_time, current_state, progress_evidence.reason,
+                    "Regularized exit event did not advance physical time sufficiently.";
+                    pair=pair, progress_evidence=progress_evidence,
                 )
             switch_count += 1
             switch_count <= parameters.maximum_switches ||
@@ -1609,6 +1730,7 @@ function simulate_experimental_switching(
             push!(events, _switch_event(
                 current_time, :exit, pair, located.observables, diagnostics,
             ))
+            progress_state = proposed_progress_state
             mode = CartesianSwitchingMode()
         end
     end

@@ -475,6 +475,8 @@ The detailed stability classification is in `API_STABILITY.md`:
   outcome is auditable without recomputing candidate or pair-competition state;
 - AS-2 adds immutable absolute and experimental characteristic-length threshold
   policies while preserving the existing absolute default;
+- AS-3 adds explicit immutable switch-progress evidence and an optional same-pair
+  re-entry excursion safeguard. Its zero default preserves existing trajectories.
 - `CHANGELOG.md` records user-visible changes.
 
 ## Licence
