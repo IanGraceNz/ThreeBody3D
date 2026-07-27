@@ -469,6 +469,8 @@ The detailed stability classification is in `API_STABILITY.md`:
 - `V0_6_AUTOMATIC_SWITCHING_ROBUSTNESS_DESIGN.md` defines the next
   design-first numerical workstream for scale-aware, auditable automatic
   regularization switching;
+- `AUTOMATIC_SWITCHING_POLICY_INVENTORY.md` freezes the AS-0 algebraic
+  decision matrix, boundary semantics, reason symbols, and pair conventions;
 - `CHANGELOG.md` records user-visible changes.
 
 ## Licence

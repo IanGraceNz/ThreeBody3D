@@ -2154,6 +2154,8 @@ end
     )
 end
 
+include("automatic_switching_policy_inventory.jl")
+
 include("ks/runtests.jl")
 
 include("validation_framework/runtests.jl")

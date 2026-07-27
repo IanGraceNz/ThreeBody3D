@@ -482,11 +482,12 @@ quality with clearly reduced work and no hidden loss of coverage.
 
 ## 14. Immediate next action
 
-Implement **Stage AS-0 — Policy inventory and invariant tests**.
+Stage **AS-0 — Policy inventory and invariant tests** is complete. The current
+behaviour is frozen by `AUTOMATIC_SWITCHING_POLICY_INVENTORY.md` and the
+table-driven tests in `test/automatic_switching_policy_inventory.jl`. No
+switching decision was changed.
 
-The first increment should not change switching decisions. It should build a
-compact, table-driven test matrix around `pair_observables`,
-`automatic_entry_decision`, and `automatic_exit_decision`, and add a documented
-inventory of all current reason symbols and their meanings. Any discrepancy
-found between documentation and implementation should be reported before a
-behavioural patch is proposed.
+The next increment is **Stage AS-1 — Structured decision evidence**. It should
+extend decisions or companion records so every policy outcome retains the
+candidate, threshold, scale, and pair-competition evidence needed to explain
+the result without recomputing hidden policy state.
