@@ -471,6 +471,8 @@ The detailed stability classification is in `API_STABILITY.md`:
   regularization switching;
 - `AUTOMATIC_SWITCHING_POLICY_INVENTORY.md` freezes the AS-0 algebraic
   decision matrix, boundary semantics, reason symbols, and pair conventions;
+- AS-1 decisions retain `AutomaticSwitchingDecisionEvidence` so each algebraic
+  outcome is auditable without recomputing candidate or pair-competition state;
 - `CHANGELOG.md` records user-visible changes.
 
 ## Licence

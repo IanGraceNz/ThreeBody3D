@@ -143,6 +143,7 @@
             @test decision.action == case.action
             @test decision.pair == case.pair
             @test decision.reason == case.reason
+            @test decision.evidence isa AutomaticSwitchingDecisionEvidence
         end
     end
 
@@ -159,6 +160,7 @@
                 @test decision.action == :exit
                 @test decision.pair == selected_pair
                 @test decision.reason == :isolated_receding_pair
+                @test decision.evidence isa AutomaticSwitchingDecisionEvidence
             end
         end
     end
@@ -243,6 +245,7 @@
             @test decision.action == case.action
             @test decision.pair == case.pair
             @test decision.reason == case.reason
+            @test decision.evidence isa AutomaticSwitchingDecisionEvidence
         end
     end
 

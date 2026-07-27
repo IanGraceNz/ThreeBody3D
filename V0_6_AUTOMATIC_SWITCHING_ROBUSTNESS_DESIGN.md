@@ -370,7 +370,7 @@ orientations, threshold boundaries, and collision classes.
 
 **Suggested commit:** `Define automatic-switching policy invariants`
 
-### Stage AS-1 — Structured decision evidence
+### Stage AS-1 — Structured decision evidence — complete
 
 **Objective:** Extend decisions or companion records so every policy outcome
 retains candidate, threshold, scale, and pair-competition evidence.
@@ -487,7 +487,11 @@ behaviour is frozen by `AUTOMATIC_SWITCHING_POLICY_INVENTORY.md` and the
 table-driven tests in `test/automatic_switching_policy_inventory.jl`. No
 switching decision was changed.
 
-The next increment is **Stage AS-1 — Structured decision evidence**. It should
-extend decisions or companion records so every policy outcome retains the
-candidate, threshold, scale, and pair-competition evidence needed to explain
-the result without recomputing hidden policy state.
+Stage **AS-1 — Structured decision evidence** is complete. Algebraic entry and
+exit decisions now retain immutable, precision-generic evidence for observables,
+effective absolute thresholds, candidates, selected pairs, and pair competition.
+AS-0 actions, reasons, orientations, boundaries, and precedence remain unchanged.
+
+The next increment is **Stage AS-2 — Scale-policy abstraction**. It should add a
+backwards-compatible immutable abstraction for current absolute thresholds and
+experimental scale-aware thresholds while preserving the AS-0 default behaviour.

@@ -138,3 +138,18 @@ The AS-0 tests freeze the current policy for:
 These tests describe existing behaviour. Any future change to a reason, boundary,
 precedence rule, pair orientation, or action requires an explicit later-stage
 policy review rather than an incidental test update.
+
+
+## 7. AS-1 decision evidence
+
+Beginning with AS-1, every result returned directly by
+`automatic_entry_decision` or `automatic_exit_decision` retains immutable
+`AutomaticSwitchingDecisionEvidence`. The evidence records the original pair
+observables, effective absolute thresholds, entry-candidate mask and count,
+candidate or selected pair, selected canonical index, and second-closest index.
+
+This addition does not alter any AS-0 action, reason, pair orientation, boundary,
+or precedence rule. The legacy three-argument `AutomaticSwitchingDecision`
+constructor remains available for controller helper outcomes that do not result
+from one complete algebraic policy evaluation; those records have `evidence ===
+nothing`.

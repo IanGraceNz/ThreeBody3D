@@ -326,6 +326,114 @@ Return pair radial separation rates in canonical order `(1,2)`, `(1,3)`,
 pair_radial_rates(u::AbstractVector{<:AbstractFloat}) = pair_observables(u).radial_rates
 
 """
+    AutomaticSwitchingDecisionEvidence
+
+Immutable, precision-generic evidence retained for one algebraic automatic-
+switching policy evaluation.
+
+The record preserves the policy phase, all pair observables, the effective
+absolute thresholds, the entry-candidate mask, the selected/candidate pair,
+and pair-competition indices. It is sufficient to explain the decision without
+recomputing hidden policy state. `scale_kind` is `:absolute` in AS-1; later
+scale-aware stages may add other documented values without changing the current
+absolute-threshold semantics.
+"""
+struct AutomaticSwitchingDecisionEvidence{T<:AbstractFloat}
+    phase::Symbol
+    scale_kind::Symbol
+    separations::NTuple{3,T}
+    radial_rates::NTuple{3,T}
+    collisions::NTuple{3,Bool}
+    order::NTuple{3,Int}
+    isolation_ratio::T
+    enter_threshold::T
+    exit_threshold::T
+    ambiguity_threshold::T
+    minimum_separation_ratio::T
+    candidate_mask::NTuple{3,Bool}
+    candidate_count::Int
+    candidate_pair::Union{Nothing,Tuple{Int,Int}}
+    selected_pair::Union{Nothing,Tuple{Int,Int}}
+    selected_index::Union{Nothing,Int}
+    second_index::Int
+
+    function AutomaticSwitchingDecisionEvidence{T}(
+        phase::Symbol,
+        scale_kind::Symbol,
+        separations::NTuple{3,T},
+        radial_rates::NTuple{3,T},
+        collisions::NTuple{3,Bool},
+        order::NTuple{3,Int},
+        isolation_ratio::T,
+        enter_threshold::T,
+        exit_threshold::T,
+        ambiguity_threshold::T,
+        minimum_separation_ratio::T,
+        candidate_mask::NTuple{3,Bool},
+        candidate_count::Int,
+        candidate_pair::Union{Nothing,Tuple{Int,Int}},
+        selected_pair::Union{Nothing,Tuple{Int,Int}},
+        selected_index::Union{Nothing,Int},
+        second_index::Int,
+    ) where {T<:AbstractFloat}
+        phase in (:entry, :exit) ||
+            throw(ArgumentError("decision-evidence phase must be :entry or :exit."))
+        scale_kind === :absolute ||
+            throw(ArgumentError("AS-1 decision evidence supports only :absolute scale_kind."))
+        sort(collect(order)) == [1, 2, 3] ||
+            throw(ArgumentError("decision-evidence order must be a permutation of 1:3."))
+        1 <= second_index <= 3 ||
+            throw(ArgumentError("decision-evidence second_index must be in 1:3."))
+        candidate_count == count(identity, candidate_mask) ||
+            throw(ArgumentError("candidate_count must match candidate_mask."))
+        0 <= candidate_count <= 3 ||
+            throw(ArgumentError("candidate_count must be between zero and three."))
+        if !isnothing(candidate_pair)
+            _validate_pair(candidate_pair)
+        end
+        if !isnothing(selected_pair)
+            _validate_pair(selected_pair)
+        end
+        if !isnothing(selected_index)
+            1 <= selected_index <= 3 ||
+                throw(ArgumentError("selected_index must be in 1:3."))
+        end
+        all(isfinite, separations) ||
+            throw(ArgumentError("decision-evidence separations must be finite."))
+        all(isfinite, radial_rates) ||
+            throw(ArgumentError("decision-evidence radial rates must be finite."))
+        isfinite(isolation_ratio) || isinf(isolation_ratio) ||
+            throw(ArgumentError("decision-evidence isolation ratio must be finite or infinite."))
+        all(isfinite, (
+            enter_threshold,
+            exit_threshold,
+            ambiguity_threshold,
+            minimum_separation_ratio,
+        )) || throw(ArgumentError("decision-evidence thresholds must be finite."))
+
+        new{T}(
+            phase,
+            scale_kind,
+            separations,
+            radial_rates,
+            collisions,
+            order,
+            isolation_ratio,
+            enter_threshold,
+            exit_threshold,
+            ambiguity_threshold,
+            minimum_separation_ratio,
+            candidate_mask,
+            candidate_count,
+            candidate_pair,
+            selected_pair,
+            selected_index,
+            second_index,
+        )
+    end
+end
+
+"""
     AutomaticSwitchingDecision
 
 Solver-independent decision returned by the experimental automatic-switching
@@ -333,18 +441,23 @@ policy.
 
 `action` is one of `:none`, `:enter`, `:exit`, or `:failure`. `pair` identifies
 the affected ordered pair when applicable. `reason` is a machine-readable
-explanation suitable for diagnostics and tests. This type contains no solver
-state and does not locate threshold crossings.
+explanation suitable for diagnostics and tests. Algebraic entry and exit policy
+functions also attach [`AutomaticSwitchingDecisionEvidence`](@ref), allowing
+every outcome to be audited without recomputing hidden policy state. The
+three-argument constructor remains available and records `nothing` evidence for
+non-policy helper decisions.
 """
 struct AutomaticSwitchingDecision
     action::Symbol
     pair::Union{Nothing,Tuple{Int,Int}}
     reason::Symbol
+    evidence::Union{Nothing,AutomaticSwitchingDecisionEvidence}
 
     function AutomaticSwitchingDecision(
         action::Symbol,
         pair::Union{Nothing,Tuple{<:Integer,<:Integer}},
         reason::Symbol,
+        evidence::Union{Nothing,AutomaticSwitchingDecisionEvidence}=nothing,
     )
         action in (:none, :enter, :exit, :failure) ||
             throw(ArgumentError("decision action must be :none, :enter, :exit, or :failure."))
@@ -356,7 +469,7 @@ struct AutomaticSwitchingDecision
         end
         action in (:enter, :exit) && isnothing(validated_pair) &&
             throw(ArgumentError("entry and exit decisions require a selected pair."))
-        new(action, validated_pair, reason)
+        new(action, validated_pair, reason, evidence)
     end
 end
 
@@ -372,6 +485,49 @@ end
     AutomaticSwitchingDecision(:none, nothing, reason)
 @inline _failure_decision(reason::Symbol, pair=nothing) =
     AutomaticSwitchingDecision(:failure, pair, reason)
+
+@inline function _entry_candidate_mask(
+    observables::PairObservables{T},
+    parameters::AutomaticSwitchingParameters,
+) where {T<:AbstractFloat}
+    ntuple(3) do index
+        observables.separations[index] <= parameters.enter_threshold &&
+            observables.radial_rates[index] < zero(T)
+    end
+end
+
+function _decision_evidence(
+    phase::Symbol,
+    observables::PairObservables{T},
+    parameters::AutomaticSwitchingParameters;
+    candidate_mask::NTuple{3,Bool}=(false, false, false),
+    candidate_pair::Union{Nothing,Tuple{Int,Int}}=nothing,
+    selected_pair::Union{Nothing,Tuple{Int,Int}}=nothing,
+    selected_index::Union{Nothing,Int}=nothing,
+) where {T<:AbstractFloat}
+    AutomaticSwitchingDecisionEvidence{T}(
+        phase,
+        :absolute,
+        observables.separations,
+        observables.radial_rates,
+        observables.collisions,
+        observables.order,
+        observables.isolation_ratio,
+        T(parameters.enter_threshold),
+        T(parameters.exit_threshold),
+        T(parameters.ambiguity_threshold),
+        T(parameters.minimum_separation_ratio),
+        candidate_mask,
+        count(identity, candidate_mask),
+        candidate_pair,
+        selected_pair,
+        selected_index,
+        observables.order[2],
+    )
+end
+
+@inline _decision(action, pair, reason, evidence) =
+    AutomaticSwitchingDecision(action, pair, reason, evidence)
 
 """
     automatic_entry_decision(observables, parameters)
@@ -393,32 +549,38 @@ function automatic_entry_decision(
     observables::PairObservables{T},
     parameters::AutomaticSwitchingParameters,
 ) where {T<:AbstractFloat}
+    candidate_mask = _entry_candidate_mask(observables, parameters)
+    candidate_indices = findall(identity, candidate_mask)
+    candidate_pair = length(candidate_indices) == 1 ?
+        _CANONICAL_BINARY_PAIRS[only(candidate_indices)] : nothing
+    evidence = _decision_evidence(
+        :entry,
+        observables,
+        parameters;
+        candidate_mask,
+        candidate_pair,
+    )
+
     any(observables.collisions) &&
-        return _failure_decision(:collision_state, observables.closest_pair)
+        return _decision(:failure, observables.closest_pair, :collision_state, evidence)
 
-    candidates = Int[]
-    for index in 1:3
-        if observables.separations[index] <= parameters.enter_threshold &&
-           observables.radial_rates[index] < zero(T)
-            push!(candidates, index)
-        end
-    end
+    isempty(candidate_indices) &&
+        return _decision(:none, nothing, :no_entry_candidate, evidence)
+    length(candidate_indices) > 1 &&
+        return _decision(:failure, nothing, :simultaneous_entry_candidates, evidence)
 
-    isempty(candidates) && return _none_decision(:no_entry_candidate)
-    length(candidates) > 1 && return _failure_decision(:simultaneous_entry_candidates)
-
-    candidate_index = only(candidates)
+    candidate_index = only(candidate_indices)
     candidate_pair = _CANONICAL_BINARY_PAIRS[candidate_index]
     candidate_index == observables.order[1] ||
-        return _failure_decision(:candidate_not_closest, candidate_pair)
+        return _decision(:failure, candidate_pair, :candidate_not_closest, evidence)
 
     second_index = observables.order[2]
     observables.separations[second_index] <= parameters.ambiguity_threshold &&
-        return _failure_decision(:ambiguous_close_pairs, candidate_pair)
+        return _decision(:failure, candidate_pair, :ambiguous_close_pairs, evidence)
     observables.isolation_ratio < parameters.minimum_separation_ratio &&
-        return _failure_decision(:insufficient_pair_isolation, candidate_pair)
+        return _decision(:failure, candidate_pair, :insufficient_pair_isolation, evidence)
 
-    AutomaticSwitchingDecision(:enter, candidate_pair, :unique_approaching_pair)
+    _decision(:enter, candidate_pair, :unique_approaching_pair, evidence)
 end
 
 """
@@ -443,31 +605,43 @@ function automatic_exit_decision(
 ) where {T<:AbstractFloat}
     selected_index = _canonical_pair_index(pair)
     selected_pair = (Int(pair[1]), Int(pair[2]))
+    evidence = _decision_evidence(
+        :exit,
+        observables,
+        parameters;
+        selected_pair,
+        selected_index,
+    )
 
     for index in 1:3
         if observables.collisions[index] && index != selected_index
-            return _failure_decision(:nonselected_pair_collision, selected_pair)
+            return _decision(
+                :failure,
+                selected_pair,
+                :nonselected_pair_collision,
+                evidence,
+            )
         end
     end
     observables.collisions[selected_index] &&
-        return AutomaticSwitchingDecision(:none, selected_pair, :selected_pair_collision)
+        return _decision(:none, selected_pair, :selected_pair_collision, evidence)
 
     selected_index == observables.order[1] ||
-        return _failure_decision(:selected_pair_lost, selected_pair)
+        return _decision(:failure, selected_pair, :selected_pair_lost, evidence)
 
     second_index = observables.order[2]
     observables.separations[second_index] <= parameters.ambiguity_threshold &&
-        return _failure_decision(:ambiguous_close_pairs, selected_pair)
+        return _decision(:failure, selected_pair, :ambiguous_close_pairs, evidence)
     observables.isolation_ratio < parameters.minimum_separation_ratio &&
-        return _failure_decision(:insufficient_pair_isolation, selected_pair)
+        return _decision(:failure, selected_pair, :insufficient_pair_isolation, evidence)
 
     selected_separation = observables.separations[selected_index]
     selected_rate = observables.radial_rates[selected_index]
     if selected_separation >= parameters.exit_threshold && selected_rate > zero(T)
-        return AutomaticSwitchingDecision(:exit, selected_pair, :isolated_receding_pair)
+        return _decision(:exit, selected_pair, :isolated_receding_pair, evidence)
     end
 
-    AutomaticSwitchingDecision(:none, selected_pair, :exit_condition_not_met)
+    _decision(:none, selected_pair, :exit_condition_not_met, evidence)
 end
 
 """
