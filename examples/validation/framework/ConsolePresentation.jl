@@ -343,3 +343,33 @@ end
 
 render_performance_comparison(comparison::PerformanceBenchmarkComparison) =
     render_performance_comparison(stdout, comparison)
+
+"""Render one ordered accuracy-versus-work series without assigning a ranking."""
+function render_accuracy_work_series(io::IO, series::PerformanceAccuracyWorkSeries)
+    println(io, "Accuracy-versus-work series: ", series.title)
+    println(io, "Series ID: ", series.series_id)
+    println(io, "Accuracy metric: ", first(series.points).accuracy_metric_label)
+    println(io)
+    println(io, "Points")
+    for point in series.points
+        report = point.report
+        println(io, "  ", point.label, " (", point.point_id, ")")
+        println(io, "    Benchmark ID: ", report.definition.benchmark_id)
+        println(io, "    Solver: ", isnothing(report.configuration.solver) ? "unavailable" : report.configuration.solver)
+        println(io, "    Accuracy median: ", point.accuracy_median)
+        println(io, "    Elapsed median seconds: ", isnothing(report.summary.elapsed_median) ? "unavailable" : report.summary.elapsed_median)
+        for (label, field) in (("Accepted steps median", :accepted_steps),
+                               ("Rejected steps median", :rejected_steps),
+                               ("RHS evaluations median", :rhs_evaluations),
+                               ("Saved states median", :saved_states))
+            value = _series_solver_median(point, field)
+            println(io, "    ", label, ": ", isnothing(value) ? "unavailable" : value)
+        end
+    end
+    println(io)
+    println(io, "Interpretation: ordered descriptive evidence only; unlike accuracy measures are not combined and no solver is declared universally superior.")
+    nothing
+end
+
+render_accuracy_work_series(series::PerformanceAccuracyWorkSeries) =
+    render_accuracy_work_series(stdout, series)

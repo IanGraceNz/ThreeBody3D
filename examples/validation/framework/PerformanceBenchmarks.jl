@@ -110,14 +110,20 @@ function hierarchical_triple_performance_operation(;
     reltol=1e-13,
     abstol=1e-13,
 )
-    () -> _performance_observation(ThreeBody3D.run_validation_benchmark(
-        :hierarchical_triple;
-        duration,
-        solver,
-        saveat,
-        reltol,
-        abstol,
-    ))
+    () -> begin
+        report = if isnothing(reltol) && isnothing(abstol)
+            ThreeBody3D.run_validation_benchmark(
+                :hierarchical_triple; duration, solver, saveat,
+            )
+        elseif isnothing(reltol) || isnothing(abstol)
+            throw(ArgumentError("reltol and abstol must both be provided or both be nothing."))
+        else
+            ThreeBody3D.run_validation_benchmark(
+                :hierarchical_triple; duration, solver, saveat, reltol, abstol,
+            )
+        end
+        _performance_observation(report)
+    end
 end
 
 function representative_performance_entries(;
@@ -137,5 +143,110 @@ function representative_performance_entries(;
             policy,
             joinpath(performance_directory, "hierarchical_triple_performance.jl"),
         ),
+    )
+end
+
+const FIGURE_EIGHT_ACCURACY_WORK_POINTS = (:fast, :accurate)
+const HIERARCHICAL_TRIPLE_ACCURACY_WORK_POINTS = (:fast, :accurate)
+
+function _accuracy_work_definition(family::Symbol, point::Symbol)
+    point in (:fast, :accurate) || throw(ArgumentError("Unsupported accuracy-work point: $point."))
+    if family == :figure_eight
+        return PerformanceBenchmarkDefinition(
+            Symbol("figure_eight_accuracy_work_", point),
+            "Figure-eight accuracy-versus-work: $(point)",
+            "One fixed figure-eight configuration in the descriptive accuracy-versus-work series.",
+            "examples/validation/performance/figure_eight_accuracy_work.jl",
+            (:periodic_orbit, :accuracy_work, :solver_work),
+            (:figure_eight, :accuracy_work, point),
+            PERFORMANCE_BENCHMARK_DEFINITION_VERSION,
+            (:elapsed_time, :solver_statistics, :saved_states, :maximum_relative_energy_drift),
+            "V0_5_PERFORMANCE_BENCHMARK_DESIGN.md",
+        )
+    elseif family == :hierarchical_triple
+        return PerformanceBenchmarkDefinition(
+            Symbol("hierarchical_triple_accuracy_work_", point),
+            "Hierarchical-triple accuracy-versus-work: $(point)",
+            "One fixed hierarchical-triple configuration in the descriptive accuracy-versus-work series.",
+            "examples/validation/performance/hierarchical_triple_accuracy_work.jl",
+            (:hierarchical_system, :accuracy_work, :solver_work),
+            (:hierarchical_triple, :accuracy_work, point),
+            PERFORMANCE_BENCHMARK_DEFINITION_VERSION,
+            (:elapsed_time, :solver_statistics, :saved_states, :maximum_relative_energy_drift),
+            "V0_5_PERFORMANCE_BENCHMARK_DESIGN.md",
+        )
+    end
+    throw(ArgumentError("Unsupported accuracy-work family: $family."))
+end
+
+figure_eight_accuracy_work_definition(point::Symbol) = _accuracy_work_definition(:figure_eight, point)
+hierarchical_triple_accuracy_work_definition(point::Symbol) = _accuracy_work_definition(:hierarchical_triple, point)
+
+function figure_eight_accuracy_work_entries(;
+    policy=StandardBenchmark(),
+    performance_directory=joinpath(@__DIR__, "..", "performance"),
+    periods=10,
+    saveat=0.02,
+)
+    Tuple(
+        PerformanceBenchmarkEntry(
+            figure_eight_accuracy_work_definition(point),
+            figure_eight_performance_configuration(; periods, solver=point, saveat),
+            policy,
+            joinpath(performance_directory, "figure_eight_accuracy_work.jl"),
+        ) for point in FIGURE_EIGHT_ACCURACY_WORK_POINTS
+    )
+end
+
+function hierarchical_triple_accuracy_work_entries(;
+    policy=StandardBenchmark(),
+    performance_directory=joinpath(@__DIR__, "..", "performance"),
+    duration=100.0,
+    saveat=0.02,
+)
+    Tuple(
+        PerformanceBenchmarkEntry(
+            hierarchical_triple_accuracy_work_definition(point),
+            hierarchical_triple_performance_configuration(;
+                duration,
+                solver=point,
+                saveat,
+                reltol=point == :accurate ? 1e-13 : nothing,
+                abstol=point == :accurate ? 1e-13 : nothing,
+            ),
+            policy,
+            joinpath(performance_directory, "hierarchical_triple_accuracy_work.jl"),
+        ) for point in HIERARCHICAL_TRIPLE_ACCURACY_WORK_POINTS
+    )
+end
+
+function representative_accuracy_work_entries(; policy=StandardBenchmark(), performance_directory=joinpath(@__DIR__, "..", "performance"))
+    (
+        figure_eight_accuracy_work_entries(; policy, performance_directory)...,
+        hierarchical_triple_accuracy_work_entries(; policy, performance_directory)...,
+    )
+end
+
+function figure_eight_accuracy_work_series(suite::PerformanceSuiteReport)
+    build_accuracy_work_series(
+        suite,
+        :figure_eight_accuracy_work,
+        "Figure-eight accuracy versus work",
+        "Fixed fast and accurate solver profiles for the ten-period figure-eight workload.",
+        :maximum_relative_energy_drift,
+        ((:fast, "Fast profile", :figure_eight_accuracy_work_fast),
+         (:accurate, "Accurate profile", :figure_eight_accuracy_work_accurate)),
+    )
+end
+
+function hierarchical_triple_accuracy_work_series(suite::PerformanceSuiteReport)
+    build_accuracy_work_series(
+        suite,
+        :hierarchical_triple_accuracy_work,
+        "Hierarchical-triple accuracy versus work",
+        "Fixed fast and accurate solver profiles for the 100-time-unit hierarchical workload.",
+        :maximum_relative_energy_drift,
+        ((:fast, "Fast profile", :hierarchical_triple_accuracy_work_fast),
+         (:accurate, "Accurate profile", :hierarchical_triple_accuracy_work_accurate)),
     )
 end

@@ -431,6 +431,10 @@ suite. See `VALIDATION_WORKFLOW.md` for candidate-reference preparation,
 approval rules, programmatic use, status interpretation, and CI guidance. The
 workflow never updates reference baselines automatically.
 
+Repository performance benchmarks and the fixed accuracy-versus-work series are
+documented in `PERFORMANCE_BENCHMARKS.md`. They retain descriptive timing,
+solver-work, and accuracy evidence separately from scientific acceptance.
+
 ## Testing
 
 From the repository root:
@@ -460,6 +464,8 @@ The detailed stability classification is in `API_STABILITY.md`:
 - `V0_4_RELEASE_READINESS.md` defines the release gates;
 - `VALIDATION_WORKFLOW.md` defines the canonical reviewed-reference validation
   and CI workflow;
+- `PERFORMANCE_BENCHMARKS.md` documents reproducible performance and
+  accuracy-versus-work workflows;
 - `CHANGELOG.md` records user-visible changes.
 
 ## Licence

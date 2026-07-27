@@ -21,6 +21,8 @@ include("performance_measurement.jl")
 
 include("performance_comparison.jl")
 
+include("performance_series.jl")
+
 include("performance_presentation.jl")
 
 include("console_presentation.jl")

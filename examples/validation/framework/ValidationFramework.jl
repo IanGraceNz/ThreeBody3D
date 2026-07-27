@@ -24,6 +24,7 @@ include("Serialization.jl")
 include("PerformanceSerialization.jl")
 include("PerformanceMeasurement.jl")
 include("PerformanceComparison.jl")
+include("PerformanceSeries.jl")
 include("ApprovalWorkflow.jl")
 include("ConsolePresentation.jl")
 include("ReferenceWorkflow.jl")
@@ -78,6 +79,16 @@ export AbstractValidationMetric,
        performance_comparison_issues,
        compare_performance_reports,
        performance_difference,
+       PerformanceAccuracyWorkPoint,
+       PerformanceAccuracyWorkSeries,
+       build_accuracy_work_series,
+       figure_eight_accuracy_work_definition,
+       hierarchical_triple_accuracy_work_definition,
+       figure_eight_accuracy_work_entries,
+       hierarchical_triple_accuracy_work_entries,
+       representative_accuracy_work_entries,
+       figure_eight_accuracy_work_series,
+       hierarchical_triple_accuracy_work_series,
        PERFORMANCE_REPORT_ENV,
        PERFORMANCE_BENCHMARK_ID_ENV,
        PERFORMANCE_SCHEMA_VERSION_ENV,
@@ -95,6 +106,7 @@ export AbstractValidationMetric,
        render_performance_benchmark,
        render_performance_suite,
        render_performance_comparison,
+       render_accuracy_work_series,
        actual_completed,
        actual_errored,
        actual_malformed_report,

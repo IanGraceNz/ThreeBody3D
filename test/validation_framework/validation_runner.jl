@@ -14,9 +14,13 @@ end
 @testset "High-level validation runner reference integration" begin
     runner = ValidationRunnerTestHarness
 
-    mktempdir(runner.project_root()) do directory
-        case_path = joinpath(directory, "synthetic_runner_case.jl")
-        write(case_path, "println(\"Synthetic validation runner case\")\n")
+    # Use the system temporary directory rather than the OneDrive-backed
+    # project tree. On Windows, synchronization or indexing can briefly retain
+    # handles to newly written child-process reports and make mktempdir cleanup
+    # report ENOTEMPTY even after the child process has terminated.
+    case_path = joinpath(@__DIR__, "synthetic_runner_case.jl")
+
+    mktempdir() do directory
         entry = runner.ValidationSuiteEntry(
             :synthetic_runner_case,
             "Synthetic process used to test the high-level validation runner.",
