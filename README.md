@@ -466,6 +466,9 @@ The detailed stability classification is in `API_STABILITY.md`:
   and CI workflow;
 - `PERFORMANCE_BENCHMARKS.md` documents reproducible performance and
   accuracy-versus-work workflows;
+- `V0_6_AUTOMATIC_SWITCHING_ROBUSTNESS_DESIGN.md` defines the next
+  design-first numerical workstream for scale-aware, auditable automatic
+  regularization switching;
 - `CHANGELOG.md` records user-visible changes.
 
 ## Licence

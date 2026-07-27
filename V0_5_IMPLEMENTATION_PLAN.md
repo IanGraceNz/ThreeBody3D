@@ -422,7 +422,8 @@ Planned subjects are:
 - long-duration switched-trajectory robustness.
 
 A separate design specification must define these stages and acceptance limits
-before implementation begins.
+before implementation begins. That specification is now provided by
+`V0_6_AUTOMATIC_SWITCHING_ROBUSTNESS_DESIGN.md`.
 
 ## 5. Workstream C: Regularization robustness
 
