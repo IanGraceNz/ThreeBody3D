@@ -314,3 +314,32 @@ function render_performance_suite(io::IO, report::PerformanceSuiteReport)
 end
 
 render_performance_suite(report::PerformanceSuiteReport) = render_performance_suite(stdout, report)
+
+function _performance_difference_value(value)
+    isnothing(value) ? "unavailable" : string(value)
+end
+
+"""Render a descriptive pairwise performance comparison without judgement."""
+function render_performance_comparison(io::IO, comparison::PerformanceBenchmarkComparison)
+    println(io, "Performance comparison: ", comparison.benchmark_id)
+    println(io, "Definition version: ", comparison.definition_version)
+    println(io, "Compatible: ", comparison.compatible)
+    if !isempty(comparison.compatibility_issues)
+        println(io, "Compatibility issues: ", join(string.(comparison.compatibility_issues), ", "))
+    end
+    println(io, "Environment mismatch override: ", comparison.environment_override)
+    println(io)
+    println(io, "Descriptive differences (candidate - reference)")
+    for difference in comparison.differences
+        println(io, "  ", difference.measurement_id)
+        println(io, "    Reference: ", _performance_difference_value(difference.reference_value))
+        println(io, "    Candidate: ", _performance_difference_value(difference.candidate_value))
+        println(io, "    Absolute difference: ", _performance_difference_value(difference.absolute_difference))
+        println(io, "    Percentage difference: ", _performance_difference_value(difference.percentage_difference))
+    end
+    println(io, "Interpretation: descriptive comparison only; no regression, improvement, or PASS/FAIL status is assigned.")
+    nothing
+end
+
+render_performance_comparison(comparison::PerformanceBenchmarkComparison) =
+    render_performance_comparison(stdout, comparison)

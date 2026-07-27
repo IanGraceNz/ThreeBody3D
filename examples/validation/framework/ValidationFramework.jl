@@ -23,6 +23,7 @@ include("ReferenceComparison.jl")
 include("Serialization.jl")
 include("PerformanceSerialization.jl")
 include("PerformanceMeasurement.jl")
+include("PerformanceComparison.jl")
 include("ApprovalWorkflow.jl")
 include("ConsolePresentation.jl")
 include("ReferenceWorkflow.jl")
@@ -72,6 +73,11 @@ export AbstractValidationMetric,
        PerformanceMeasurementResult,
        measure_performance_sample,
        run_performance_measurements,
+       PerformanceMeasurementDifference,
+       PerformanceBenchmarkComparison,
+       performance_comparison_issues,
+       compare_performance_reports,
+       performance_difference,
        PERFORMANCE_REPORT_ENV,
        PERFORMANCE_BENCHMARK_ID_ENV,
        PERFORMANCE_SCHEMA_VERSION_ENV,
@@ -88,6 +94,7 @@ export AbstractValidationMetric,
        run_performance_suite,
        render_performance_benchmark,
        render_performance_suite,
+       render_performance_comparison,
        actual_completed,
        actual_errored,
        actual_malformed_report,
