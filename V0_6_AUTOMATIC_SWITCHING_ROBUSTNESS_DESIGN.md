@@ -502,4 +502,7 @@ segment-level time-progress semantics remain unchanged. Immutable progress state
 and evidence now support an opt-in same-pair exit-to-re-entry separation
 excursion, while first switches and pair changes remain unaffected.
 
-The next increment is **Stage AS-4 — Pair-competition robustness**.
+Stage AS-4 is now in progress. AS-4a adds immutable quantitative competition
+evidence to algebraic entry and exit decisions without changing policy. The next
+increment is AS-4b, certified event-crossing provenance, as defined in
+`V0_6_AS4_PAIR_COMPETITION_DESIGN.md`.

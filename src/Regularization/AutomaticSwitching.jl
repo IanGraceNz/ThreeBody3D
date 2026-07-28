@@ -581,6 +581,125 @@ Return pair radial separation rates in canonical order `(1,2)`, `(1,3)`,
 """
 pair_radial_rates(u::AbstractVector{<:AbstractFloat}) = pair_observables(u).radial_rates
 
+
+"""
+    AutomaticSwitchingCompetitionEvidence
+
+Immutable, precision-generic quantitative evidence describing competition
+between the three canonical binary pairs during one automatic-switching policy
+evaluation.
+
+The record is derived entirely from retained [`PairObservables`](@ref), resolved
+thresholds, and the current candidate or selected pair. Signed entry margins use
+`separation - enter_threshold`; `exit_margin` uses
+`selected_separation - exit_threshold`. `relative_separation_gap` is `nothing`
+when the closest separation is zero, avoiding division by zero. Candidate pairs
+remain in canonical pair order. AS-4a records only `:algebraic` provenance;
+continuous-crossing provenance is reserved for AS-4b.
+"""
+struct AutomaticSwitchingCompetitionEvidence{T<:AbstractFloat,C<:Tuple}
+    closest_index::Int
+    second_index::Int
+    closest_pair::Tuple{Int,Int}
+    second_pair::Tuple{Int,Int}
+    closest_separation::T
+    second_separation::T
+    absolute_separation_gap::T
+    relative_separation_gap::Union{Nothing,T}
+    exact_closest_tie::Bool
+    entry_margins::NTuple{3,T}
+    exit_margin::Union{Nothing,T}
+    ambiguity_margin::T
+    isolation_ratio_margin::T
+    candidate_pairs::C
+    candidate_is_closest::Union{Nothing,Bool}
+    candidate_tied_for_closest::Union{Nothing,Bool}
+    crossing_provenance::Symbol
+
+    function AutomaticSwitchingCompetitionEvidence{T,C}(
+        closest_index::Int,
+        second_index::Int,
+        closest_pair::Tuple{Int,Int},
+        second_pair::Tuple{Int,Int},
+        closest_separation::T,
+        second_separation::T,
+        absolute_separation_gap::T,
+        relative_separation_gap::Union{Nothing,T},
+        exact_closest_tie::Bool,
+        entry_margins::NTuple{3,T},
+        exit_margin::Union{Nothing,T},
+        ambiguity_margin::T,
+        isolation_ratio_margin::T,
+        candidate_pairs::C,
+        candidate_is_closest::Union{Nothing,Bool},
+        candidate_tied_for_closest::Union{Nothing,Bool},
+        crossing_provenance::Symbol,
+    ) where {T<:AbstractFloat,C<:Tuple}
+        1 <= closest_index <= 3 ||
+            throw(ArgumentError("closest_index must be in 1:3."))
+        1 <= second_index <= 3 ||
+            throw(ArgumentError("second_index must be in 1:3."))
+        closest_index != second_index ||
+            throw(ArgumentError("closest_index and second_index must differ."))
+        _validate_pair(closest_pair)
+        _validate_pair(second_pair)
+        all(pair -> begin
+            i, j, _ = _validate_pair(pair)
+            i < j
+        end, candidate_pairs) ||
+            throw(ArgumentError("candidate_pairs must contain canonical unordered pairs."))
+        length(unique(candidate_pairs)) == length(candidate_pairs) ||
+            throw(ArgumentError("candidate_pairs must not contain duplicates."))
+        crossing_provenance in (
+            :algebraic,
+            :certified_cartesian_entry,
+            :certified_regularized_exit,
+        ) || throw(ArgumentError("unsupported crossing provenance."))
+        closest_separation >= zero(T) && isfinite(closest_separation) ||
+            throw(ArgumentError("closest separation must be finite and nonnegative."))
+        second_separation >= zero(T) && isfinite(second_separation) ||
+            throw(ArgumentError("second separation must be finite and nonnegative."))
+        absolute_separation_gap >= zero(T) && isfinite(absolute_separation_gap) ||
+            throw(ArgumentError("absolute separation gap must be finite and nonnegative."))
+        if !isnothing(relative_separation_gap)
+            relative_separation_gap >= zero(T) && isfinite(relative_separation_gap) ||
+                throw(ArgumentError("relative separation gap must be finite and nonnegative."))
+        end
+        all(isfinite, entry_margins) ||
+            throw(ArgumentError("entry margins must be finite."))
+        isnothing(exit_margin) || isfinite(exit_margin) ||
+            throw(ArgumentError("exit margin must be finite when present."))
+        isfinite(ambiguity_margin) ||
+            throw(ArgumentError("ambiguity margin must be finite."))
+        isfinite(isolation_ratio_margin) || isinf(isolation_ratio_margin) ||
+            throw(ArgumentError("isolation-ratio margin must be finite or infinite."))
+        if isnothing(candidate_is_closest) != isnothing(candidate_tied_for_closest)
+            throw(ArgumentError("candidate competition flags must both be present or both be nothing."))
+        end
+
+        new{T,C}(
+            closest_index,
+            second_index,
+            closest_pair,
+            second_pair,
+            closest_separation,
+            second_separation,
+            absolute_separation_gap,
+            relative_separation_gap,
+            exact_closest_tie,
+            entry_margins,
+            exit_margin,
+            ambiguity_margin,
+            isolation_ratio_margin,
+            candidate_pairs,
+            candidate_is_closest,
+            candidate_tied_for_closest,
+            crossing_provenance,
+        )
+    end
+end
+
+
 """
     AutomaticSwitchingDecisionEvidence
 
@@ -589,12 +708,12 @@ switching policy evaluation.
 
 The record preserves the policy phase, all pair observables, the effective
 resolved thresholds and scale evidence, the entry-candidate mask, the selected/candidate pair,
-and pair-competition indices. It is sufficient to explain the decision without
+and immutable quantitative pair-competition evidence. It is sufficient to explain the decision without
 recomputing hidden policy state. `scale_kind` is `:absolute` or
 `:characteristic_length`; `reference_scale` is the immutable scale used to
 resolve the physical thresholds.
 """
-struct AutomaticSwitchingDecisionEvidence{T<:AbstractFloat}
+struct AutomaticSwitchingDecisionEvidence{T<:AbstractFloat,C<:Tuple}
     phase::Symbol
     scale_kind::Symbol
     reference_scale::T
@@ -613,8 +732,9 @@ struct AutomaticSwitchingDecisionEvidence{T<:AbstractFloat}
     selected_pair::Union{Nothing,Tuple{Int,Int}}
     selected_index::Union{Nothing,Int}
     second_index::Int
+    competition::AutomaticSwitchingCompetitionEvidence{T,C}
 
-    function AutomaticSwitchingDecisionEvidence{T}(
+    function AutomaticSwitchingDecisionEvidence{T,C}(
         phase::Symbol,
         scale_kind::Symbol,
         reference_scale::T,
@@ -633,7 +753,8 @@ struct AutomaticSwitchingDecisionEvidence{T<:AbstractFloat}
         selected_pair::Union{Nothing,Tuple{Int,Int}},
         selected_index::Union{Nothing,Int},
         second_index::Int,
-    ) where {T<:AbstractFloat}
+        competition::AutomaticSwitchingCompetitionEvidence{T,C},
+    ) where {T<:AbstractFloat,C<:Tuple}
         phase in (:entry, :exit) ||
             throw(ArgumentError("decision-evidence phase must be :entry or :exit."))
         scale_kind in (:absolute, :characteristic_length) ||
@@ -671,7 +792,7 @@ struct AutomaticSwitchingDecisionEvidence{T<:AbstractFloat}
             minimum_separation_ratio,
         )) || throw(ArgumentError("decision-evidence thresholds must be finite."))
 
-        new{T}(
+        new{T,C}(
             phase,
             scale_kind,
             reference_scale,
@@ -690,6 +811,7 @@ struct AutomaticSwitchingDecisionEvidence{T<:AbstractFloat}
             selected_pair,
             selected_index,
             second_index,
+            competition,
         )
     end
 end
@@ -757,6 +879,57 @@ end
     end
 end
 
+function _competition_evidence(
+    phase::Symbol,
+    observables::PairObservables{T},
+    parameters::AutomaticSwitchingParameters;
+    candidate_mask::NTuple{3,Bool}=(false, false, false),
+    candidate_pair::Union{Nothing,Tuple{Int,Int}}=nothing,
+    selected_index::Union{Nothing,Int}=nothing,
+    crossing_provenance::Symbol=:algebraic,
+) where {T<:AbstractFloat}
+    phase in (:entry, :exit) ||
+        throw(ArgumentError("competition-evidence phase must be :entry or :exit."))
+    closest_index = observables.order[1]
+    second_index = observables.order[2]
+    closest_separation = observables.separations[closest_index]
+    second_separation = observables.separations[second_index]
+    absolute_gap = second_separation - closest_separation
+    relative_gap = iszero(closest_separation) ? nothing : absolute_gap / closest_separation
+    entry_margins = ntuple(3) do index
+        observables.separations[index] - T(parameters.enter_threshold)
+    end
+    exit_margin = isnothing(selected_index) ? nothing :
+        observables.separations[selected_index] - T(parameters.exit_threshold)
+    candidate_pairs = Tuple(
+        _CANONICAL_BINARY_PAIRS[index] for index in 1:3 if candidate_mask[index]
+    )
+    candidate_index = isnothing(candidate_pair) ? nothing : _canonical_pair_index(candidate_pair)
+    candidate_is_closest = isnothing(candidate_index) ? nothing : candidate_index == closest_index
+    candidate_tied_for_closest = isnothing(candidate_index) ? nothing :
+        observables.separations[candidate_index] == closest_separation
+
+    AutomaticSwitchingCompetitionEvidence{T,typeof(candidate_pairs)}(
+        closest_index,
+        second_index,
+        _CANONICAL_BINARY_PAIRS[closest_index],
+        _CANONICAL_BINARY_PAIRS[second_index],
+        closest_separation,
+        second_separation,
+        absolute_gap,
+        relative_gap,
+        closest_separation == second_separation,
+        entry_margins,
+        exit_margin,
+        second_separation - T(parameters.ambiguity_threshold),
+        observables.isolation_ratio - T(parameters.minimum_separation_ratio),
+        candidate_pairs,
+        candidate_is_closest,
+        candidate_tied_for_closest,
+        crossing_provenance,
+    )
+end
+
 function _decision_evidence(
     phase::Symbol,
     observables::PairObservables{T},
@@ -766,7 +939,15 @@ function _decision_evidence(
     selected_pair::Union{Nothing,Tuple{Int,Int}}=nothing,
     selected_index::Union{Nothing,Int}=nothing,
 ) where {T<:AbstractFloat}
-    AutomaticSwitchingDecisionEvidence{T}(
+    competition = _competition_evidence(
+        phase,
+        observables,
+        parameters;
+        candidate_mask,
+        candidate_pair,
+        selected_index,
+    )
+    AutomaticSwitchingDecisionEvidence{T,typeof(competition.candidate_pairs)}(
         phase,
         parameters.threshold_scale_kind,
         T(parameters.threshold_reference_scale),
@@ -785,6 +966,7 @@ function _decision_evidence(
         selected_pair,
         selected_index,
         observables.order[2],
+        competition,
     )
 end
 

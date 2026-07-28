@@ -476,7 +476,10 @@ The detailed stability classification is in `API_STABILITY.md`:
 - AS-2 adds immutable absolute and experimental characteristic-length threshold
   policies while preserving the existing absolute default;
 - AS-3 adds explicit immutable switch-progress evidence and an optional same-pair
-  re-entry excursion safeguard. Its zero default preserves existing trajectories.
+  re-entry excursion safeguard. Its zero default preserves existing trajectories;
+- AS-4a adds immutable quantitative pair-competition evidence while preserving
+  all established switching decisions; `V0_6_AS4_PAIR_COMPETITION_DESIGN.md`
+  defines the remaining certified-crossing provenance and competition study.
 - `CHANGELOG.md` records user-visible changes.
 
 ## Licence
