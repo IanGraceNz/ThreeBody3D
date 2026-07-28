@@ -182,6 +182,20 @@
         @test exit_evidence.competition.crossing_provenance ==
               :certified_regularized_exit
 
+        safety_evidence = ThreeBody3D._decision_evidence(
+            :exit,
+            observables,
+            parameters;
+            candidate_pair=(1, 3),
+            selected_pair=(1, 2),
+            selected_index=1,
+            crossing_provenance=:certified_nonselected_pair_crossing,
+        )
+        @test safety_evidence.candidate_pair == (1, 3)
+        @test safety_evidence.selected_pair == (1, 2)
+        @test safety_evidence.competition.crossing_provenance ==
+              :certified_nonselected_pair_crossing
+
         @test_throws ArgumentError ThreeBody3D._decision_evidence(
             :entry,
             observables,

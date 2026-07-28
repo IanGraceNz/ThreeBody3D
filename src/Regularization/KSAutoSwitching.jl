@@ -7,6 +7,30 @@ function _ks_entry_transition_diagnostics(system, state, time, pair, reference)
     _transition_diagnostics(system, state, reconstructed, time, pair)
 end
 
+@inline function _certified_nonselected_pair_decision(
+    observables::PairObservables{T},
+    parameters::AutomaticSwitchingParameters,
+    selected_pair::Tuple{<:Integer,<:Integer},
+    triggering_pair::Tuple{<:Integer,<:Integer},
+) where {T<:AbstractFloat}
+    selected = (Int(selected_pair[1]), Int(selected_pair[2]))
+    selected_index = _canonical_pair_index(selected)
+    trigger_index = _canonical_pair_index(triggering_pair)
+    trigger_index != selected_index ||
+        throw(ArgumentError("the triggering pair must differ from the selected pair."))
+    trigger = _CANONICAL_BINARY_PAIRS[trigger_index]
+    evidence = _decision_evidence(
+        :exit,
+        observables,
+        parameters;
+        candidate_pair=trigger,
+        selected_pair=selected,
+        selected_index,
+        crossing_provenance=:certified_nonselected_pair_crossing,
+    )
+    _decision(:failure, selected, :nonselected_pair_unsafe, evidence)
+end
+
 """
     locate_ks_regularized_exit_event(system, state, pair, entry_time, target_time,
                                      parameters; kwargs...)
@@ -85,6 +109,7 @@ function locate_ks_regularized_exit_event(
 
     for _ in 1:max_expansions
         reason = Ref(:none)
+        triggering_pair = Ref{Union{Nothing,Tuple{Int,Int}}}(nothing)
         exit_condition(y, _s, _integrator) = dot(view(y, 1:4), view(y, 1:4)) - T(parameters.exit_threshold)
         function exit_affect!(integrator)
             reconstructed = ks_three_body_cartesian_state(problem, integrator.u)
@@ -102,10 +127,18 @@ function locate_ks_regularized_exit_event(
             SciMLBase.ContinuousCallback(target_condition, target_affect!, nothing; save_positions=(true, true)),
         ]
         if threshold > zero(T)
-            for which in 1:2
-                condition(y, _s, _integrator) = _ks_nonselected_separations(problem, y)[which] - threshold
-                affect!(integrator) = (reason[] = :nonselected; SciMLBase.terminate!(integrator))
-                push!(callbacks, SciMLBase.ContinuousCallback(condition, affect!, nothing))
+            nonselected_pairs = ((i, problem.third), (j, problem.third))
+            for (which, pair_that_crossed) in enumerate(nonselected_pairs)
+                let which=which, pair_that_crossed=pair_that_crossed
+                    condition(y, _s, _integrator) =
+                        _ks_nonselected_separations(problem, y)[which] - threshold
+                    function affect!(integrator)
+                        reason[] = :nonselected
+                        triggering_pair[] = pair_that_crossed
+                        SciMLBase.terminate!(integrator)
+                    end
+                    push!(callbacks, SciMLBase.ContinuousCallback(condition, affect!, nothing))
+                end
             end
         end
         callback = SciMLBase.CallbackSet(callbacks...)
@@ -132,7 +165,12 @@ function locate_ks_regularized_exit_event(
         observables = pair_observables(terminal_state)
 
         if reason[] === :nonselected
-            decision = _failure_decision(:nonselected_pair_unsafe, (i, j))
+            decision = _certified_nonselected_pair_decision(
+                observables,
+                parameters,
+                (i, j),
+                something(triggering_pair[]),
+            )
             return RegularizedExitLocationResult(
                 :failure, terminal_time, terminal_s, terminal_state,
                 problem, result, decision, observables,

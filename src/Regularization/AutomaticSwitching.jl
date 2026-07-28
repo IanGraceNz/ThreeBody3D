@@ -654,6 +654,7 @@ struct AutomaticSwitchingCompetitionEvidence{T<:AbstractFloat,C<:Tuple}
             :algebraic,
             :certified_cartesian_entry,
             :certified_regularized_exit,
+            :certified_nonselected_pair_crossing,
         ) || throw(ArgumentError("unsupported crossing provenance."))
         closest_separation >= zero(T) && isfinite(closest_separation) ||
             throw(ArgumentError("closest separation must be finite and nonnegative."))

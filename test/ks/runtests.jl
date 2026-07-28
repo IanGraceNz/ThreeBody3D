@@ -1125,3 +1125,173 @@ end
         @test located.regularized_result.solution.u[end][10] ≈ located.physical_time atol=2e-12
     end
 end
+
+@testset "Certified KS non-selected-pair safety evidence" begin
+    function safety_crossing_fixture(
+        ::Type{T},
+        triggering_pair::Tuple{Int,Int},
+    ) where {T<:AbstractFloat}
+        trigger_selected, third = triggering_pair
+        other_selected = only(setdiff((1, 2, 3), triggering_pair))
+        selected_pair = (other_selected, trigger_selected)
+        positions = [zeros(T, 3) for _ in 1:3]
+        velocities = [zeros(T, 3) for _ in 1:3]
+        positions[other_selected] = T[-0.1, 0, 0]
+        positions[trigger_selected] = T[0.1, 0, 0]
+        positions[third] = T[0.25, 0, 0]
+        velocities[third] = T[1, 0, 0]
+        state = statevector(
+            positions[1], velocities[1],
+            positions[2], velocities[2],
+            positions[3], velocities[3],
+        )
+        selected_pair, state
+    end
+
+    function safety_parameters(::Type{T}) where {T<:AbstractFloat}
+        ThreeBody3D.AutomaticSwitchingParameters(
+            enter_threshold=T(0.2),
+            exit_threshold=T(0.4),
+            ambiguity_threshold=T(0.3),
+            minimum_separation_ratio=T(2),
+            maximum_switches=10,
+        )
+    end
+
+    system = ThreeBodySystem((1e-12, 1e-12, 1e-12); G=1.0)
+    parameters = safety_parameters(Float64)
+    for triggering_pair in ((1, 2), (1, 3), (2, 3))
+        selected_pair, state = safety_crossing_fixture(Float64, triggering_pair)
+        located = ThreeBody3D.locate_ks_regularized_exit_event(
+            system, state, selected_pair, 0.0, 0.2, parameters,
+        )
+        direct = pair_observables(located.state)
+        evidence = located.decision.evidence
+        competition = evidence.competition
+
+        @test located.status == :failure
+        @test located.decision.action == :failure
+        @test located.decision.pair == selected_pair
+        @test located.decision.reason == :nonselected_pair_unsafe
+        @test !isnothing(evidence)
+        @test evidence.phase == :exit
+        @test evidence.candidate_pair == triggering_pair
+        @test evidence.selected_pair == selected_pair
+        @test evidence.selected_index ==
+              ThreeBody3D._canonical_pair_index(selected_pair)
+        @test competition.crossing_provenance ==
+              :certified_nonselected_pair_crossing
+        @test evidence.separations == direct.separations
+        @test evidence.radial_rates == direct.radial_rates
+        @test evidence.collisions == direct.collisions
+        @test evidence.order == direct.order
+        @test evidence.isolation_ratio == direct.isolation_ratio
+        @test competition.closest_pair == direct.closest_pair
+        @test competition.second_pair == direct.second_closest_pair
+    end
+
+    selected_pair, state = safety_crossing_fixture(Float64, (2, 3))
+    variations = map((nothing, 0.013, 0.031)) do grid
+        ThreeBody3D.locate_ks_regularized_exit_event(
+            system, state, selected_pair, 0.0, 0.2, parameters;
+            saveat=grid,
+        )
+    end
+    classifications = map(variations) do located
+        competition = located.decision.evidence.competition
+        (
+            located.decision.evidence.candidate_pair,
+            competition.crossing_provenance,
+            competition.closest_pair,
+            competition.second_pair,
+            competition.candidate_is_closest,
+            competition.candidate_tied_for_closest,
+        )
+    end
+    @test all(==(first(classifications)), classifications)
+
+    repeated = map(1:3) do _
+        ThreeBody3D.locate_ks_regularized_exit_event(
+            system, state, selected_pair, 0.0, 0.2, parameters,
+        )
+    end
+    @test all(result -> result.physical_time == first(repeated).physical_time, repeated)
+    @test all(
+        result -> result.decision.evidence.candidate_pair ==
+                  first(repeated).decision.evidence.candidate_pair,
+        repeated,
+    )
+    @test all(
+        result -> result.decision.evidence.competition.crossing_provenance ==
+                  :certified_nonselected_pair_crossing,
+        repeated,
+    )
+
+    setprecision(BigFloat, 256) do
+        big_system = ThreeBodySystem(
+            (BigFloat("1e-12"), BigFloat("1e-12"), BigFloat("1e-12"));
+            G=BigFloat(1),
+        )
+        big_parameters = safety_parameters(BigFloat)
+        big_selected, big_state = safety_crossing_fixture(BigFloat, (2, 3))
+        located = ThreeBody3D.locate_ks_regularized_exit_event(
+            big_system,
+            big_state,
+            big_selected,
+            BigFloat(0),
+            BigFloat("0.2"),
+            big_parameters;
+            reltol=BigFloat("1e-30"),
+            abstol=BigFloat("1e-30"),
+        )
+        @test eltype(located.state) === BigFloat
+        @test located.decision.evidence.candidate_pair == (2, 3)
+        @test located.decision.evidence.competition.crossing_provenance ==
+              :certified_nonselected_pair_crossing
+        @test located.decision.evidence.separations ==
+              pair_observables(located.state).separations
+    end
+
+    completed_state = statevector(
+        [-0.1, 0.0, 0.0], zeros(3),
+        [0.1, 0.0, 0.0], zeros(3),
+        [10.0, 0.0, 0.0], zeros(3),
+    )
+    completed = ThreeBody3D.locate_ks_regularized_exit_event(
+        system, completed_state, (1, 2), 0.0, 0.02, parameters,
+    )
+    @test completed.status == :completed
+    @test completed.decision.reason == :exit_threshold_not_reached
+    @test isnothing(completed.decision.evidence)
+
+    rejected_state = copy(completed_state)
+    rejected_state[7] = 0.3
+    rejected = ThreeBody3D.locate_ks_regularized_exit_event(
+        system, rejected_state, (1, 2), 0.0, 0.02, parameters,
+    )
+    @test rejected.status == :failure
+    @test rejected.decision.reason == :initial_state_at_or_outside_exit_threshold
+    @test isnothing(rejected.decision.evidence)
+
+    encounter_state = statevector(
+        [-0.5, 0.0, 0.0], [0.5, 0.0, 0.0],
+        [0.5, 0.0, 0.0], [-0.5, 0.0, 0.0],
+        [0.95, 0.0, 0.0], [1.0, 0.0, 0.0],
+    )
+    trajectory = ThreeBody3D.simulate_experimental_switching(
+        system, encounter_state, (0.0, 1.6), parameters;
+        regularization_backend=:ks,
+        regularized_kwargs=(nonselected_threshold=2.0,),
+    )
+    @test trajectory.status == :failure
+    @test trajectory.failure.reason == :nonselected_pair_unsafe
+    @test trajectory.failure.pair == (1, 2)
+    @test length(trajectory.segments) == 2
+    terminal_decision = trajectory.segments[end].location.decision
+    @test terminal_decision === trajectory.segments[end].location.decision
+    @test terminal_decision.reason == trajectory.failure.reason
+    @test terminal_decision.pair == trajectory.failure.pair
+    @test terminal_decision.evidence.candidate_pair == (1, 3)
+    @test terminal_decision.evidence.competition.crossing_provenance ==
+          :certified_nonselected_pair_crossing
+end
