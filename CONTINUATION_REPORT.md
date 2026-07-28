@@ -1,294 +1,335 @@
-# ThreeBody3D – Continuation Report for Codex
+ThreeBody3D Continuation Report
 
-**Date:** 28 July 2026
+Project: ThreeBody3D
+Branch: v0.5-development
+Date: 29 July 2026
+Repository status: Clean, fully synchronized, all tests passing
 
----
+1. Repository State
 
-# Project Overview
-
-ThreeBody3D is a scientific Julia package for solving the Newtonian three-body initial-value problem.
-
-The project's primary objective is to produce **scientifically trustworthy numerical solutions**.
-
-This is **not** primarily a software engineering exercise. Engineering exists to support numerical quality.
-
-Project priorities are:
-
-1. Scientific correctness
-2. Numerical accuracy
-3. Robustness
-4. Simplicity
-5. Ease of use
-6. Performance
-
-Performance improvements must never reduce numerical quality.
-
----
-
-# Current Repository
-
-Repository:
-
-ThreeBody3D
-
-Development branch:
+Current branch:
 
 v0.5-development
 
-The repository uses Git and all work should be performed as small, self-contained commits.
+Latest commits:
 
----
+6f531ab Retain evidence for KS safety crossings
+c1996bf Retain evidence at certified entry crossings
+00a7e2b Thread crossing provenance through exit decisions
+c35b1b4 Add project development guidance
+2b360bf Thread crossing provenance through entry decisions
 
-# Current Development Program
+Current status:
 
-The project is currently implementing the Version 0.5 scientific validation programme together with improvements to automatic regularization.
+git status
 
-The validation framework is intended to provide scientifically reproducible evidence that successive numerical improvements genuinely improve solution quality.
+On branch v0.5-development
+Your branch is up to date with 'origin/v0.5-development'.
 
-Validation infrastructure is **not** the project's primary goal.
+nothing to commit, working tree clean
 
-Its purpose is to improve confidence in future numerical algorithms.
+The repository is synchronized with GitHub.
 
----
+2. Development Environment
 
-# Development Philosophy
+Repository location:
 
-Before implementing any change:
+C:\Dev\ThreeBody3D
 
-* inspect the existing code
-* understand the current architecture
-* preserve existing behaviour unless intentionally changing it
+The previous OneDrive-related problems have been eliminated.
 
-Never reconstruct missing code.
+Verified working:
 
-Never invent repository contents.
+Julia
+Git
+VS Code workspace
+Package activation
+Pkg.test()
 
-Never modify unrelated files.
+The only unresolved environment issue is an occasional VS Code notification:
 
-Prefer asking for clarification over making assumptions.
+Julia Language Server Crashed
 
----
+This appears unrelated to the repository itself and should only be investigated if it becomes reproducible.
 
-# Scientific Priorities
+3. Current Development Philosophy
 
-Always favour:
+The project now follows a stable workflow.
 
-* mathematically rigorous algorithms
-* deterministic execution
-* reproducible validation
-* clean numerical design
+Scientific priorities
+Scientific correctness
+Numerical accuracy
+Robustness
+Simplicity
+Ease of use
 
-Avoid engineering shortcuts that reduce numerical quality.
+Infrastructure is valuable only insofar as it improves the ability to produce more accurate and scientifically trustworthy three-body solutions.
 
----
+Development workflow
 
-# Automatic Regularization Philosophy
+Continue using:
 
-Automatic regularization exists to improve robustness during close encounters while preserving solution quality.
+Design
+Small implementation
+Focused tests
+Full Pkg.test()
+Scientific review
+Commit
+Push
 
-Important design goals include:
+Avoid combining unrelated work into a single increment.
 
-* reversible coordinate transforms
-* continuity across switching boundaries
-* minimal switching
-* preservation of physical trajectory
-* deterministic switching decisions
+4. Codex / ChatGPT Workflow
 
-The switching controller should remain explainable and scientifically auditable.
+Current workflow has worked extremely well.
 
----
+ChatGPT
 
-# Validation Philosophy
+Used for:
 
-Validation should provide evidence that:
+scientific review
+numerical methods
+architecture
+implementation planning
+design documentation
+repository review
+Codex
 
-* numerical accuracy has improved
-* behaviour remains deterministic
-* previous capability has not regressed
+Used for:
 
-Infrastructure that exists only for its own sake should be avoided.
+editing repository
+implementing changes
+running Julia
+running tests
+Git operations
+JET
+commits
 
-Every new capability should ultimately support better numerical methods.
+This division of responsibilities should continue.
 
----
+5. Project Guidance Documents
 
-# Current Completed Work
+Repository now contains guidance documents intended for future implementation work.
 
-The project already contains:
+These include:
 
-* structured validation framework
-* deterministic validation records
-* scientific reference records
-* manual scientific approval workflow
-* performance benchmark infrastructure
-* automatic regularization framework
-* switching diagnostics
-* KS regularization
-* extensive benchmark suite
-* JET compatibility improvements
+CODING_GUIDELINES.md
+ARCHITECTURAL_PRINCIPLES.md
+CONTINUATION_REPORT.md
 
-All previous implementation stages were intentionally developed as small commits with tests after every stage.
+Future implementation work should read these before modifying code.
 
-Continue this discipline.
+6. Major Completed Work
 
----
+The repository now contains:
 
-# Immediate Next Task
+structured validation framework
+deterministic scientific reference workflow
+deterministic performance benchmark framework
+automatic switching robustness improvements
+provenance-aware switching evidence
 
-Current implementation stage:
+All tests currently pass.
+
+7. AS-4b Programme
+Status
+
+Completed
+
+This programme is considered finished.
+
+Completed stages
+AS-4b1
+
+Competition evidence records crossing provenance.
 
 AS-4b2
 
-Objective:
+Certified Cartesian entry decisions preserve provenance.
 
-Extend automatic entry decision provenance handling.
+AS-4b3
 
-Required behaviour:
+Certified regularized exit decisions preserve provenance.
 
-`automatic_entry_decision(...)` should accept a keyword parameter
+AS-4b4
 
-```
-crossing_provenance::Symbol = :algebraic
-```
+Cartesian entry locator retains complete reconstructed-state evidence.
 
-and forward it into the decision-evidence construction.
+This eliminated evidence loss during certified entry evaluation.
 
-Decision evidence should preserve provenance information generated earlier in the switching pipeline.
+AS-4b5
 
-Expected behavioural impact:
+KS non-selected safety crossings retain complete reconstructed-state evidence.
 
-No public API change.
+Implemented:
 
-No algorithmic change.
+accepted provenance
+:certified_nonselected_pair_crossing
+triggering pair retained
+selected pair preserved
+reconstructed-state evidence preserved
+controller propagation preserved
 
-Only provenance bookkeeping should be extended.
+No behavioural changes.
 
----
+8. Scientific Outcome of AS-4b
 
-# Likely Files
+The automatic switching subsystem now retains complete reconstructed-state evidence for every continuously located switching-related crossing.
 
-Expected implementation files include:
+Four provenance classes now exist:
 
-```
-src/Regularization/AutomaticSwitching.jl
-```
+:algebraic
+:certified_cartesian_entry
+:certified_regularized_exit
+:certified_nonselected_pair_crossing
 
-Expected test files include the existing automatic-switching tests.
+These indicate how a threshold crossing was established.
 
-Inspect the repository before modifying any files.
+They do not determine the scientific interpretation of the event.
 
----
+Instead:
 
-# Required Workflow
+pair competition
+hierarchy
+ambiguity
+collision
+radial direction
+isolation
 
-For every implementation stage:
+continue to be determined from reconstructed physical observables.
 
-1. Inspect the existing implementation.
-2. Make the smallest possible change.
-3. Update or add tests where appropriate.
-4. Run:
+This distinction should be preserved.
 
-```
+9. Repository Assessment
+
+Following review of the current repository:
+
+No major architectural refactoring is recommended.
+
+The automatic switching implementation remains coherent.
+
+The provenance work has increased scientific auditability without increasing algorithmic complexity significantly.
+
+No further AS-4b implementation work is currently recommended.
+
+10. Documentation Review
+
+Recommended next documentation updates:
+
+V0_5_IMPLEMENTATION_PLAN.md
+
+Record AS-4b as completed.
+
+AUTOMATIC_SWITCHING_POLICY_INVENTORY.md
+
+Document the four provenance classes.
+
+CHANGELOG.md
+
+Record completion of the provenance programme.
+
+CONTINUATION_REPORT.md
+
+Replace older AS-4b status with the current completion summary.
+
+These documentation changes should ideally be committed together.
+
+11. Next Development Activity
+
+Before implementing further numerical work:
+
+update documentation
+verify AS-4b closure
+perform design review
+begin planning the next programme
+
+Do not continue extending AS-4b.
+
+12. Future Design Review
+
+The next design review should determine:
+
+whether the implementation fully reflects the design documents;
+whether any documentation needs refinement following AS-4b;
+whether the next programme should remain AS-4c or evolve into a different roadmap stage;
+whether there are opportunities to simplify the implementation without changing behaviour.
+
+Only after this review should further implementation begin.
+
+13. Items Explicitly Deferred
+
+The following are not considered AS-4b work:
+
+richer diagnostics for initial-state rejection;
+richer diagnostics for completed-without-crossing outcomes;
+general observability improvements unrelated to continuously located crossings.
+
+If pursued later, they should become a separate diagnostics programme.
+
+14. Testing Status
+
+Latest reported verification:
+
+Focused AS-4 tests:
+
+387 / 387 PASS
+
+Focused KS tests:
+
+PASS
+
+Included:
+
+74 new AS-4b5 assertions
+
+Full project:
+
 Pkg.test()
-```
 
-5. If appropriate, run:
+PASS
 
-```
-using Revise
-using JET
-JET.report_package(
-    ThreeBody3D;
-    target_modules=(ThreeBody3D,),
-    toplevel_logger=nothing,
-)
-```
+Additional verification:
 
-6. Resolve any issues introduced by the change.
-7. Produce a clean Git diff.
-8. Commit only when tests pass.
+git diff --check
 
----
+PASS
 
-# Git Expectations
+Float precision coverage:
 
-Commits should be:
+Float64
+256-bit BigFloat
+15. Current Repository State
 
-* small
-* scientifically meaningful
-* easy to review
-* reversible
+Branch:
 
-Do not combine unrelated changes.
+v0.5-development
 
-Do not perform opportunistic refactoring.
+Latest commit:
 
-Do not reformat unrelated code.
+6f531ab Retain evidence for KS safety crossings
 
----
+Repository:
 
-# Code Style
+synchronized with GitHub
+clean working tree
+fully tested
 
-Follow the existing repository conventions.
+This is an excellent baseline for future work.
 
-Prefer explicit, readable code over clever code.
+16. Recommendations for the Next Conversation
 
-Preserve public APIs unless explicitly instructed otherwise.
+Begin by reviewing and updating the four documentation files identified above.
 
-Maintain deterministic behaviour.
+After those documentation changes are complete:
 
----
+perform a brief design review of the completed AS-4b implementation;
+formally close AS-4b in the implementation plan;
+begin planning the next scientific development programme.
 
-# Documentation
+Continue to preserve the established development workflow:
 
-If public behaviour changes:
-
-* update documentation
-* update examples if necessary
-* update implementation plans where appropriate
-
-Otherwise avoid unnecessary documentation churn.
-
----
-
-# Verification Before Completion
-
-A task is not complete until:
-
-* repository builds successfully
-* tests pass
-* newly added tests pass
-* no unrelated files were modified
-* Git diff contains only intended changes
-
----
-
-# Collaboration Model
-
-The project uses two complementary assistants.
-
-**ChatGPT**
-
-Responsible for:
-
-* scientific reasoning
-* numerical analysis
-* architecture
-* implementation planning
-* algorithm review
-* design decisions
-
-**Codex**
-
-Responsible for:
-
-* repository inspection
-* implementation
-* test execution
-* iterative debugging
-* Git operations
-* verified code changes
-
-When implementation questions arise, prefer preserving the scientific design over introducing expedient engineering changes.
-
-The long-term objective is not merely to add features, but to build a scientifically reliable research-quality three-body solver whose numerical accuracy improves demonstrably with each release.
+design before implementation;
+small, independently testable increments;
+comprehensive regression testing;
+scientific review before every commit;
+push only after approval.
