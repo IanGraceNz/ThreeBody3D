@@ -190,6 +190,27 @@
         )
     end
 
+    @testset "entry decisions thread crossing provenance" begin
+        observables = competition_observables(
+            (0.1, 0.5, 1.0),
+            (-1.0, 0.0, 0.0),
+        )
+        decision = automatic_entry_decision(
+            observables,
+            parameters;
+            crossing_provenance=:certified_cartesian_entry,
+        )
+        @test decision.action == :enter
+        @test decision.evidence.competition.crossing_provenance ==
+              :certified_cartesian_entry
+
+        @test_throws ArgumentError automatic_entry_decision(
+            observables,
+            parameters;
+            crossing_provenance=:unsupported,
+        )
+    end
+
     @testset "precision-generic competition evidence" begin
         setprecision(BigFloat, 256) do
             big_parameters = AutomaticSwitchingParameters(

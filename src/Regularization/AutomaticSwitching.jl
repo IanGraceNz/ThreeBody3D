@@ -994,6 +994,8 @@ root finding, or threshold-crossing location.
 function automatic_entry_decision(
     observables::PairObservables{T},
     parameters::AutomaticSwitchingParameters,
+    ;
+    crossing_provenance::Symbol=:algebraic,
 ) where {T<:AbstractFloat}
     candidate_mask = _entry_candidate_mask(observables, parameters)
     candidate_indices = findall(identity, candidate_mask)
@@ -1005,6 +1007,7 @@ function automatic_entry_decision(
         parameters;
         candidate_mask,
         candidate_pair,
+        crossing_provenance,
     )
 
     any(observables.collisions) &&
