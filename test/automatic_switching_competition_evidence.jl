@@ -146,6 +146,50 @@
         )
     end
 
+    @testset "decision evidence threads crossing provenance" begin
+        observables = competition_observables(
+            (0.1, 0.5, 1.0),
+            (-1.0, 0.0, 0.0),
+        )
+        default_evidence = ThreeBody3D._decision_evidence(
+            :entry,
+            observables,
+            parameters;
+            candidate_mask=(true, false, false),
+            candidate_pair=(1, 2),
+        )
+        @test default_evidence.competition.crossing_provenance == :algebraic
+
+        entry_evidence = ThreeBody3D._decision_evidence(
+            :entry,
+            observables,
+            parameters;
+            candidate_mask=(true, false, false),
+            candidate_pair=(1, 2),
+            crossing_provenance=:certified_cartesian_entry,
+        )
+        @test entry_evidence.competition.crossing_provenance ==
+              :certified_cartesian_entry
+
+        exit_evidence = ThreeBody3D._decision_evidence(
+            :exit,
+            observables,
+            parameters;
+            selected_pair=(1, 2),
+            selected_index=1,
+            crossing_provenance=:certified_regularized_exit,
+        )
+        @test exit_evidence.competition.crossing_provenance ==
+              :certified_regularized_exit
+
+        @test_throws ArgumentError ThreeBody3D._decision_evidence(
+            :entry,
+            observables,
+            parameters;
+            crossing_provenance=:unsupported,
+        )
+    end
+
     @testset "precision-generic competition evidence" begin
         setprecision(BigFloat, 256) do
             big_parameters = AutomaticSwitchingParameters(

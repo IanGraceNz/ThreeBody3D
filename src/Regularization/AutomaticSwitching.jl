@@ -938,6 +938,7 @@ function _decision_evidence(
     candidate_pair::Union{Nothing,Tuple{Int,Int}}=nothing,
     selected_pair::Union{Nothing,Tuple{Int,Int}}=nothing,
     selected_index::Union{Nothing,Int}=nothing,
+    crossing_provenance::Symbol=:algebraic,
 ) where {T<:AbstractFloat}
     competition = _competition_evidence(
         phase,
@@ -946,6 +947,7 @@ function _decision_evidence(
         candidate_mask,
         candidate_pair,
         selected_index,
+        crossing_provenance,
     )
     AutomaticSwitchingDecisionEvidence{T,typeof(competition.candidate_pairs)}(
         phase,
