@@ -1140,6 +1140,48 @@ struct CartesianEntryLocationResult{T<:AbstractFloat,S,R,O}
     end
 end
 
+@inline function _certified_entry_decision(
+    observables::PairObservables{T},
+    parameters::AutomaticSwitchingParameters,
+    pair::Tuple{Int,Int},
+) where {T<:AbstractFloat}
+    decision = automatic_entry_decision(
+        observables,
+        parameters;
+        crossing_provenance=:certified_cartesian_entry,
+    )
+    decision.action !== :none && return decision
+
+    event_index = _canonical_pair_index(pair)
+    event_rate = observables.radial_rates[event_index]
+    if !observables.collisions[event_index] && event_rate < zero(event_rate)
+        if event_index != observables.order[1]
+            return _decision(:failure, pair, :candidate_not_closest, decision.evidence)
+        end
+
+        second_index = observables.order[2]
+        if observables.separations[second_index] <= parameters.ambiguity_threshold
+            return _decision(:failure, pair, :ambiguous_close_pairs, decision.evidence)
+        elseif observables.isolation_ratio < parameters.minimum_separation_ratio
+            return _decision(
+                :failure,
+                pair,
+                :insufficient_pair_isolation,
+                decision.evidence,
+            )
+        end
+
+        return _decision(
+            :enter,
+            pair,
+            :certified_inward_threshold_crossing,
+            decision.evidence,
+        )
+    end
+
+    _decision(:failure, pair, :entry_condition_not_met, decision.evidence)
+end
+
 
 """
     locate_cartesian_entry_event(system, u0, tspan, parameters; kwargs...)
@@ -1228,35 +1270,7 @@ function locate_cartesian_entry_event(
     physical_time = event.time
     state = collect(simulation(physical_time))
     observables = pair_observables(state)
-    decision = automatic_entry_decision(observables, parameters)
-
-    # The continuous callback has already certified that `event.pair` crossed
-    # the entry threshold inward. Dense reevaluation at the same root-found
-    # time can differ by a few ulps and place the separation just above the
-    # threshold, so revalidate the physical entry conditions without requiring
-    # a second exact threshold comparison.
-    if decision.action === :none
-        event_index = _canonical_pair_index(event.pair)
-        event_rate = observables.radial_rates[event_index]
-        if !observables.collisions[event_index] && event_rate < zero(event_rate)
-            if event_index != observables.order[1]
-                decision = _failure_decision(:candidate_not_closest, event.pair)
-            else
-                second_index = observables.order[2]
-                if observables.separations[second_index] <= parameters.ambiguity_threshold
-                    decision = _failure_decision(:ambiguous_close_pairs, event.pair)
-                elseif observables.isolation_ratio < parameters.minimum_separation_ratio
-                    decision = _failure_decision(:insufficient_pair_isolation, event.pair)
-                else
-                    decision = AutomaticSwitchingDecision(
-                        :enter,
-                        event.pair,
-                        :certified_inward_threshold_crossing,
-                    )
-                end
-            end
-        end
-    end
+    decision = _certified_entry_decision(observables, parameters, event.pair)
 
     if decision.action === :enter
         return CartesianEntryLocationResult(
@@ -1278,7 +1292,12 @@ function locate_cartesian_entry_event(
         )
     end
 
-    failure = _failure_decision(:entry_condition_not_met, event.pair)
+    failure = _decision(
+        :failure,
+        event.pair,
+        :entry_condition_not_met,
+        decision.evidence,
+    )
     CartesianEntryLocationResult(
         :failure,
         physical_time,

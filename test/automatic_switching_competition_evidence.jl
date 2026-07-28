@@ -211,6 +211,147 @@
         )
     end
 
+    @testset "certified entry preserves state-derived competition" begin
+        observables = competition_observables(
+            (0.1, 0.5, 1.0),
+            (-1.0, 0.0, 0.0),
+        )
+        algebraic = automatic_entry_decision(observables, parameters)
+        certified = automatic_entry_decision(
+            observables,
+            parameters;
+            crossing_provenance=:certified_cartesian_entry,
+        )
+        @test certified.action == algebraic.action
+        @test certified.reason == algebraic.reason
+        @test certified.pair == algebraic.pair
+        for name in propertynames(algebraic.evidence)
+            name === :competition && continue
+            @test getproperty(certified.evidence, name) ==
+                  getproperty(algebraic.evidence, name)
+        end
+        for name in propertynames(algebraic.evidence.competition)
+            name === :crossing_provenance && continue
+            @test getproperty(certified.evidence.competition, name) ==
+                  getproperty(algebraic.evidence.competition, name)
+        end
+        @test algebraic.evidence.competition.crossing_provenance == :algebraic
+        @test certified.evidence.competition.crossing_provenance ==
+              :certified_cartesian_entry
+
+        outside_threshold = nextfloat(parameters.enter_threshold)
+        outside = competition_observables(
+            (outside_threshold, 0.5, 1.0),
+            (-1.0, 0.0, 0.0),
+        )
+        outside_decision = ThreeBody3D._certified_entry_decision(
+            outside,
+            parameters,
+            (1, 2),
+        )
+        @test outside_decision.action == :enter
+        @test outside_decision.reason == :certified_inward_threshold_crossing
+        @test outside_decision.pair == (1, 2)
+        @test outside_decision.evidence !== nothing
+        @test outside_decision.evidence.competition.crossing_provenance ==
+              :certified_cartesian_entry
+        @test outside_decision.evidence.competition.entry_margins[1] ==
+              outside_threshold - parameters.enter_threshold
+
+        setprecision(BigFloat, 256) do
+            big_parameters = AutomaticSwitchingParameters(
+                enter_threshold=big"0.2",
+                exit_threshold=big"0.4",
+                ambiguity_threshold=big"0.3",
+                minimum_separation_ratio=big"2",
+            )
+            big_outside = nextfloat(big_parameters.enter_threshold)
+            big_observables = competition_observables(
+                (big_outside, big"0.5", big"1.0"),
+                (big"-1.0", big"0.0", big"0.0"),
+            )
+            big_decision = ThreeBody3D._certified_entry_decision(
+                big_observables,
+                big_parameters,
+                (1, 2),
+            )
+            @test big_decision.action == :enter
+            @test big_decision.evidence isa
+                  AutomaticSwitchingDecisionEvidence{BigFloat}
+            @test big_decision.evidence.competition.crossing_provenance ==
+                  :certified_cartesian_entry
+            @test big_decision.evidence.competition.entry_margins[1] ==
+                  big_outside - big_parameters.enter_threshold
+        end
+    end
+
+    @testset "certified entry does not override state validity" begin
+        outside_threshold = nextfloat(parameters.enter_threshold)
+        cases = (
+            (
+                competition_observables(
+                    (outside_threshold, 0.1, 1.0),
+                    (-1.0, 0.0, 0.0),
+                ),
+                :candidate_not_closest,
+                (1, 2),
+            ),
+            (
+                competition_observables(
+                    (outside_threshold, 0.3, 1.0),
+                    (-1.0, 0.0, 0.0),
+                ),
+                :ambiguous_close_pairs,
+                (1, 2),
+            ),
+            (
+                competition_observables(
+                    (outside_threshold, 0.39, 1.0),
+                    (-1.0, 0.0, 0.0),
+                ),
+                :insufficient_pair_isolation,
+                (1, 2),
+            ),
+            (
+                competition_observables(
+                    (0.0, 0.5, 1.0),
+                    (0.0, 0.0, 0.0);
+                    collisions=(true, false, false),
+                ),
+                :collision_state,
+                (1, 2),
+            ),
+            (
+                competition_observables(
+                    (outside_threshold, 0.5, 1.0),
+                    (0.0, 0.0, 0.0),
+                ),
+                :entry_condition_not_met,
+                (1, 2),
+            ),
+            (
+                competition_observables(
+                    (0.1, 0.15, 1.0),
+                    (-1.0, -1.0, 0.0),
+                ),
+                :simultaneous_entry_candidates,
+                (1, 2),
+            ),
+        )
+        for (observables, reason, pair) in cases
+            decision = ThreeBody3D._certified_entry_decision(
+                observables,
+                parameters,
+                pair,
+            )
+            @test decision.action == :failure
+            @test decision.reason == reason
+            @test decision.evidence !== nothing
+            @test decision.evidence.competition.crossing_provenance ==
+                  :certified_cartesian_entry
+        end
+    end
+
     @testset "exit decisions thread crossing provenance" begin
         cases = (
             competition_observables((0.4, 1.0, 2.0), (1.0, 0.0, 0.0)),

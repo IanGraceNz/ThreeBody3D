@@ -1485,6 +1485,13 @@ end
     @test located.status == :entry
     @test located.decision.action == :enter
     @test located.decision.pair == (1, 2)
+    @test located.decision.reason in (
+        :unique_approaching_pair,
+        :certified_inward_threshold_crossing,
+    )
+    @test located.decision.evidence !== nothing
+    @test located.decision.evidence.competition.crossing_provenance ==
+          :certified_cartesian_entry
     @test located.physical_time ≈ 0.3 atol=1e-8
     @test located.observables.separations[1] ≈ parameters.enter_threshold atol=1e-10
     @test located.observables.radial_rates[1] < 0
@@ -1499,6 +1506,16 @@ end
     )
     @test irregular.status == :entry
     @test irregular.decision.pair == located.decision.pair
+    @test irregular.decision.evidence.competition.crossing_provenance ==
+          :certified_cartesian_entry
+    @test irregular.decision.evidence.competition.closest_pair ==
+          located.decision.evidence.competition.closest_pair
+    @test irregular.decision.evidence.competition.second_pair ==
+          located.decision.evidence.competition.second_pair
+    @test irregular.decision.evidence.competition.exact_closest_tie ==
+          located.decision.evidence.competition.exact_closest_tie
+    @test irregular.decision.evidence.competition.candidate_pairs ==
+          located.decision.evidence.competition.candidate_pairs
     @test irregular.physical_time ≈ located.physical_time atol=1e-10
     @test maximum(abs.(irregular.state .- located.state)) < 1e-9
 
