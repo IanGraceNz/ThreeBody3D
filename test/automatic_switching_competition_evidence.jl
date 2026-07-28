@@ -211,6 +211,121 @@
         )
     end
 
+    @testset "exit decisions thread crossing provenance" begin
+        cases = (
+            competition_observables((0.4, 1.0, 2.0), (1.0, 0.0, 0.0)),
+            competition_observables((0.3, 1.0, 2.0), (1.0, 0.0, 0.0)),
+            competition_observables((0.5, 0.45, 1.0), (1.0, 0.0, 0.0)),
+            competition_observables((0.4, 0.3, 1.0), (1.0, 0.0, 0.0)),
+            competition_observables(
+                (0.0, 1.0, 2.0),
+                (0.0, 0.0, 0.0);
+                collisions=(true, false, false),
+            ),
+            competition_observables(
+                (0.4, 0.0, 2.0),
+                (1.0, 0.0, 0.0);
+                collisions=(false, true, false),
+            ),
+        )
+        for observables in cases
+            algebraic = automatic_exit_decision(observables, parameters, (1, 2))
+            certified = automatic_exit_decision(
+                observables,
+                parameters,
+                (1, 2);
+                crossing_provenance=:certified_regularized_exit,
+            )
+            @test certified.action == algebraic.action
+            @test certified.reason == algebraic.reason
+            @test certified.pair == algebraic.pair
+            for name in propertynames(algebraic.evidence)
+                name === :competition && continue
+                @test getproperty(certified.evidence, name) ==
+                      getproperty(algebraic.evidence, name)
+            end
+            for name in propertynames(algebraic.evidence.competition)
+                name === :crossing_provenance && continue
+                @test getproperty(certified.evidence.competition, name) ==
+                      getproperty(algebraic.evidence.competition, name)
+            end
+            @test algebraic.evidence.competition.crossing_provenance == :algebraic
+            @test certified.evidence.competition.crossing_provenance ==
+                  :certified_regularized_exit
+        end
+
+        @test_throws ArgumentError automatic_exit_decision(
+            first(cases),
+            parameters,
+            (1, 2);
+            crossing_provenance=:unsupported,
+        )
+    end
+
+    @testset "certified exit preserves state-derived competition" begin
+        inside_threshold = prevfloat(parameters.exit_threshold)
+        observables = competition_observables(
+            (inside_threshold, 1.0, 2.0),
+            (1.0, 0.0, 0.0),
+        )
+        algebraic = automatic_exit_decision(observables, parameters, (1, 2))
+        certified = ThreeBody3D._certified_exit_decision(
+            observables,
+            parameters,
+            (1, 2),
+        )
+        @test algebraic.action == :none
+        @test algebraic.reason == :exit_condition_not_met
+        @test certified.action == :exit
+        @test certified.reason == :certified_outward_threshold_crossing
+        @test certified.pair == (1, 2)
+        @test certified.evidence.competition.crossing_provenance ==
+              :certified_regularized_exit
+        @test certified.evidence.competition.exit_margin ==
+              inside_threshold - parameters.exit_threshold
+        @test certified.evidence.competition.closest_pair == (1, 2)
+
+        lost = competition_observables(
+            (inside_threshold, 0.3, 2.0),
+            (1.0, 0.0, 0.0),
+        )
+        lost_decision = ThreeBody3D._certified_exit_decision(
+            lost,
+            parameters,
+            (1, 2),
+        )
+        @test lost_decision.action == :failure
+        @test lost_decision.reason == :selected_pair_lost
+        @test lost_decision.evidence.competition.crossing_provenance ==
+              :certified_regularized_exit
+
+        setprecision(BigFloat, 256) do
+            big_parameters = AutomaticSwitchingParameters(
+                enter_threshold=big"0.2",
+                exit_threshold=big"0.4",
+                ambiguity_threshold=big"0.3",
+                minimum_separation_ratio=big"2",
+            )
+            big_inside = prevfloat(big_parameters.exit_threshold)
+            big_observables = competition_observables(
+                (big_inside, big"1.0", big"2.0"),
+                (big"1.0", big"0.0", big"0.0"),
+            )
+            big_decision = ThreeBody3D._certified_exit_decision(
+                big_observables,
+                big_parameters,
+                (1, 2),
+            )
+            @test big_decision.action == :exit
+            @test big_decision.evidence isa
+                  AutomaticSwitchingDecisionEvidence{BigFloat}
+            @test big_decision.evidence.competition.crossing_provenance ==
+                  :certified_regularized_exit
+            @test big_decision.evidence.competition.exit_margin ==
+                  big_inside - big_parameters.exit_threshold
+        end
+    end
+
     @testset "precision-generic competition evidence" begin
         setprecision(BigFloat, 256) do
             big_parameters = AutomaticSwitchingParameters(

@@ -1551,6 +1551,8 @@ end
     @test located.status == :exit
     @test located.decision.action == :exit
     @test located.decision.pair == (1, 2)
+    @test located.decision.evidence.competition.crossing_provenance ==
+          :certified_regularized_exit
     @test located.physical_time ≈ 0.6 atol=2e-7
     @test located.observables.separations[1] ≈ parameters.exit_threshold atol=1e-9
     @test located.observables.radial_rates[1] > 0

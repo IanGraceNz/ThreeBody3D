@@ -1051,6 +1051,8 @@ function automatic_exit_decision(
     observables::PairObservables{T},
     parameters::AutomaticSwitchingParameters,
     pair::Tuple{<:Integer,<:Integer},
+    ;
+    crossing_provenance::Symbol=:algebraic,
 ) where {T<:AbstractFloat}
     selected_index = _canonical_pair_index(pair)
     selected_pair = (Int(pair[1]), Int(pair[2]))
@@ -1060,6 +1062,7 @@ function automatic_exit_decision(
         parameters;
         selected_pair,
         selected_index,
+        crossing_provenance,
     )
 
     for index in 1:3
@@ -1342,18 +1345,26 @@ end
     parameters::AutomaticSwitchingParameters,
     pair::Tuple{Int,Int},
 ) where {T<:AbstractFloat}
-    decision = automatic_exit_decision(observables, parameters, pair)
+    decision = automatic_exit_decision(
+        observables,
+        parameters,
+        pair;
+        crossing_provenance=:certified_regularized_exit,
+    )
     decision.action !== :none && return decision
 
     selected_index = _canonical_pair_index(pair)
     if decision.reason === :exit_condition_not_met &&
        observables.radial_rates[selected_index] > zero(T)
-        return AutomaticSwitchingDecision(
-            :exit, pair, :certified_outward_threshold_crossing,
+        return _decision(
+            :exit,
+            pair,
+            :certified_outward_threshold_crossing,
+            decision.evidence,
         )
     end
 
-    _failure_decision(:exit_condition_not_met, pair)
+    _decision(:failure, pair, :exit_condition_not_met, decision.evidence)
 end
 
 """

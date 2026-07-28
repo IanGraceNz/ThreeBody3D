@@ -1117,6 +1117,8 @@ end
         )
         @test located.status == :exit
         @test located.decision.action == :exit
+        @test located.decision.evidence.competition.crossing_provenance ==
+              :certified_regularized_exit
         @test located.problem.pair == pair
         @test located.physical_time ≈ 0.2 atol=3e-7
         @test located.observables.separations[ThreeBody3D._canonical_pair_index(pair)] ≈ 0.4 atol=3e-8
