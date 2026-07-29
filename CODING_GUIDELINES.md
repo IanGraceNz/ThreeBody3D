@@ -63,7 +63,13 @@ Before considering any task complete:
 
 If appropriate, also run
 
-- `JET.report_package()`
+One-time setup from the repository root:
+
+`julia --project=dev/jet -e 'using Pkg; Pkg.develop(path="."); Pkg.instantiate()'`
+
+Normal analysis:
+
+`julia --project=dev/jet -e 'using ThreeBody3D, JET; JET.report_package(ThreeBody3D)'`
 
 ---
 

@@ -1,0 +1,7 @@
+[deps]
+JET = "c3a54625-cd67-489e-a8e7-0a5a0ff4e31b"
+ThreeBody3D = "56809431-d508-4869-b2a1-a7090c02118e"
+
+[compat]
+JET = "0.11"
+julia = "1.10"
