@@ -223,12 +223,17 @@ function build_hierarchical_triple_case_result(
     center_of_mass_limit,
     minimum_ratio_limit,
     final_time_limit,
+    reltol,
+    abstol,
 )
+    isnothing(reltol) == isnothing(abstol) || throw(ArgumentError(
+        "Hierarchical-triple relative and absolute tolerance overrides must both be supplied or both be nothing.",
+    ))
     builder = ValidationCaseResultBuilder(hierarchical_triple_case_definition(), environment)
     record_configuration!(builder, ValidationConfiguration(
         solver=report.profile,
-        absolute_tolerance=1e-13,
-        relative_tolerance=1e-13,
+        absolute_tolerance=abstol,
+        relative_tolerance=reltol,
         time_interval=(report.initial_time, report.expected_final_time),
         sampling="saveat=0.02",
         thresholds=(

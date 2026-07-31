@@ -37,6 +37,7 @@ include("PerformanceBenchmarks.jl")
 include("SuiteRunner.jl")
 include("CoreBenchmarkCases.jl")
 include("FigureEightInvestigation.jl")
+include("HierarchicalTripleInvestigation.jl")
 include("CloseEncounterCase.jl")
 include("TripleCollisionCase.jl")
 include("RandomizedRegressionCase.jl")
@@ -166,6 +167,10 @@ export AbstractValidationMetric,
        FIGURE_EIGHT_INVESTIGATION_METRICS,
        figure_eight_profile_investigation_definition,
        figure_eight_profile_investigation_series,
+       HIERARCHICAL_TRIPLE_INVESTIGATION_DEFINITION_VERSION,
+       HIERARCHICAL_TRIPLE_INVESTIGATION_METRICS,
+       hierarchical_triple_profile_investigation_definition,
+       hierarchical_triple_profile_investigation_series,
        finish_execution!,
        evaluate_criteria,
        evaluate_criterion,

@@ -182,6 +182,12 @@ end
 figure_eight_accuracy_work_definition(point::Symbol) = _accuracy_work_definition(:figure_eight, point)
 hierarchical_triple_accuracy_work_definition(point::Symbol) = _accuracy_work_definition(:hierarchical_triple, point)
 
+function _hierarchical_triple_profile_tolerances(profile::Symbol)
+    profile == :fast && return (reltol=nothing, abstol=nothing)
+    profile == :accurate && return (reltol=1e-13, abstol=1e-13)
+    throw(ArgumentError("Unsupported hierarchical-triple solver profile: $profile."))
+end
+
 function figure_eight_accuracy_work_entries(;
     policy=StandardBenchmark(),
     performance_directory=joinpath(@__DIR__, "..", "performance"),
@@ -207,13 +213,14 @@ function hierarchical_triple_accuracy_work_entries(;
     Tuple(
         PerformanceBenchmarkEntry(
             hierarchical_triple_accuracy_work_definition(point),
-            hierarchical_triple_performance_configuration(;
-                duration,
-                solver=point,
-                saveat,
-                reltol=point == :accurate ? 1e-13 : nothing,
-                abstol=point == :accurate ? 1e-13 : nothing,
-            ),
+            let tolerances = _hierarchical_triple_profile_tolerances(point)
+                hierarchical_triple_performance_configuration(;
+                    duration,
+                    solver=point,
+                    saveat,
+                    tolerances...,
+                )
+            end,
             policy,
             joinpath(performance_directory, "hierarchical_triple_accuracy_work.jl"),
         ) for point in HIERARCHICAL_TRIPLE_ACCURACY_WORK_POINTS

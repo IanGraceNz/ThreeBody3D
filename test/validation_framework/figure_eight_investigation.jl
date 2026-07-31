@@ -304,7 +304,7 @@ end
 
 @testset "Figure-eight Investigation 1 duplicate performance reports" begin
     report = _figure_eight_performance_report(:fast)
-    @test_throws ArgumentError ValidationFramework._figure_eight_reports_by_id(
+    @test_throws ArgumentError ValidationFramework._performance_reports_by_id(
         (report, report),
     )
 end

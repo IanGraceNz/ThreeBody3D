@@ -64,10 +64,25 @@ end
         center_of_mass_limit=1e-11,
         minimum_ratio_limit=5.0,
         final_time_limit=1e-10,
+        reltol=1e-13,
+        abstol=1e-13,
     )
     @test hierarchy.status == case_pass
     @test hierarchy.definition.case_id == :hierarchical_triple
     @test only(filter(metric -> metric.metric_id == :minimum_hierarchy_ratio, hierarchy.metrics)).value == 10.0
+    @test hierarchy.configuration.relative_tolerance == 1e-13
+    @test hierarchy.configuration.absolute_tolerance == 1e-13
+    @test_throws ArgumentError build_hierarchical_triple_case_result(
+        _synthetic_benchmark_report(name=:hierarchical_triple), environment;
+        energy_limit=1e-11,
+        momentum_limit=1e-12,
+        angular_momentum_limit=1e-11,
+        center_of_mass_limit=1e-11,
+        minimum_ratio_limit=5.0,
+        final_time_limit=1e-10,
+        reltol=1e-13,
+        abstol=nothing,
+    )
 
     failing = build_figure_eight_case_result(
         _synthetic_benchmark_report(periodicity_error=1e-3), environment;

@@ -9,13 +9,16 @@ using .ValidationFramework
 # the system remains hierarchical throughout the integration.
 protocol = resolve_case_protocol(hierarchical_triple_case_definition(), VALIDATION_SCHEMA_VERSION)
 
+const HIERARCHICAL_RELTOL = 1e-13
+const HIERARCHICAL_ABSTOL = 1e-13
+
 report = run_validation_benchmark(
     :hierarchical_triple;
     duration=100.0,
     solver=:accurate,
     saveat=0.02,
-    reltol=1e-13,
-    abstol=1e-13,
+    reltol=HIERARCHICAL_RELTOL,
+    abstol=HIERARCHICAL_ABSTOL,
 )
 println(report)
 
@@ -83,6 +86,8 @@ if report_requested(protocol)
         center_of_mass_limit=HIERARCHICAL_COM_RESIDUAL_LIMIT,
         minimum_ratio_limit=HIERARCHICAL_MINIMUM_RATIO_LIMIT,
         final_time_limit=HIERARCHICAL_FINAL_TIME_RESIDUAL_LIMIT,
+        reltol=HIERARCHICAL_RELTOL,
+        abstol=HIERARCHICAL_ABSTOL,
     )
     exit_code = publish_case_result(protocol, structured_result; render=false)
     exit_code == 0 || exit(exit_code)

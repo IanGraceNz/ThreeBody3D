@@ -173,7 +173,7 @@ function _figure_eight_investigation_point(
     )
 end
 
-function _figure_eight_reports_by_id(reports)
+function _performance_reports_by_id(reports)
     indexed = Dict{Symbol,PerformanceBenchmarkReport}()
     for report in reports
         benchmark_id = report.definition.benchmark_id
@@ -196,7 +196,7 @@ function figure_eight_profile_investigation_series(
     suite::PerformanceSuiteReport,
     case_results,
 )
-    reports = _figure_eight_reports_by_id(suite.benchmarks)
+    reports = _performance_reports_by_id(suite.benchmarks)
     normalized_results = Tuple(case_results)
     all(result -> result isa ValidationCaseResult, normalized_results) || throw(
         ArgumentError("case_results must contain ValidationCaseResult records."),
