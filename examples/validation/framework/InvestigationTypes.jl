@@ -68,6 +68,8 @@ Immutable evidence from one completed or attempted investigation measurement.
 
 An unsuccessful attempt may retain no metrics or solver statistics; its
 [`ExecutionOutcome`](@ref) preserves the failure status and factual summary.
+`supporting_evidence` may retain an immutable experiment-specific report when
+the generic metric and performance fields cannot represent the raw evidence.
 """
 struct InvestigationMeasurementPoint
     point_id::Symbol
@@ -79,6 +81,7 @@ struct InvestigationMeasurementPoint
     metrics::Tuple{Vararg{AbstractValidationMetric}}
     solver_statistics::Union{Nothing,SolverStatistics}
     performance_report::Union{Nothing,PerformanceBenchmarkReport}
+    supporting_evidence::Any
     notes::Union{Nothing,String}
 
     function InvestigationMeasurementPoint(
@@ -91,6 +94,7 @@ struct InvestigationMeasurementPoint
         metrics,
         solver_statistics::Union{Nothing,SolverStatistics}=nothing;
         performance_report=nothing,
+        supporting_evidence=nothing,
         notes=nothing,
     )
         isnothing(performance_report) || performance_report isa PerformanceBenchmarkReport || throw(
@@ -128,6 +132,7 @@ struct InvestigationMeasurementPoint
             normalized_metrics,
             solver_statistics,
             performance_report,
+            supporting_evidence,
             isnothing(notes) ? nothing : _nonempty_string(notes, "notes"),
         )
     end

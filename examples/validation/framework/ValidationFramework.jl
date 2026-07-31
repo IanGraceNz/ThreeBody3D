@@ -47,6 +47,7 @@ include("KSCollisionContinuationCase.jl")
 include("KSLeviCivitaComparisonCase.jl")
 include("KSHierarchicalTripleCase.jl")
 include("KSSwitchingComparisonCase.jl")
+include("KSSwitchingInvestigation.jl")
 
 export AbstractValidationMetric,
        PerformanceBenchmarkDefinition,
@@ -193,6 +194,9 @@ export AbstractValidationMetric,
        ks_levi_civita_comparison_case_definition,
        ks_hierarchical_triple_case_definition,
        ks_switching_comparison_case_definition,
+       ks_switching_backend_investigation_definition,
+       ks_switching_backend_investigation_series,
+       build_ks_switching_backend_reports,
        MetricKind,
        metric_boolean,
        metric_integer,

@@ -9,6 +9,18 @@ function _build_ks_switching_comparison_case(;
     ks_transition_residual=5e-12,
     levi_civita_transition_residual=5e-12,
 )
+    configuration = ValidationFramework._ks_switching_comparison_configuration(
+        masses=(1e-12, 1e-12, 1e-12), gravitational_constant=1.0,
+        initial_state=Tuple(zeros(18)), selected_pair=(1, 2),
+        physical_time_interval=(0.0, 1.6), comparison_sample_count=161,
+        enter_threshold=0.2, exit_threshold=0.4, ambiguity_threshold=0.3,
+        minimum_separation_ratio=2.0, maximum_switches=10,
+        minimum_time_progress=eps(Float64), minimum_separation_excursion=0.0,
+        threshold_scale_kind=:absolute, threshold_reference_scale=1.0,
+        fixed_settings=ValidationFramework._ks_switching_fixed_settings(),
+        state_difference_limit=2e-8, event_time_difference_limit=2e-6,
+        transition_residual_limit=1e-11,
+    )
     build_ks_switching_comparison_case_result(
         ks_status,
         levi_civita_status,
@@ -19,19 +31,10 @@ function _build_ks_switching_comparison_case(;
         exit_time_difference,
         ks_transition_residual,
         levi_civita_transition_residual,
+        161,
         SolverStatistics(segment_count=6, switch_count=4),
         _pilot_environment();
-        masses=(1e-12, 1e-12, 1e-12),
-        gravitational_constant=1.0,
-        initial_state=Tuple(zeros(18)),
-        physical_time_interval=(0.0, 1.6),
-        comparison_sample_count=161,
-        enter_threshold=0.2,
-        exit_threshold=0.4,
-        ambiguity_threshold=0.3,
-        minimum_separation_ratio=2.0,
-        maximum_switches=10,
-        minimum_time_progress=eps(Float64),
+        configuration,
         state_difference_limit=2e-8,
         event_time_difference_limit=2e-6,
         transition_residual_limit=1e-11,
@@ -48,8 +51,9 @@ end
     @test result.solver_statistics.switch_count == 4
 
     failed_ks = _build_ks_switching_comparison_case(ks_status=:failure)
-    @test failed_ks.status == case_fail
-    @test failed_ks.criteria[1].status == criterion_fail
+    @test failed_ks.execution.actual == actual_terminated
+    @test isempty(failed_ks.criteria)
+    @test any(metric -> metric.metric_id == :ks_status, failed_ks.metrics)
 
     wrong_switch_count = _build_ks_switching_comparison_case(ks_switch_count=3)
     @test wrong_switch_count.status == case_fail
