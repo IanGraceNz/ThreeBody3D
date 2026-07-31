@@ -23,6 +23,8 @@ include("performance_comparison.jl")
 
 include("performance_series.jl")
 
+include("investigation_types.jl")
+
 include("performance_presentation.jl")
 
 include("console_presentation.jl")

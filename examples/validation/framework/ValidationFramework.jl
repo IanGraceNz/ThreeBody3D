@@ -15,6 +15,7 @@ not included in, or exported from, the public `ThreeBody3D` package API.
 
 include("Types.jl")
 include("PerformanceTypes.jl")
+include("InvestigationTypes.jl")
 include("Criteria.jl")
 include("CaseResults.jl")
 include("SuiteResults.jl")
@@ -81,6 +82,9 @@ export AbstractValidationMetric,
        performance_difference,
        PerformanceAccuracyWorkPoint,
        PerformanceAccuracyWorkSeries,
+       InvestigationDefinition,
+       InvestigationMeasurementPoint,
+       InvestigationMeasurementSeries,
        build_accuracy_work_series,
        figure_eight_accuracy_work_definition,
        hierarchical_triple_accuracy_work_definition,
