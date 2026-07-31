@@ -39,6 +39,7 @@ include("CoreBenchmarkCases.jl")
 include("FigureEightInvestigation.jl")
 include("HierarchicalTripleInvestigation.jl")
 include("CloseEncounterCase.jl")
+include("CloseEncounterInvestigation.jl")
 include("TripleCollisionCase.jl")
 include("RandomizedRegressionCase.jl")
 include("KSKeplerCase.jl")
@@ -171,6 +172,10 @@ export AbstractValidationMetric,
        HIERARCHICAL_TRIPLE_INVESTIGATION_METRICS,
        hierarchical_triple_profile_investigation_definition,
        hierarchical_triple_profile_investigation_series,
+       CLOSE_ENCOUNTER_INVESTIGATION_DEFINITION_VERSION,
+       CLOSE_ENCOUNTER_INVESTIGATION_METRICS,
+       close_encounter_representation_investigation_definition,
+       close_encounter_representation_investigation_series,
        finish_execution!,
        evaluate_criteria,
        evaluate_criterion,

@@ -13,11 +13,11 @@ function _close_case_data(; automatic_error=2e-10, cartesian_error=1e-3, cartesi
         segments=3, switches=2,
     )
     exit_difference = (state=4e-11,)
-    reference_periapsis = (separation=1e-4,)
+    reference_periapsis = (time=0.8, separation=1e-4,)
     periapses = (
-        (name="Cartesian", result=(separation=1e-4 + cartesian_periapsis_error,)),
-        (name="Automatic switching", result=(separation=1e-4 + 2e-11,)),
-        (name="Explicit regularized", result=(separation=1e-4 + 3e-11,)),
+        (name="Cartesian", result=(time=0.801, separation=1e-4 + cartesian_periapsis_error,)),
+        (name="Automatic switching", result=(time=0.80000001, separation=1e-4 + 2e-11,)),
+        (name="Explicit regularized", result=(time=0.80000002, separation=1e-4 + 3e-11,)),
     )
     endpoint_times = (explicit_time_residual=4e-12,)
     (; cartesian, automatic, explicit, exit_difference, reference_periapsis, periapses, endpoint_times)
@@ -41,15 +41,14 @@ function _build_close_case(data; automatic_improvement_ratio_limit=0.5)
         explicit_periapsis_separation_error_limit=1e-10,
         cartesian_under_resolution_minimum=1e-3,
         automatic_improvement_ratio_limit,
-        reference_precision=256,
-        sample_step=0.002,
-        selected_pair=(1, 2),
-        entry_threshold=0.10,
-        exit_threshold=0.25,
-        cartesian_tolerance=1e-13,
-        regularized_tolerance=1e-12,
-        evaluation_tolerance=1e-14,
-        time_interval=(0.0, 1.6),
+        configuration=ValidationFramework._close_encounter_configuration(
+            initial_state=ntuple(identity, 18),
+            masses=(1.0, 1.0, 0.001),
+            gravitational_constant=1.0,
+            apoapsis=1.0,
+            nominal_periapsis=0.0001,
+            third_body_offset=10.0,
+        ),
     )
 end
 
@@ -57,13 +56,17 @@ end
     result = _build_close_case(_close_case_data())
     @test result.status == case_pass
     @test result.definition.case_id == :close_encounter_comparison
-    @test length(result.metrics) == 8
+    @test length(result.metrics) == 11
     @test length(result.criteria) == 8
     @test all(criterion -> criterion.status == criterion_pass, result.criteria)
     @test result.criteria[7].specification.relation == relation_greater_than_or_equal
     @test result.solver_statistics.accepted_steps == 30
     @test result.solver_statistics.segment_count == 7
     @test result.solver_statistics.switch_count == 4
+    @test only(filter(
+        metric -> metric.metric_id == :automatic_periapsis_time_error,
+        result.metrics,
+    )).value ≈ 1e-8
 
     under_resolution_not_exposed = _build_close_case(
         _close_case_data(cartesian_periapsis_error=5e-4),

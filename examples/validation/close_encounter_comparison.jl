@@ -29,8 +29,24 @@ const EXIT_THRESHOLD = 0.25
 const CARTESIAN_TOLERANCE = 1e-13
 const REGULARIZED_TOLERANCE = 1e-12
 const EVALUATION_TOLERANCE = 1e-14
+const AUTOMATIC_MINIMUM_SEPARATION_RATIO = 10.0
+const AUTOMATIC_MAXIMUM_SWITCHES = 10
+const REGULARIZED_INITIAL_STEP = 0.1
+const REGULARIZED_MAX_ITERATIONS = 256
+const EVALUATION_MAX_ITERATIONS = 256
+const REFERENCE_TOLERANCE = "1e-30"
+const CLOSE_ENCOUNTER_AUTOMATIC_MAXIMUM_STATE_ERROR_LIMIT = 1.0e-9
+const CLOSE_ENCOUNTER_EXPLICIT_MAXIMUM_STATE_ERROR_LIMIT = 1.0e-9
+const CLOSE_ENCOUNTER_EXIT_STATE_AGREEMENT_LIMIT = 1.0e-10
+const CLOSE_ENCOUNTER_EXPLICIT_EXIT_TIME_RESIDUAL_LIMIT = 5.0e-12
+const CLOSE_ENCOUNTER_AUTOMATIC_PERIAPSIS_ERROR_LIMIT = 1.0e-10
+const CLOSE_ENCOUNTER_EXPLICIT_PERIAPSIS_ERROR_LIMIT = 1.0e-10
+const CLOSE_ENCOUNTER_CARTESIAN_UNDER_RESOLUTION_MINIMUM = 1.0e-3
+const CLOSE_ENCOUNTER_AUTOMATIC_IMPROVEMENT_RATIO_LIMIT = 0.5
 
-protocol = resolve_case_protocol(close_encounter_case_definition(), VALIDATION_SCHEMA_VERSION)
+case_definition = close_encounter_case_definition()
+experiment_environment = current_validation_environment()
+protocol = resolve_case_protocol(case_definition, VALIDATION_SCHEMA_VERSION)
 
 @inline decimal(::Type{Float64}, value::AbstractString) = parse(Float64, value)
 @inline decimal(::Type{BigFloat}, value::AbstractString) = parse(BigFloat, value)
@@ -62,11 +78,18 @@ function close_encounter_problem(::Type{T}) where {T<:AbstractFloat}
     v2 = T[zero(T), -relative_speed / T(2), zero(T)]
     v3 = T[zero(T), zero(T), zero(T)]
 
+    system = ThreeBodySystem((m1, m2, m3); G=G)
     (
-        system=ThreeBodySystem((m1, m2, m3); G=G),
+        system=system,
         u0=statevector(r1, v1, r2, v2, r3, v3),
         tspan=(zero(T), decimal(T, "1.6")),
         nominal_periapsis=periapsis,
+        physical_parameters=(
+            masses=Tuple(system.masses),
+            gravitational_constant=system.G,
+            apoapsis=apoapsis,
+            third_body_offset=third_offset,
+        ),
     )
 end
 
@@ -314,7 +337,14 @@ function regularized_endpoint_time_report(automatic_segment, explicit_segment, e
     )
 end
 
-function run_cartesian(problem, times, reference_states)
+function run_cartesian(
+    problem,
+    times,
+    reference_states,
+    definition,
+    configuration,
+    environment,
+)
     elapsed = @elapsed result = simulate(
         problem.system,
         problem.u0,
@@ -327,6 +357,10 @@ function run_cartesian(problem, times, reference_states)
     states = result.solution.u
     (
         name="Cartesian",
+        definition=definition,
+        configuration=configuration,
+        environment=environment,
+        execution=ExecutionOutcome(actual_completed; exit_code=0),
         elapsed=elapsed,
         states=states,
         conservation=conservation_report(problem.system, times, states),
@@ -334,19 +368,26 @@ function run_cartesian(problem, times, reference_states)
         work=solution_work(result.solution),
         segments=1,
         switches=0,
-        transition_residual=0.0,
+        final_time=last(result.solution.t),
         state_at_time=time -> Vector{Float64}(result.solution(time)),
         result=result,
     )
 end
 
-function run_automatic(problem, times, reference_states)
+function run_automatic(
+    problem,
+    times,
+    reference_states,
+    definition,
+    configuration,
+    environment,
+)
     parameters = AutomaticSwitchingParameters(
         enter_threshold=ENTRY_THRESHOLD,
         exit_threshold=EXIT_THRESHOLD,
         ambiguity_threshold=EXIT_THRESHOLD,
-        minimum_separation_ratio=10.0,
-        maximum_switches=10,
+        minimum_separation_ratio=AUTOMATIC_MINIMUM_SEPARATION_RATIO,
+        maximum_switches=AUTOMATIC_MAXIMUM_SWITCHES,
     )
 
     elapsed = @elapsed trajectory = simulate_experimental_switching(
@@ -362,7 +403,7 @@ function run_automatic(problem, times, reference_states)
         regularized_kwargs=(
             reltol=REGULARIZED_TOLERANCE,
             abstol=REGULARIZED_TOLERANCE,
-            initial_step=0.1,
+            initial_step=REGULARIZED_INITIAL_STEP,
         ),
     )
     trajectory.status == :completed || error(
@@ -375,13 +416,17 @@ function run_automatic(problem, times, reference_states)
         include_switches=false,
         regularized_kwargs=(
             tolerance=EVALUATION_TOLERANCE,
-            max_iterations=256,
+            max_iterations=EVALUATION_MAX_ITERATIONS,
         ),
     )
     diagnostics = diagnostics_report(trajectory, samples)
 
     (
         name="Automatic switching",
+        definition=definition,
+        configuration=configuration,
+        environment=environment,
+        execution=ExecutionOutcome(actual_completed; exit_code=0),
         elapsed=elapsed,
         states=samples.states,
         conservation=conservation_report(problem.system, times, samples.states),
@@ -390,19 +435,28 @@ function run_automatic(problem, times, reference_states)
         segments=diagnostics.segment_count,
         switches=diagnostics.switch_count,
         transition_residual=diagnostics.maximum_transition_state_residual,
+        final_time=last(samples.times),
         state_at_time=time -> experimental_switching_state(
             trajectory,
             time;
             regularized_kwargs=(
                 tolerance=EVALUATION_TOLERANCE,
-                max_iterations=256,
+                max_iterations=EVALUATION_MAX_ITERATIONS,
             ),
         ),
         result=trajectory,
     )
 end
 
-function run_explicit(problem, times, reference_states, automatic)
+function run_explicit(
+    problem,
+    times,
+    reference_states,
+    automatic,
+    definition,
+    configuration,
+    environment,
+)
     entry_time = Float64(first_event(automatic.result, :entry).physical_time)
     exit_time = Float64(first_event(automatic.result, :exit).physical_time)
 
@@ -418,8 +472,8 @@ function run_explicit(problem, times, reference_states, automatic)
         cartesian_abstol=CARTESIAN_TOLERANCE,
         regularized_reltol=REGULARIZED_TOLERANCE,
         regularized_abstol=REGULARIZED_TOLERANCE,
-        regularized_initial_step=0.1,
-        regularized_max_iterations=256,
+        regularized_initial_step=REGULARIZED_INITIAL_STEP,
+        regularized_max_iterations=REGULARIZED_MAX_ITERATIONS,
     )
     states = [
         composed_regularized_state(
@@ -436,6 +490,10 @@ function run_explicit(problem, times, reference_states, automatic)
 
     (
         name="Explicit regularized",
+        definition=definition,
+        configuration=configuration,
+        environment=environment,
+        execution=ExecutionOutcome(actual_completed; exit_code=0),
         elapsed=elapsed,
         states=states,
         conservation=conservation_report(problem.system, times, states),
@@ -444,6 +502,7 @@ function run_explicit(problem, times, reference_states, automatic)
         segments=3,
         switches=2,
         transition_residual=transition_residual,
+        final_time=last(times),
         state_at_time=time -> composed_regularized_state(
             trajectory,
             time;
@@ -502,21 +561,56 @@ function print_method_table(cases)
         "handoff-resid",
     )
     for case in cases
+        transition_residual = hasproperty(case, :transition_residual) ?
+            @sprintf("%.3e", case.transition_residual) :
+            "-"
         @printf(
-            "%-21s %8d %8d %11d %11d %11d %13.3e\n",
+            "%-21s %8d %8d %11d %11d %11d %13s\n",
             case.name,
             case.segments,
             case.switches,
             case.work.accepted_steps,
             case.work.rejected_steps,
             case.work.saved_states,
-            case.transition_residual,
+            transition_residual,
         )
     end
 end
 
 problem = close_encounter_problem(Float64)
 times = sample_times(problem.tspan)
+experiment_configuration = ValidationFramework._close_encounter_configuration(
+    initial_state=Tuple(problem.u0),
+    masses=problem.physical_parameters.masses,
+    gravitational_constant=problem.physical_parameters.gravitational_constant,
+    apoapsis=problem.physical_parameters.apoapsis,
+    nominal_periapsis=problem.nominal_periapsis,
+    third_body_offset=problem.physical_parameters.third_body_offset,
+    reference_precision=REFERENCE_PRECISION,
+    sample_step=SAMPLE_STEP,
+    selected_pair=SELECTED_PAIR,
+    entry_threshold=ENTRY_THRESHOLD,
+    exit_threshold=EXIT_THRESHOLD,
+    cartesian_tolerance=CARTESIAN_TOLERANCE,
+    regularized_tolerance=REGULARIZED_TOLERANCE,
+    evaluation_tolerance=EVALUATION_TOLERANCE,
+    time_interval=problem.tspan,
+    automatic_ambiguity_threshold=EXIT_THRESHOLD,
+    automatic_minimum_separation_ratio=AUTOMATIC_MINIMUM_SEPARATION_RATIO,
+    automatic_maximum_switches=AUTOMATIC_MAXIMUM_SWITCHES,
+    regularized_initial_step=REGULARIZED_INITIAL_STEP,
+    regularized_max_iterations=REGULARIZED_MAX_ITERATIONS,
+    evaluation_max_iterations=EVALUATION_MAX_ITERATIONS,
+    reference_tolerance=REFERENCE_TOLERANCE,
+    automatic_maximum_state_error_limit=CLOSE_ENCOUNTER_AUTOMATIC_MAXIMUM_STATE_ERROR_LIMIT,
+    explicit_maximum_state_error_limit=CLOSE_ENCOUNTER_EXPLICIT_MAXIMUM_STATE_ERROR_LIMIT,
+    exit_state_agreement_limit=CLOSE_ENCOUNTER_EXIT_STATE_AGREEMENT_LIMIT,
+    explicit_exit_time_residual_limit=CLOSE_ENCOUNTER_EXPLICIT_EXIT_TIME_RESIDUAL_LIMIT,
+    automatic_periapsis_separation_error_limit=CLOSE_ENCOUNTER_AUTOMATIC_PERIAPSIS_ERROR_LIMIT,
+    explicit_periapsis_separation_error_limit=CLOSE_ENCOUNTER_EXPLICIT_PERIAPSIS_ERROR_LIMIT,
+    cartesian_under_resolution_minimum=CLOSE_ENCOUNTER_CARTESIAN_UNDER_RESOLUTION_MINIMUM,
+    automatic_improvement_ratio_limit=CLOSE_ENCOUNTER_AUTOMATIC_IMPROVEMENT_RATIO_LIMIT,
+)
 
 println("Computing independent BigFloat Cartesian reference...")
 reference_elapsed = @elapsed reference = setprecision(BigFloat, REFERENCE_PRECISION) do
@@ -527,8 +621,8 @@ reference_elapsed = @elapsed reference = setprecision(BigFloat, REFERENCE_PRECIS
         reference_problem.tspan;
         solver=:extreme,
         precision=REFERENCE_PRECISION,
-        reltol=parse(BigFloat, "1e-30"),
-        abstol=parse(BigFloat, "1e-30"),
+        reltol=parse(BigFloat, REFERENCE_TOLERANCE),
+        abstol=parse(BigFloat, REFERENCE_TOLERANCE),
         dense=true,
         save_everystep=true,
     )
@@ -536,9 +630,18 @@ end
 reference_states = [reference.solution(BigFloat(time)) for time in times]
 
 println("Computing Float64 comparison runs...")
-cartesian = run_cartesian(problem, times, reference_states)
-automatic = run_automatic(problem, times, reference_states)
-explicit = run_explicit(problem, times, reference_states, automatic)
+cartesian = run_cartesian(
+    problem, times, reference_states,
+    case_definition, experiment_configuration, experiment_environment,
+)
+automatic = run_automatic(
+    problem, times, reference_states,
+    case_definition, experiment_configuration, experiment_environment,
+)
+explicit = run_explicit(
+    problem, times, reference_states, automatic,
+    case_definition, experiment_configuration, experiment_environment,
+)
 cases = (cartesian, automatic, explicit)
 
 entry_time = first_event(automatic.result, :entry).physical_time
@@ -587,6 +690,20 @@ periapses = [
     )
     for case in cases
 ]
+periapsis_by_name = Dict(item.name => item.result for item in periapses)
+cases = Tuple(
+    (;
+        case...,
+        periapsis_time_error=abs(Float64(
+            periapsis_by_name[case.name].time - reference_periapsis.time,
+        )),
+        periapsis_separation_error=abs(Float64(
+            periapsis_by_name[case.name].separation - reference_periapsis.separation,
+        )),
+    )
+    for case in cases
+)
+cartesian, automatic, explicit = cases
 
 print_method_table(cases)
 
@@ -678,15 +795,6 @@ println("Regularized endpoint physical-time consistency")
 @printf("  automatic Sundman-time residual:         %.3e\n", endpoint_times.automatic_time_residual)
 @printf("  explicit Sundman-time residual:          %.3e\n", endpoint_times.explicit_time_residual)
 
-
-const CLOSE_ENCOUNTER_AUTOMATIC_MAXIMUM_STATE_ERROR_LIMIT = 1.0e-9
-const CLOSE_ENCOUNTER_EXPLICIT_MAXIMUM_STATE_ERROR_LIMIT = 1.0e-9
-const CLOSE_ENCOUNTER_EXIT_STATE_AGREEMENT_LIMIT = 1.0e-10
-const CLOSE_ENCOUNTER_EXPLICIT_EXIT_TIME_RESIDUAL_LIMIT = 5.0e-12
-const CLOSE_ENCOUNTER_AUTOMATIC_PERIAPSIS_ERROR_LIMIT = 1.0e-10
-const CLOSE_ENCOUNTER_EXPLICIT_PERIAPSIS_ERROR_LIMIT = 1.0e-10
-const CLOSE_ENCOUNTER_CARTESIAN_UNDER_RESOLUTION_MINIMUM = 1.0e-3
-const CLOSE_ENCOUNTER_AUTOMATIC_IMPROVEMENT_RATIO_LIMIT = 0.5
 
 function validate_close_encounter_comparison(
     cartesian,
@@ -794,7 +902,7 @@ if report_requested(protocol)
         reference_periapsis,
         periapses,
         endpoint_times,
-        current_validation_environment();
+        experiment_environment;
         automatic_maximum_state_error_limit=CLOSE_ENCOUNTER_AUTOMATIC_MAXIMUM_STATE_ERROR_LIMIT,
         explicit_maximum_state_error_limit=CLOSE_ENCOUNTER_EXPLICIT_MAXIMUM_STATE_ERROR_LIMIT,
         exit_state_agreement_limit=CLOSE_ENCOUNTER_EXIT_STATE_AGREEMENT_LIMIT,
@@ -803,15 +911,7 @@ if report_requested(protocol)
         explicit_periapsis_separation_error_limit=CLOSE_ENCOUNTER_EXPLICIT_PERIAPSIS_ERROR_LIMIT,
         cartesian_under_resolution_minimum=CLOSE_ENCOUNTER_CARTESIAN_UNDER_RESOLUTION_MINIMUM,
         automatic_improvement_ratio_limit=CLOSE_ENCOUNTER_AUTOMATIC_IMPROVEMENT_RATIO_LIMIT,
-        reference_precision=REFERENCE_PRECISION,
-        sample_step=SAMPLE_STEP,
-        selected_pair=SELECTED_PAIR,
-        entry_threshold=ENTRY_THRESHOLD,
-        exit_threshold=EXIT_THRESHOLD,
-        cartesian_tolerance=CARTESIAN_TOLERANCE,
-        regularized_tolerance=REGULARIZED_TOLERANCE,
-        evaluation_tolerance=EVALUATION_TOLERANCE,
-        time_interval=problem.tspan,
+        configuration=experiment_configuration,
     )
     exit_code = publish_case_result(protocol, structured_result; render=false)
     exit_code == 0 || exit(exit_code)

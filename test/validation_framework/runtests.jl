@@ -29,6 +29,8 @@ include("figure_eight_investigation.jl")
 
 include("hierarchical_triple_investigation.jl")
 
+include("close_encounter_investigation.jl")
+
 include("performance_presentation.jl")
 
 include("console_presentation.jl")

@@ -22,52 +22,39 @@ function _periapsis_by_name(periapses)
     Dict(item.name => item.result for item in periapses)
 end
 
-function build_close_encounter_case_result(
-    cartesian,
-    automatic,
-    explicit,
-    exit_difference,
-    reference_periapsis,
-    periapses,
-    endpoint_times,
-    environment::ValidationEnvironment;
-    automatic_maximum_state_error_limit,
-    explicit_maximum_state_error_limit,
-    exit_state_agreement_limit,
-    explicit_exit_time_residual_limit,
-    automatic_periapsis_separation_error_limit,
-    explicit_periapsis_separation_error_limit,
-    cartesian_under_resolution_minimum,
-    automatic_improvement_ratio_limit,
-    reference_precision,
-    sample_step,
-    selected_pair,
-    entry_threshold,
-    exit_threshold,
-    cartesian_tolerance,
-    regularized_tolerance,
-    evaluation_tolerance,
-    time_interval,
+function _close_encounter_configuration(;
+    initial_state,
+    masses,
+    gravitational_constant,
+    apoapsis,
+    nominal_periapsis,
+    third_body_offset,
+    reference_precision=256,
+    sample_step=0.002,
+    selected_pair=(1, 2),
+    entry_threshold=0.10,
+    exit_threshold=0.25,
+    cartesian_tolerance=1e-13,
+    regularized_tolerance=1e-12,
+    evaluation_tolerance=1e-14,
+    time_interval=(0.0, 1.6),
+    automatic_ambiguity_threshold=0.25,
+    automatic_minimum_separation_ratio=10.0,
+    automatic_maximum_switches=10,
+    regularized_initial_step=0.1,
+    regularized_max_iterations=256,
+    evaluation_max_iterations=256,
+    reference_tolerance="1e-30",
+    automatic_maximum_state_error_limit=1.0e-9,
+    explicit_maximum_state_error_limit=1.0e-9,
+    exit_state_agreement_limit=1.0e-10,
+    explicit_exit_time_residual_limit=5.0e-12,
+    automatic_periapsis_separation_error_limit=1.0e-10,
+    explicit_periapsis_separation_error_limit=1.0e-10,
+    cartesian_under_resolution_minimum=1.0e-3,
+    automatic_improvement_ratio_limit=0.5,
 )
-    periapsis = _periapsis_by_name(periapses)
-    automatic_periapsis = periapsis["Automatic switching"]
-    explicit_periapsis = periapsis["Explicit regularized"]
-    cartesian_periapsis = periapsis["Cartesian"]
-
-    automatic_periapsis_error = abs(Float64(
-        automatic_periapsis.separation - reference_periapsis.separation,
-    ))
-    explicit_periapsis_error = abs(Float64(
-        explicit_periapsis.separation - reference_periapsis.separation,
-    ))
-    cartesian_periapsis_error = abs(Float64(
-        cartesian_periapsis.separation - reference_periapsis.separation,
-    ))
-    automatic_improvement_ratio =
-        automatic.errors.maximum_combined / cartesian.errors.maximum_combined
-
-    builder = ValidationCaseResultBuilder(close_encounter_case_definition(), environment)
-    record_configuration!(builder, ValidationConfiguration(
+    ValidationConfiguration(
         solver=:method_comparison,
         absolute_tolerance=cartesian_tolerance,
         relative_tolerance=cartesian_tolerance,
@@ -90,7 +77,75 @@ function build_close_encounter_case_result(
             ValidationParameter(:cartesian_under_resolution_minimum, cartesian_under_resolution_minimum),
             ValidationParameter(:automatic_improvement_ratio_limit, automatic_improvement_ratio_limit),
         ),
+        parameters=(
+            ValidationParameter(:initial_state, initial_state),
+            ValidationParameter(:masses, masses),
+            ValidationParameter(:gravitational_constant, gravitational_constant),
+            ValidationParameter(:apoapsis, apoapsis),
+            ValidationParameter(:nominal_periapsis, nominal_periapsis),
+            ValidationParameter(:third_body_offset, third_body_offset),
+            ValidationParameter(:automatic_ambiguity_threshold, automatic_ambiguity_threshold),
+            ValidationParameter(:automatic_minimum_separation_ratio, automatic_minimum_separation_ratio),
+            ValidationParameter(:automatic_maximum_switches, automatic_maximum_switches),
+            ValidationParameter(:regularized_initial_step, regularized_initial_step),
+            ValidationParameter(:regularized_max_iterations, regularized_max_iterations),
+            ValidationParameter(:evaluation_max_iterations, evaluation_max_iterations),
+            ValidationParameter(:reference_tolerance, reference_tolerance),
+            ValidationParameter(:reference_solver, :extreme),
+            ValidationParameter(:reference_dense_output, true),
+            ValidationParameter(:reference_save_everystep, true),
+            ValidationParameter(:explicit_targeting_tolerance, :derived),
+        ),
+    )
+end
+
+function build_close_encounter_case_result(
+    cartesian,
+    automatic,
+    explicit,
+    exit_difference,
+    reference_periapsis,
+    periapses,
+    endpoint_times,
+    environment::ValidationEnvironment;
+    automatic_maximum_state_error_limit,
+    explicit_maximum_state_error_limit,
+    exit_state_agreement_limit,
+    explicit_exit_time_residual_limit,
+    automatic_periapsis_separation_error_limit,
+    explicit_periapsis_separation_error_limit,
+    cartesian_under_resolution_minimum,
+    automatic_improvement_ratio_limit,
+    configuration::ValidationConfiguration,
+)
+    periapsis = _periapsis_by_name(periapses)
+    automatic_periapsis = periapsis["Automatic switching"]
+    explicit_periapsis = periapsis["Explicit regularized"]
+    cartesian_periapsis = periapsis["Cartesian"]
+
+    automatic_periapsis_error = abs(Float64(
+        automatic_periapsis.separation - reference_periapsis.separation,
     ))
+    explicit_periapsis_error = abs(Float64(
+        explicit_periapsis.separation - reference_periapsis.separation,
+    ))
+    cartesian_periapsis_error = abs(Float64(
+        cartesian_periapsis.separation - reference_periapsis.separation,
+    ))
+    automatic_periapsis_time_error = abs(Float64(
+        automatic_periapsis.time - reference_periapsis.time,
+    ))
+    explicit_periapsis_time_error = abs(Float64(
+        explicit_periapsis.time - reference_periapsis.time,
+    ))
+    cartesian_periapsis_time_error = abs(Float64(
+        cartesian_periapsis.time - reference_periapsis.time,
+    ))
+    automatic_improvement_ratio =
+        automatic.errors.maximum_combined / cartesian.errors.maximum_combined
+
+    builder = ValidationCaseResultBuilder(close_encounter_case_definition(), environment)
+    record_configuration!(builder, configuration)
 
     metrics = (
         ValidationMetric(:automatic_maximum_state_error, "Automatic maximum state error", automatic.errors.maximum_combined;
@@ -107,6 +162,12 @@ function build_close_encounter_case_result(
             scale=scale_absolute, role=role_acceptance, aggregation=aggregation_final),
         ValidationMetric(:cartesian_periapsis_separation_error, "Cartesian periapsis separation error", cartesian_periapsis_error;
             scale=scale_absolute, role=role_acceptance, aggregation=aggregation_final),
+        ValidationMetric(:automatic_periapsis_time_error, "Automatic periapsis time error", automatic_periapsis_time_error;
+            scale=scale_duration, role=role_descriptive, aggregation=aggregation_final),
+        ValidationMetric(:explicit_periapsis_time_error, "Explicit periapsis time error", explicit_periapsis_time_error;
+            scale=scale_duration, role=role_descriptive, aggregation=aggregation_final),
+        ValidationMetric(:cartesian_periapsis_time_error, "Cartesian periapsis time error", cartesian_periapsis_time_error;
+            scale=scale_duration, role=role_descriptive, aggregation=aggregation_final),
         ValidationMetric(:automatic_to_cartesian_maximum_state_error_ratio, "Automatic-to-Cartesian maximum state-error ratio", automatic_improvement_ratio;
             scale=scale_relative, role=role_acceptance, aggregation=aggregation_none),
     )
