@@ -36,6 +36,7 @@ include("PerformanceRunner.jl")
 include("PerformanceBenchmarks.jl")
 include("SuiteRunner.jl")
 include("CoreBenchmarkCases.jl")
+include("FigureEightInvestigation.jl")
 include("CloseEncounterCase.jl")
 include("TripleCollisionCase.jl")
 include("RandomizedRegressionCase.jl")
@@ -161,6 +162,10 @@ export AbstractValidationMetric,
        declare_criterion!,
        evaluate_criteria!,
        figure_eight_case_definition,
+       FIGURE_EIGHT_INVESTIGATION_DEFINITION_VERSION,
+       FIGURE_EIGHT_INVESTIGATION_METRICS,
+       figure_eight_profile_investigation_definition,
+       figure_eight_profile_investigation_series,
        finish_execution!,
        evaluate_criteria,
        evaluate_criterion,

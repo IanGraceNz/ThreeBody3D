@@ -4,6 +4,7 @@ function _synthetic_benchmark_report(; name=:figure_eight, periodicity_error=1e-
         maximum_linear_momentum_drift=1e-14,
         maximum_angular_momentum_drift=1e-13,
         maximum_center_of_mass_residual=1e-14,
+        minimum_separation=0.69,
     )
     (
         name=name,
@@ -46,11 +47,12 @@ end
         :integration_status,
         :final_time_residual,
         :maximum_relative_energy_drift,
-        :maximum_linear_momentum_drift,
-        :maximum_angular_momentum_drift,
-        :maximum_center_of_mass_residual,
-        :periodicity_error,
-    )
+          :maximum_linear_momentum_drift,
+          :maximum_angular_momentum_drift,
+          :maximum_center_of_mass_residual,
+          :minimum_pair_separation,
+          :periodicity_error,
+      )
     @test all(criterion -> criterion.status == criterion_pass, figure.criteria)
     @test figure.solver_statistics.accepted_steps == 50
 

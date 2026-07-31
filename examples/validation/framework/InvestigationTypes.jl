@@ -78,6 +78,7 @@ struct InvestigationMeasurementPoint
     execution::ExecutionOutcome
     metrics::Tuple{Vararg{AbstractValidationMetric}}
     solver_statistics::Union{Nothing,SolverStatistics}
+    performance_report::Union{Nothing,PerformanceBenchmarkReport}
     notes::Union{Nothing,String}
 
     function InvestigationMeasurementPoint(
@@ -89,8 +90,12 @@ struct InvestigationMeasurementPoint
         execution::ExecutionOutcome,
         metrics,
         solver_statistics::Union{Nothing,SolverStatistics}=nothing;
+        performance_report=nothing,
         notes=nothing,
     )
+        isnothing(performance_report) || performance_report isa PerformanceBenchmarkReport || throw(
+            ArgumentError("performance_report must be a PerformanceBenchmarkReport record or nothing."),
+        )
         independent_value.parameter_id == definition.independent_variable || throw(
             ArgumentError("independent_value must use the definition's independent variable."),
         )
@@ -122,6 +127,7 @@ struct InvestigationMeasurementPoint
             execution,
             normalized_metrics,
             solver_statistics,
+            performance_report,
             isnothing(notes) ? nothing : _nonempty_string(notes, "notes"),
         )
     end

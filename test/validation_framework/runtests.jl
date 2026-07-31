@@ -25,6 +25,8 @@ include("performance_series.jl")
 
 include("investigation_types.jl")
 
+include("figure_eight_investigation.jl")
+
 include("performance_presentation.jl")
 
 include("console_presentation.jl")

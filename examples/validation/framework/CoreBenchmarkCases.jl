@@ -125,6 +125,11 @@ function _record_common_benchmark_metrics!(builder, report)
         report.diagnostics.maximum_center_of_mass_residual;
         scale=scale_absolute, role=role_acceptance, aggregation=aggregation_maximum,
     ))
+    record_metric!(builder, ValidationMetric(
+        :minimum_pair_separation, "Minimum pair separation",
+        report.diagnostics.minimum_separation;
+        scale=scale_dimensional, role=role_descriptive, aggregation=aggregation_minimum,
+    ))
     builder
 end
 
