@@ -40,6 +40,8 @@ include("FigureEightInvestigation.jl")
 include("HierarchicalTripleInvestigation.jl")
 include("CoreToleranceInvestigation.jl")
 include("CoreDurationSamplingInvestigation.jl")
+include("FigureEightPrecisionInvestigation.jl")
+include("PrecisionTriggerSerialization.jl")
 include("CloseEncounterCase.jl")
 include("CloseEncounterInvestigation.jl")
 include("TripleCollisionCase.jl")
@@ -224,6 +226,26 @@ export AbstractValidationMetric,
        core_duration_sampling_performance_operation,
        core_duration_sampling_performance_entry,
        decode_core_duration_sampling_benchmark_id,
+       FIGURE_EIGHT_PRECISION_BITS,
+       FigureEightPrecisionTriggerAssessment,
+       evaluate_figure_eight_precision_trigger,
+       write_figure_eight_precision_trigger,
+       figure_eight_precision_trigger_text,
+       read_figure_eight_precision_trigger,
+       write_figure_eight_precision_trigger_atomic,
+       FigureEightPrecisionConfiguration,
+       FigureEightPrecisionEvidence,
+       FigureEightPrecisionAttempt,
+       figure_eight_precision_configuration,
+       run_figure_eight_precision_observation,
+       attempt_figure_eight_precision,
+       figure_eight_precision_investigation_definition,
+       figure_eight_precision_investigation_series,
+       figure_eight_precision_performance_id,
+       figure_eight_precision_performance_definition,
+       figure_eight_precision_performance_operation,
+       figure_eight_precision_performance_entry,
+       decode_figure_eight_precision_id,
        CLOSE_ENCOUNTER_INVESTIGATION_DEFINITION_VERSION,
        CLOSE_ENCOUNTER_INVESTIGATION_METRICS,
        close_encounter_representation_investigation_definition,

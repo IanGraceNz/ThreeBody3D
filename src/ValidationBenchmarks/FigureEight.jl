@@ -41,18 +41,13 @@ function _figure_eight_canonical_inputs(precision::Integer)
     end
 end
 
-function _solve_figure_eight_benchmark(
-    periods::Integer,
-    solver::Symbol,
-    saveat::Real;
-    kwargs...,
-)
-    system, u0, period = _figure_eight_benchmark_inputs()
-    expected_final_time = periods * period
+function _solve_figure_eight_benchmark_inputs(inputs, periods::Integer,
+    solver::Symbol, saveat::Real; kwargs...)
+    expected_final_time = inputs.initial_time + periods * inputs.period
     result = simulate(
-        system,
-        u0,
-        (zero(period), expected_final_time);
+        inputs.system,
+        inputs.initial_state,
+        (inputs.initial_time, expected_final_time);
         solver,
         saveat,
         kwargs...,
@@ -78,6 +73,36 @@ function _solve_figure_eight_benchmark(
         Int(stats.nf),
     )
     (; report, result)
+end
+
+
+function _solve_figure_eight_benchmark(periods::Integer, solver::Symbol,
+    saveat::Real; kwargs...)
+    system, initial_state, period = _figure_eight_benchmark_inputs()
+    inputs = (; system, initial_state, initial_time=zero(period), period)
+    _solve_figure_eight_benchmark_inputs(inputs, periods, solver, saveat; kwargs...)
+end
+
+function _solve_figure_eight_precision_benchmark(precision_bits::Integer)
+    setprecision(BigFloat, precision_bits) do
+        inputs = _figure_eight_canonical_inputs(precision_bits)
+        calculation = _solve_figure_eight_benchmark_inputs(inputs, 10, :extreme,
+            inputs.saveat; reltol=inputs.tolerance, abstol=inputs.tolerance,
+            precision=precision_bits)
+        (; calculation..., inputs)
+    end
+end
+
+function _run_figure_eight_precision_benchmark(precision_bits::Integer;
+    calculator=_solve_figure_eight_precision_benchmark)
+    calculator(precision_bits).report
+end
+
+function _run_figure_eight_precision_benchmark_observation(precision_bits::Integer;
+    calculator=_solve_figure_eight_precision_benchmark,
+    observer=_snapshot_figure_eight_precision_observation)
+    calculation = calculator(precision_bits)
+    observer(calculation.report, calculation.result, calculation.inputs)
 end
 
 _run_figure_eight_benchmark(args...; kwargs...) =

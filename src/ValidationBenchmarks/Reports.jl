@@ -39,6 +39,16 @@ struct CoreValidationBenchmarkObservation{R,T,Y,U}
     initial_state::U
 end
 
+"""Repository-internal canonical arbitrary-precision figure-eight observation."""
+struct FigureEightPrecisionObservation{R,T,Y,U,C}
+    report::R
+    times::T
+    system::Y
+    initial_state::U
+    canonical::C
+    precision_bits::Int
+end
+
 function _snapshot_core_validation_execution(report, result)
     CoreValidationBenchmarkExecution(
         report,
@@ -53,6 +63,11 @@ end
 function _snapshot_core_validation_observation(report, result)
     CoreValidationBenchmarkObservation(
         report, copy(result.solution.t), result.system, copy(first(result.solution.u)))
+end
+
+function _snapshot_figure_eight_precision_observation(report, result, inputs)
+    FigureEightPrecisionObservation(report, copy(result.solution.t), result.system,
+        copy(first(result.solution.u)), inputs.canonical, inputs.precision_bits)
 end
 
 function Base.show(io::IO, report::ValidationBenchmarkReport)
