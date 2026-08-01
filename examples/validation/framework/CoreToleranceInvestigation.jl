@@ -92,6 +92,8 @@ struct CoreToleranceAttempt
         if isnothing(evidence)
             execution.actual in (actual_completed, actual_terminated) && throw(ArgumentError(
                 "Completed or terminated direct outcomes require retained benchmark evidence."))
+            isnothing(execution.summary) && throw(ArgumentError(
+                "A direct outcome without evidence requires a factual execution summary."))
         else
             evidence.configuration == configuration || throw(ArgumentError(
                 "Attempt evidence configuration differs from the declared configuration."))
@@ -168,24 +170,34 @@ function _core_characteristic_scales(system, initial_state)
     )
 end
 
-function _validate_core_trajectory(execution::CoreToleranceExecution)
-    isempty(execution.times) && throw(ArgumentError("Saved trajectory has no final state."))
-    length(execution.times) == length(execution.states) || throw(ArgumentError("Saved time/state lengths differ."))
-    all(isfinite, execution.times) || throw(ArgumentError("Saved times must be finite."))
-    all(time -> time isa Float64, execution.times) || throw(ArgumentError(
+function _core_scalar_saveat_grid(final_time::Float64, saveat::Float64)
+    times = vcat(0.0, collect(saveat:saveat:final_time))
+    last(times) == final_time || push!(times, final_time)
+    times
+end
+
+function _validate_core_saved_times(times, report, saveat)
+    isempty(times) && throw(ArgumentError("Saved physical-time grid is empty."))
+    all(isfinite, times) || throw(ArgumentError("Saved times must be finite."))
+    all(time -> time isa Float64, times) || throw(ArgumentError(
         "Approved core saved times must use Float64 arithmetic."))
+    all(times[index] < times[index + 1] for index in 1:length(times)-1) ||
+        throw(ArgumentError("Saved times must be strictly increasing."))
+    first(times) == 0.0 || throw(ArgumentError("Saved trajectory must begin at the approved initial time."))
+    last(times) == report.final_time || throw(ArgumentError("Achieved final time differs from the saved grid."))
+    expected = _core_scalar_saveat_grid(report.final_time, saveat)
+    times == expected || throw(ArgumentError("Saved trajectory does not use the exact approved physical-time grid."))
+    nothing
+end
+
+function _validate_core_trajectory(execution::CoreToleranceExecution)
+    length(execution.times) == length(execution.states) || throw(ArgumentError("Saved time/state lengths differ."))
+    _validate_core_saved_times(execution.times, execution.report,
+        execution.configuration.saveat)
     all(state -> length(state) == ThreeBody3D.STATE_SIZE && all(isfinite, state), execution.states) ||
         throw(ArgumentError("Saved states must be finite physical states."))
     all(state -> eltype(state) == Float64, execution.states) || throw(ArgumentError(
         "Approved core saved states must use Float64 arithmetic."))
-    all(execution.times[index] < execution.times[index + 1]
-        for index in 1:length(execution.times)-1) ||
-        throw(ArgumentError("Saved times must be strictly increasing."))
-    first(execution.times) == 0.0 || throw(ArgumentError("Saved trajectory must begin at the approved initial time."))
-    last(execution.times) == execution.report.final_time || throw(ArgumentError("Achieved final time differs from the trajectory."))
-    expected = collect(0.0:execution.configuration.saveat:execution.report.final_time)
-    last(expected) == execution.report.final_time || push!(expected, execution.report.final_time)
-    execution.times == expected || throw(ArgumentError("Saved trajectory does not use the exact approved physical-time grid."))
     nothing
 end
 
@@ -423,9 +435,16 @@ function _core_combined_execution(direct::ExecutionOutcome, performance::Executi
     performance
 end
 
+function _core_direct_attempt_detail(attempt)
+    notes, summary = attempt.notes, attempt.execution.summary
+    isnothing(notes) && return summary
+    (isnothing(summary) || notes == summary) ? notes : "$notes; $summary"
+end
+
 function _core_attempt_notes(attempt::CoreToleranceAttempt, performance::PerformanceBenchmarkReport)
     parts = String[]
-    !isnothing(attempt.notes) && push!(parts, "Direct execution: $(attempt.notes)")
+    direct_summary = _core_direct_attempt_detail(attempt)
+    !isnothing(direct_summary) && push!(parts, "Direct execution: $direct_summary")
     !isnothing(performance.execution.summary) && push!(parts,
         "Performance execution: $(performance.execution.summary)")
     isempty(parts) ? nothing : join(parts, "; ")

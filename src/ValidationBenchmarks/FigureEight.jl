@@ -88,3 +88,10 @@ function _run_figure_eight_benchmark_execution(args...;
     calculation = _solve_figure_eight_benchmark(args...; kwargs...)
     snapshotter(calculation.report, calculation.result)
 end
+
+
+function _run_figure_eight_benchmark_observation(args...;
+    observer=_snapshot_core_validation_observation, kwargs...)
+    calculation = _solve_figure_eight_benchmark(args...; kwargs...)
+    observer(calculation.report, calculation.result)
+end

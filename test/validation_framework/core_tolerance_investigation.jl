@@ -60,9 +60,7 @@ function _core_fixture_execution(family, algorithm, tolerance;
     final_time = family == :figure_eight ?
         ValidationFramework.ThreeBody3D.FIGURE_EIGHT_PERIOD * 10 : 100.0
     if isnothing(times)
-        saved = collect(0.0:0.02:final_time)
-        last(saved) == final_time || push!(saved, final_time)
-        times = saved
+        times = ValidationFramework._core_scalar_saveat_grid(final_time, 0.02)
     end
     states = [begin
         state = copy(initial)
@@ -102,6 +100,24 @@ end
     @test definition.independent_variable == :integration_tolerance
     @test definition.optional_metric_ids == CORE_TOLERANCE_COMPARISON_METRICS
     @test figure_eight_profile_investigation_definition().family_id == :figure_eight_profile
+    expected_figure_eight = ValidationCaseDefinition(:figure_eight,
+        "Figure-eight validation benchmark",
+        "Strongly coupled periodic equal-mass three-body choreography propagated for ten periods.",
+        (:periodic_orbit, :conservation, :reference_state),
+        (:figure_eight, :core_benchmark), "examples/validation/figure_eight_benchmark.jl",
+        (:standard,), expected_completed, true, "1.0.0",
+        "V0_5_VALIDATION_ARCHITECTURE_DESIGN.md")
+    expected_hierarchy = ValidationCaseDefinition(:hierarchical_triple,
+        "Hierarchical-triple validation benchmark",
+        "Long-duration weakly perturbed hierarchical triple with conservation and hierarchy checks.",
+        (:hierarchical_system, :conservation, :multiscale),
+        (:hierarchical_triple, :core_benchmark),
+        "examples/validation/hierarchical_triple_benchmark.jl", (:standard,),
+        expected_completed, true, "1.0.0", "V0_5_VALIDATION_ARCHITECTURE_DESIGN.md")
+    @test ValidationFramework._record_fields_equal(figure_eight_case_definition(),
+        expected_figure_eight)
+    @test ValidationFramework._record_fields_equal(hierarchical_triple_case_definition(),
+        expected_hierarchy)
 end
 
 @testset "Core tolerance point-contract validation" begin
@@ -207,6 +223,13 @@ end
         ExecutionOutcome(actual_completed; exit_code=0))
     @test_throws ArgumentError CoreToleranceAttempt(configuration,
         ExecutionOutcome(actual_terminated; exit_code=1, summary="missing evidence"))
+    @test_throws ArgumentError CoreToleranceAttempt(configuration,
+        ExecutionOutcome(actual_stopped; exit_code=1))
+    @test_throws ArgumentError CoreToleranceAttempt(configuration,
+        ExecutionOutcome(actual_errored; exit_code=1))
+    explained = CoreToleranceAttempt(configuration,
+        ExecutionOutcome(actual_errored; exit_code=1, summary="integration failed"))
+    @test explained.execution.summary == "integration failed"
     @test_throws ArgumentError CoreToleranceAttempt(configuration,
         ExecutionOutcome(actual_errored; exit_code=1, summary="wrong"), completed_evidence)
     @test_throws ArgumentError CoreToleranceAttempt(configuration,
@@ -475,6 +498,34 @@ end
         @test all(id -> id ∉ map(metric -> metric.metric_id, partial.points[2].metrics),
             CORE_TOLERANCE_COMPARISON_METRICS)
     end
+end
+
+@testset "Core tolerance direct summary notes" begin
+    family, algorithm = :figure_eight, :tsit5
+    environment = _pilot_environment()
+    executions = Tuple(_core_fixture_execution(family, algorithm, tolerance)
+        for tolerance in CORE_TOLERANCE_VALUES)
+    attempts = collect(map(_core_attempt, executions))
+    terminated_summary = "direct tolerance benchmark terminated"
+    terminated_evidence = _core_fixture_execution(family, algorithm,
+        CORE_TOLERANCE_VALUES[2]; status=:terminated_close_approach)
+    attempts[2] = CoreToleranceAttempt(terminated_evidence.configuration,
+        ExecutionOutcome(actual_terminated; exit_code=1, summary=terminated_summary),
+        terminated_evidence)
+    errored_summary = "direct tolerance integration failed"
+    attempts[3] = CoreToleranceAttempt(executions[3].configuration,
+        ExecutionOutcome(actual_errored; exit_code=1, summary=errored_summary))
+    series = core_tolerance_investigation_series(
+        _core_performance_suite(family, algorithm, environment), Tuple(attempts))
+    @test series.points[2].notes == "Direct execution: $terminated_summary"
+    @test series.points[3].notes == "Direct execution: $errored_summary"
+
+    attempts[2] = CoreToleranceAttempt(terminated_evidence.configuration,
+        ExecutionOutcome(actual_terminated; exit_code=1, summary=terminated_summary),
+        terminated_evidence; notes=terminated_summary)
+    duplicate_series = core_tolerance_investigation_series(
+        _core_performance_suite(family, algorithm, environment), Tuple(attempts))
+    @test length(findall(terminated_summary, duplicate_series.points[2].notes)) == 1
 end
 
 @testset "Parameterized core performance identity" begin

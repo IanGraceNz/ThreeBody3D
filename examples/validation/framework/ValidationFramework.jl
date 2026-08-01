@@ -39,6 +39,7 @@ include("CoreBenchmarkCases.jl")
 include("FigureEightInvestigation.jl")
 include("HierarchicalTripleInvestigation.jl")
 include("CoreToleranceInvestigation.jl")
+include("CoreDurationSamplingInvestigation.jl")
 include("CloseEncounterCase.jl")
 include("CloseEncounterInvestigation.jl")
 include("TripleCollisionCase.jl")
@@ -205,6 +206,24 @@ export AbstractValidationMetric,
        core_tolerance_performance_operation,
        core_tolerance_performance_entry,
        decode_core_tolerance_benchmark_id,
+       CORE_DURATION_PERIODS,
+       CORE_DURATION_VALUES,
+       CORE_DIAGNOSTIC_SAVEATS,
+       CoreDurationSamplingConfiguration,
+       CoreBenchmarkObservation,
+       CoreDurationSamplingAttempt,
+       investigation_2_figure_eight_case_definition,
+       investigation_2_hierarchical_triple_case_definition,
+       core_duration_sampling_configuration,
+       run_core_benchmark_observation,
+       attempt_core_benchmark_observation,
+       core_duration_sampling_investigation_definition,
+       core_duration_sampling_investigation_series,
+       core_duration_sampling_performance_benchmark_id,
+       core_duration_sampling_performance_definition,
+       core_duration_sampling_performance_operation,
+       core_duration_sampling_performance_entry,
+       decode_core_duration_sampling_benchmark_id,
        CLOSE_ENCOUNTER_INVESTIGATION_DEFINITION_VERSION,
        CLOSE_ENCOUNTER_INVESTIGATION_METRICS,
        close_encounter_representation_investigation_definition,

@@ -31,6 +31,14 @@ struct CoreValidationBenchmarkExecution{R,T,S,Y,U}
     initial_state::U
 end
 
+"""Repository-internal benchmark result retaining only direct grid evidence."""
+struct CoreValidationBenchmarkObservation{R,T,Y,U}
+    report::R
+    times::T
+    system::Y
+    initial_state::U
+end
+
 function _snapshot_core_validation_execution(report, result)
     CoreValidationBenchmarkExecution(
         report,
@@ -39,6 +47,12 @@ function _snapshot_core_validation_execution(report, result)
         result.system,
         copy(first(result.solution.u)),
     )
+end
+
+
+function _snapshot_core_validation_observation(report, result)
+    CoreValidationBenchmarkObservation(
+        report, copy(result.solution.t), result.system, copy(first(result.solution.u)))
 end
 
 function Base.show(io::IO, report::ValidationBenchmarkReport)
