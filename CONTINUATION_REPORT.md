@@ -1,6 +1,6 @@
 # ThreeBody3D Continuation Report
 
-**Report date:** 1 August 2026
+**Report date:** 2 August 2026
 **Local time zone:** Pacific/Auckland
 **Repository:** `https://github.com/IanGraceNz/ThreeBody3D`
 **Local repository path:** `C:\Dev\ThreeBody3D`
@@ -10,32 +10,73 @@
 
 ## 1. Purpose of This Report
 
-This report records the exact state of the ThreeBody3D project at the end of the current development session. It is intended to permit work to resume in a new ChatGPT conversation without losing project context, design intent, implementation history, validation results, or the current Git checkpoint.
+This report records the exact state of the ThreeBody3D project at the end of the current development session.
 
-The current repository should be uploaded at the beginning of the next conversation before any file is inspected or modified. Do not reconstruct or guess current file contents from this report.
+It is intended to permit development to resume in a new ChatGPT conversation without losing:
+
+* project objectives;
+* scientific priorities;
+* approved design decisions;
+* implementation history;
+* validation results;
+* Git state;
+* the exact point reached in the approved Investigation 2 plan; or
+* constraints that must be preserved during the next implementation increment.
+
+At the beginning of the next conversation, upload the then-current repository archive before asking for source inspection or modification.
+
+Do not reconstruct or guess current file contents from this report. The repository itself remains authoritative for implementation details.
 
 ---
 
-## 2. Current Repository State
+## 2. Exact Repository State
 
-The latest commit is:
+### 2.1 Current local commit
+
+The latest local commit is:
 
 ```text
-aa87ff1 Add KS switching Investigation 1 pilot adapter
+e968c1d Add conditional figure-eight precision investigation
 ```
 
-The latest branch state reported by Git is:
+### 2.2 Current remote state
+
+At the time this report was requested:
+
+```text
+origin/v0.5-development = 767bba5
+local v0.5-development  = e968c1d
+```
+
+Therefore, before this continuation report is committed:
+
+* the local branch is one commit ahead of the remote;
+* commit `e968c1d` has not yet been pushed;
+* the working tree is clean;
+* there are no staged changes;
+* there are no untracked files.
+
+The reported Git state immediately after committing I2-B3 was:
 
 ```text
 On branch v0.5-development
-Your branch is up to date with 'origin/v0.5-development'.
+Your branch is ahead of 'origin/v0.5-development' by 1 commit.
+  (use "git push" to publish your local commits)
 
 nothing to commit, working tree clean
 ```
 
-The latest five commits are:
+### 2.3 Latest commits
+
+The latest commits are:
 
 ```text
+e968c1d Add conditional figure-eight precision investigation
+767bba5 Add core duration and sampling investigations
+002fe90 Add core tolerance investigation foundation
+a5f6f59 Approve Investigation 2 experimental plan
+212465c Add Investigation 1 baseline execution and reporting
+10ffc32 Update Continuation Report CONTINUATION_REPORT.md
 aa87ff1 Add KS switching Investigation 1 pilot adapter
 6ef5489 Add close-encounter Investigation 1 pilot adapter
 bff7a94 Add hierarchical-triple Investigation 1 pilot adapter
@@ -43,19 +84,29 @@ bff7a94 Add hierarchical-triple Investigation 1 pilot adapter
 dbe61c0 Add Investigation 1 record types
 ```
 
-Commit `aa87ff1` has been pushed successfully:
+### 2.4 Expected Git action after copying this report
 
-```text
-6ef5489..aa87ff1  v0.5-development -> v0.5-development
+After replacing `CONTINUATION_REPORT.md` with this text, the intended commands are:
+
+```powershell
+git add CONTINUATION_REPORT.md
+git commit -m "Update Continuation Report"
+git push
 ```
 
-Therefore:
+That push should publish both:
 
-* local `HEAD` and `origin/v0.5-development` both point to `aa87ff1`;
-* the working tree is clean;
-* there are no staged or unstaged changes;
-* there are no untracked files;
-* there is no outstanding commit or push.
+* `e968c1d Add conditional figure-eight precision investigation`; and
+* the new continuation-report commit.
+
+After the push, verify:
+
+```powershell
+git status
+git log -5 --oneline
+```
+
+The expected final state is a clean working tree with local and remote `v0.5-development` synchronized.
 
 ---
 
@@ -63,7 +114,7 @@ Therefore:
 
 ThreeBody3D is a Julia package for solving three-dimensional three-body initial-value problems.
 
-The project’s primary purpose is to produce increasingly accurate, robust, and scientifically defensible three-body solutions.
+Its primary purpose is to produce increasingly accurate, robust, and scientifically defensible three-body solutions.
 
 The agreed priorities are:
 
@@ -72,36 +123,40 @@ The agreed priorities are:
 3. **Robust handling of close encounters and singular behaviour**
 4. **Ease of use**
 5. **Simplicity**
-6. **Clean, modular architecture**
-7. **Performance only where it does not compromise the preceding goals**
+6. **Clean and modular architecture**
+7. **Performance where it does not compromise the preceding goals**
 
-Validation, benchmarking, baseline approval, reporting, and investigation infrastructure are supporting tools. They are justified only insofar as they help:
+Validation, benchmarking, reference records, reporting, and investigation infrastructure are supporting tools rather than the project’s primary purpose.
 
-* discover better regularization methods;
-* expose numerical weaknesses;
-* compare alternative formulations truthfully;
-* improve solution accuracy and quality.
+Infrastructure work is justified only when it helps:
 
-The project should not become primarily an infrastructure project.
+* identify numerical weaknesses;
+* distinguish genuine accuracy improvements from attractive diagnostics;
+* compare alternative formulations fairly;
+* discover better regularisation methods;
+* improve the accuracy and quality of physical solutions; or
+* avoid implementing changes that are unsupported by evidence.
 
 The governing principle remains:
 
 > Each successive iteration should genuinely improve the accuracy and quality of ThreeBody3D.
 
+“No change” is an acceptable scientific conclusion when controlled evidence does not justify an implementation change.
+
 ---
 
 ## 4. Development and Review Workflow
 
-The established workflow should continue.
+### 4.1 Repository inspection
 
-### 4.1 File handling
+Before modifying files in a new conversation:
 
-Before inspecting or modifying code in a new conversation:
-
-* request or use the current repository archive uploaded by the user;
-* inspect the real files;
-* do not reconstruct files from memory, excerpts, old diffs, or this report;
-* do not assume an earlier repository archive is still current.
+* upload the latest repository;
+* inspect the real current files;
+* read the relevant approved design document;
+* determine the next approved stage from that design document;
+* do not infer the next stage from this continuation report alone;
+* do not reconstruct source files from memory, old patches, excerpts, or previous archives.
 
 ### 4.2 Change discipline
 
@@ -110,15 +165,21 @@ Changes should be:
 * small;
 * design-led;
 * scientifically motivated;
+* narrowly scoped;
 * fully documented;
-* covered by focused unit tests;
-* followed by the full package test suite;
-* committed separately by logical stage.
+* covered by focused tests;
+* followed by the complete package test suite;
+* committed separately by logical increment.
+
+Do not combine unrelated cleanup with scientific implementation work.
+
+### 4.3 Review and Git workflow
 
 Before committing:
 
 ```powershell
 git diff --check
+git status
 git diff --stat
 git diff
 ```
@@ -128,6 +189,7 @@ After staging:
 ```powershell
 git diff --cached --check
 git diff --cached --stat
+git diff --cached
 ```
 
 After committing:
@@ -137,914 +199,1616 @@ git status
 git log -5 --oneline
 ```
 
-The user normally performs Git commands locally after reviewing the complete diff.
+The user normally performs all staging, commit, and push operations locally after reviewing the complete diff.
 
-### 4.3 Validation expectations
+Do not stage, commit, amend, reset, rebase, or push unless expressly instructed.
 
-For significant validation or benchmark adapters, run:
+### 4.4 Test expectations
 
-* focused validation-framework tests;
+For a significant validation or investigation increment, run:
+
+* the focused validation-framework suite;
 * full `Pkg.test()`;
-* the complete affected standalone benchmark, not merely a syntax check;
+* affected standalone benchmarks;
+* representative direct smoke executions;
+* representative process-isolated performance children;
 * `git diff --check`.
 
-Successful syntax parsing is not a substitute for executing a benchmark.
+A syntax check is not a substitute for running the affected benchmark.
 
-### 4.4 Commit history
+### 4.5 Historical commits
 
 Do not amend or alter established historical commits unless expressly instructed.
 
-In particular, earlier instructions required that commit `026b393` not be amended or altered.
+Earlier instructions specifically required that commit `026b393` not be amended or changed.
 
 ---
 
 ## 5. Development Environment
 
-The user works primarily with:
+The user’s primary environment is:
 
 * Windows;
 * PowerShell;
 * Visual Studio Code;
 * Julia 1.12.5;
 * Git command-line tools;
-* repository path `C:\Dev\ThreeBody3D`.
+* local path `C:\Dev\ThreeBody3D`.
 
-Typical package test command:
+Typical full test command:
 
 ```powershell
 julia --project=. -e "using Pkg; Pkg.test()"
 ```
 
-A recurring manifest-resolution warning appears during the full package test. It is already known. The package test nevertheless completes successfully with the ThreeBody3D tests passing.
+A known manifest-resolution recommendation may appear during `Pkg.test()`.
 
-This warning should not be treated as a newly introduced failure unless its behaviour changes.
+It has appeared repeatedly without causing test failure. No dependency files were changed during the recent Investigation 2 increments.
+
+Treat the warning as pre-existing unless its content or consequences change.
 
 ---
 
-## 6. Current Investigation 1 Design Basis
+## 6. Authoritative Design Documents
 
-The relevant design document is:
+### 6.1 Investigation 1
+
+The authoritative Investigation 1 design is:
 
 ```text
 docs/design/V0_6_INVESTIGATION_1_MEASUREMENT_PLAN.md
 ```
 
-The Investigation 1 implementation has been developed in four pilot regimes:
+Investigation 1 is complete.
 
-1. Figure-eight
-2. Hierarchical triple
-3. Close encounter
-4. KS/Levi-Civita automatic-switching comparison
+### 6.2 Investigation 2
 
-The Investigation 1 work is structured around immutable records representing:
+The authoritative Investigation 2 design is:
 
-* an investigation definition;
-* one measurement point;
-* an explicitly ordered measurement series.
+```text
+docs/design/V0_6_INVESTIGATION_2_EXPERIMENTAL_PLAN.md
+```
 
-Each measurement point may retain:
+It was approved and committed as:
 
-* controlled configuration;
-* environment and provenance;
-* execution outcome;
-* metrics;
-* solver statistics;
-* performance measurements;
-* experiment-specific supporting evidence.
+```text
+a5f6f59 Approve Investigation 2 experimental plan
+```
 
-The implementation deliberately distinguishes:
+This document, not this continuation report, determines:
 
-* execution failure;
-* acceptance failure;
-* unavailable evidence;
-* not-applicable evidence;
-* successful measurements.
+* the scientific hypotheses;
+* approved point values;
+* fixed controls;
+* experimental stages;
+* interpretation rules;
+* completion criteria;
+* prohibited conclusions.
 
-Unavailable or inapplicable measurements must not be represented with fabricated zeroes, infinities, `NaN`, or other numerical sentinels.
+The approved implementation stages are:
+
+```text
+I2-A — Experimental-plan approval
+I2-B — Core integration experiments
+I2-C — Close-encounter decomposition
+I2-D — KS backend localisation
+I2-E — Explanatory execution and report
+```
+
+Stage I2-A is complete.
+
+Work remains within Stage I2-B.
+
+Do not begin I2-C until the remaining I2-B integration work has been reviewed, committed, and published.
 
 ---
 
-## 7. Investigation 1 Record Types
+## 7. Completed Investigation 1 Programme
 
-### Commit
+Investigation 1 established a structured factual baseline without attempting causal explanation.
+
+### 7.1 Record types
+
+Commit:
 
 ```text
 dbe61c0 Add Investigation 1 record types
 ```
 
-### Main types
+The validation framework contains immutable records for:
 
-The validation framework now contains immutable types representing:
+* `InvestigationDefinition`;
+* `InvestigationMeasurementPoint`;
+* `InvestigationMeasurementSeries`.
 
-* `InvestigationDefinition`
-* `InvestigationMeasurementPoint`
-* `InvestigationMeasurementSeries`
+These records preserve:
 
-The records enforce:
-
-* benchmark identity and version;
-* one declared independent variable;
+* benchmark identity;
+* independent variable;
 * fixed controls;
-* required and optional metric identifiers;
-* deterministic point ordering;
-* configuration and provenance consistency;
-* completed-point evidence requirements;
-* factual retention of unsuccessful attempts.
+* ordered point identity;
+* configuration;
+* environment and provenance;
+* execution outcome;
+* direct metrics;
+* solver statistics;
+* performance reports;
+* optional supporting evidence;
+* factual notes.
 
-### Supporting evidence extension
+Unavailable or inapplicable measurements are omitted rather than represented by fabricated zeroes, `NaN`, infinity, or empty numerical sentinels.
 
-Commit `aa87ff1` extended `InvestigationMeasurementPoint` with:
+### 7.2 Pilot adapters
 
-```julia
-supporting_evidence
-```
-
-This permits an immutable experiment-specific report to remain attached to a measurement point when generic metrics and solver statistics cannot represent all raw observations.
-
-This was required for the KS switching pilot so that the resulting series retains structural access to:
-
-* sampled states and times;
-* switch events;
-* decisions;
-* competition evidence;
-* progress evidence;
-* crossing observations;
-* backend execution records.
-
-The generic field is currently typed as `Any` so experiment-specific immutable report types can be retained without changing the common record for every experiment.
-
----
-
-## 8. Figure-Eight Investigation Pilot
-
-### Commit
+The four Investigation 1 pilot adapters were completed in:
 
 ```text
 822f156 Add figure-eight Investigation 1 pilot adapter
-```
-
-### Experiment
-
-The figure-eight pilot compares the existing solver profiles:
-
-```text
-:fast
-:accurate
-```
-
-The experiment uses:
-
-* the existing figure-eight benchmark;
-* ten periods;
-* `saveat = 0.02`;
-* explicitly ordered points;
-* existing accuracy and performance infrastructure.
-
-### Retained evidence
-
-The adapter retains applicable evidence including:
-
-* periodicity error;
-* maximum relative energy drift;
-* linear momentum drift;
-* angular momentum drift;
-* centre-of-mass residual;
-* minimum pair separation;
-* solver statistics;
-* full performance report;
-* retained raw timing samples;
-* configuration;
-* environment;
-* provenance;
-* execution outcome.
-
-### Important implementation note
-
-Some helpers used by later adapters are currently located physically in:
-
-```text
-examples/validation/framework/FigureEightInvestigation.jl
-```
-
-These include helpers such as:
-
-```text
-_parameter_value
-_retained_solver_statistics
-_investigation_execution
-_investigation_notes
-_performance_reports_by_id
-```
-
-This is not a current correctness problem, but a future maintainability cleanup may move shared helpers into a neutral support file.
-
-Do not perform that refactor casually or as part of unrelated scientific work.
-
----
-
-## 9. Hierarchical-Triple Investigation Pilot
-
-### Commit
-
-```text
 bff7a94 Add hierarchical-triple Investigation 1 pilot adapter
-```
-
-### Experiment
-
-The hierarchical-triple pilot compares:
-
-```text
-:fast
-:accurate
-```
-
-The fixed experiment uses:
-
-* duration `100.0`;
-* `saveat = 0.02`;
-* the existing hierarchical-triple benchmark and performance records;
-* deterministic order: fast, then accurate.
-
-### Solver-profile fidelity
-
-An important issue was corrected before committing.
-
-The shared profile rule is:
-
-```julia
-:fast     => reltol=nothing, abstol=nothing
-:accurate => reltol=1e-13, abstol=1e-13
-```
-
-This ensures that:
-
-* the fast profile truthfully uses its profile defaults;
-* the accurate profile truthfully records explicit tolerance overrides;
-* execution and structured result construction use the same values;
-* partial tolerance pairs are rejected.
-
-### Retained evidence
-
-The adapter retains:
-
-* minimum hierarchy ratio;
-* maximum relative energy drift;
-* maximum linear momentum drift;
-* maximum angular momentum drift;
-* maximum centre-of-mass residual;
-* minimum pair separation;
-* solver statistics;
-* performance report and raw timing observations;
-* configuration;
-* provenance;
-* execution status;
-* notes.
-
-Complete evidence is required for completed points. Partial evidence remains retainable for unsuccessful points.
-
----
-
-## 10. Close-Encounter Investigation Pilot
-
-### Commit
-
-```text
 6ef5489 Add close-encounter Investigation 1 pilot adapter
-```
-
-### Independent variable and order
-
-The close-encounter series uses:
-
-```text
-:representation_mode
-```
-
-with explicit order:
-
-1. `:cartesian`
-2. `:automatic_switching`
-3. `:explicit_regularized`
-
-### Experiment characteristics
-
-The adapter reuses the existing close-encounter comparison benchmark and its independent BigFloat Cartesian reference.
-
-The configuration records the complete controlled experiment, including:
-
-* masses;
-* gravitational constant;
-* initial state;
-* apoapsis;
-* nominal periapsis;
-* third-body offset;
-* selected pair;
-* time interval;
-* sampling;
-* Cartesian tolerances;
-* regularized tolerances;
-* evaluation tolerance;
-* switching thresholds;
-* ambiguity threshold;
-* minimum separation ratio;
-* maximum switches;
-* regularized initial step;
-* maximum regularized iterations;
-* evaluation iterations;
-* BigFloat precision;
-* reference tolerance;
-* reference solver and dense-output settings;
-* existing acceptance limits.
-
-### Retained evidence
-
-Each applicable point retains:
-
-* integration status;
-* final-time residual;
-* maximum position error;
-* maximum velocity error;
-* maximum combined state error;
-* final position error;
-* final velocity error;
-* final state error;
-* maximum relative energy drift;
-* linear momentum drift;
-* angular momentum drift;
-* centre-of-mass residual;
-* minimum sampled pair separation;
-* periapsis time error;
-* periapsis separation error;
-* solver work;
-* elapsed time;
-* segment count;
-* switch count;
-* configuration;
-* environment;
-* provenance;
-* execution status.
-
-Transition-state residual is optional:
-
-* omitted for Cartesian because no representation transition exists;
-* retained for automatic switching;
-* retained for explicit regularized propagation.
-
-The standalone method table prints:
-
-```text
--
-```
-
-for the Cartesian handoff residual rather than inventing a zero-valued transition observation.
-
-### Validation result
-
-The complete standalone close-encounter benchmark was executed after the final correction and passed all eight existing acceptance criteria.
-
-Full `Pkg.test()` also passed.
-
----
-
-## 11. KS/Levi-Civita Switching Investigation Pilot
-
-### Commit
-
-```text
 aa87ff1 Add KS switching Investigation 1 pilot adapter
 ```
 
-This is the latest commit and the most substantial Investigation 1 adapter.
+The pilot regimes are:
 
-### Independent variable and order
+1. figure-eight profile comparison;
+2. hierarchical-triple profile comparison;
+3. close-encounter representation comparison;
+4. KS versus Levi-Civita automatic-switching comparison.
+
+### 7.3 Baseline execution and reporting
+
+Stage I1-E was completed in:
+
+```text
+212465c Add Investigation 1 baseline execution and reporting
+```
+
+The implementation provides:
+
+* deterministic Investigation-series TOML serialization;
+* complete KS supporting-evidence serialization;
+* process-isolated execution;
+* explicit operational-failure retention;
+* fixed report filenames;
+* atomic output;
+* two-execution reproducibility comparison;
+* deterministic Markdown baseline reporting;
+* separation of measurements and interpretation.
+
+Generated Investigation 1 artifacts are placed under:
+
+```text
+validation_reports/investigation_1/
+```
+
+The standard files are:
+
+```text
+figure_eight_profile.toml
+hierarchical_triple_profile.toml
+close_encounter_representation.toml
+ks_switching_backend.toml
+INVESTIGATION_1_BASELINE_REPORT.md
+```
+
+The generated directory is ignored by Git.
+
+The final committed-tree regeneration reported:
+
+```text
+Reproducibility: PASS
+Mismatches: none
+```
+
+Timing and garbage-collection timing were excluded from reproducibility equality.
+
+### 7.4 Investigation 1 scientific observations
+
+Investigation 1 identified behaviours requiring causal explanation, including:
+
+* very large profile-dependent differences in invariant drift;
+* much smaller changes in some trajectory-specific measurements;
+* substantial Cartesian near-periapsis error;
+* strong agreement between automatic and explicitly bounded regularised propagation;
+* a measurable KS/Levi-Civita physical-state discrepancy despite small event-time and transition residuals.
+
+Investigation 1 did not establish the causes of those behaviours.
+
+That causal work belongs to Investigation 2.
+
+---
+
+## 8. Approved Investigation 2 Hypotheses
+
+The approved hypotheses are recorded in the design document.
+
+Their final wording avoids treating profile names as causal mechanisms.
+
+### H1 — Contributions of integration algorithm and tolerance
+
+The differences observed between the `:fast` and `:accurate` core profiles may arise from:
+
+* the integration algorithms;
+* tolerance settings; and
+* interactions between algorithm and tolerance.
+
+The experiments must separate those effects using matched algorithms and matched tolerances.
+
+### H2 — Distinct behaviour of trajectory and diagnostic measurements
+
+Trajectory-specific errors and invariant-drift measurements may respond differently to:
+
+* tolerance;
+* duration;
+* diagnostic sampling.
+
+Improved invariant drift must not automatically be interpreted as proportionally improved trajectory accuracy.
+
+### H3 — Limiting source of figure-eight periodicity error
+
+At sufficiently tight tolerances, figure-eight periodicity error may become limited by:
+
+* the fixed benchmark initial conditions;
+* the fixed period value;
+* arithmetic precision; or
+* another non-integrator source.
+
+The conditional precision experiment is designed to test whether ordinary Float64 integration remains the dominant limitation.
+
+### H4 — Source of Cartesian close-encounter error
+
+The dominant Cartesian close-encounter error may develop during unregularised propagation through the near-periapsis region.
+
+This will be tested in Stage I2-C using reference-defined temporal localisation.
+
+### H5 — Contribution of switching and handoff
+
+For the Investigation 1 close encounter, switching detection and segment handoff may contribute less error than propagation within the regularised representation.
+
+This will be tested using matched automatic and explicit regularised experiments.
+
+### H6 — Origin of the KS and Levi-Civita discrepancy
+
+The KS/Levi-Civita physical-state discrepancy may arise primarily during:
+
+* regularised propagation;
+* physical-state reconstruction; or
+* dense-output evaluation,
+
+rather than from switching-event timing or transition discontinuity.
+
+This will be tested in Stage I2-D.
+
+No hypothesis is considered established merely because it is stated in the plan.
+
+---
+
+## 9. Stage I2-A — Experimental-Plan Approval
+
+Stage I2-A is complete.
+
+Commit:
+
+```text
+a5f6f59 Approve Investigation 2 experimental plan
+```
+
+The approved plan freezes:
+
+* target behaviours;
+* hypotheses;
+* point values;
+* fixed controls;
+* comparison grids;
+* comparison norms and scales;
+* precision-safe input construction;
+* reference-defined encounter boundaries;
+* reconstruction and dense-output definitions;
+* interpretation rules;
+* completion criteria.
+
+The plan must not be casually edited during implementation.
+
+Any proposed scientific change to it should be reviewed and approved separately.
+
+---
+
+## 10. Stage I2-B Status
+
+Stage I2-B is the current approved stage.
+
+Its required scientific components are:
+
+* matched algorithm-and-tolerance series;
+* matched-tolerance algorithm comparisons;
+* core duration series;
+* diagnostic-sampling series;
+* fixed adjacent-tolerance state comparisons;
+* the conditional precision trigger;
+* precision-safe canonical-input construction.
+
+Three implementation increments have been completed and committed:
+
+```text
+I2-B1 — Core tolerance investigation foundation
+I2-B2 — Core duration and diagnostic-sampling investigations
+I2-B3 — Conditional figure-eight precision confirmation support
+```
+
+These labels are useful implementation subdivisions. The approved design document itself defines only the broader Stage I2-B.
+
+---
+
+## 11. I2-B1 — Core Tolerance Investigation Foundation
+
+### 11.1 Commit
+
+```text
+002fe90 Add core tolerance investigation foundation
+```
+
+### 11.2 Approved tolerance series
+
+I2-B1 defines:
+
+```text
+figure_eight_tsit5_tolerance
+figure_eight_vern9_tolerance
+hierarchical_triple_tsit5_tolerance
+hierarchical_triple_vern9_tolerance
+```
+
+Each uses the exact ordered tolerances:
+
+```text
+1e-9
+1e-10
+1e-11
+1e-12
+1e-13
+```
+
+The scientific algorithm identity is distinct from the package selector:
+
+```text
+:tsit5 → :fast
+:vern9 → :accurate
+```
+
+The series are not described as profile comparisons.
+
+They record:
+
+* the actual scientific algorithm;
+* the internal selector;
+* explicit relative and absolute tolerances;
+* benchmark duration or period count;
+* `saveat`;
+* arithmetic type;
+* direct metrics;
+* solver work;
+* retained performance evidence;
+* execution outcomes;
+* notes.
+
+### 11.3 Direct execution model
+
+I2-B1 introduced:
+
+* immutable parameterised configurations;
+* validated direct attempt records;
+* completed, terminated, and errored outcomes;
+* strict validation against package-owned physical inputs;
+* strict Float64 arithmetic validation;
+* exact benchmark identity and profile validation;
+* exact saved-grid validation;
+* factual preservation of failures.
+
+An errored point remains in its declared order without fabricated:
+
+* benchmark metrics;
+* trajectories;
+* solver statistics.
+
+### 11.4 Adjacent-tolerance comparisons
+
+The comparison pairs are:
+
+```text
+1e-9  versus 1e-10
+1e-10 versus 1e-11
+1e-11 versus 1e-12
+1e-12 versus 1e-13
+```
+
+The comparison is attached to the looser point.
+
+The `1e-13` point has no adjacent-comparison metrics.
+
+Comparisons use:
+
+```text
+L₀ = maximum initial pair separation
+V₀ = maximum initial pair-relative speed
+```
+
+with an explicit `1` fallback when either scale is exactly zero.
+
+At each shared saved physical time, centre-of-mass position and velocity are removed separately from both solutions.
+
+The retained comparisons are:
+
+```text
+maximum_position_difference
+maximum_velocity_difference
+maximum_scaled_state_difference
+final_position_difference
+final_velocity_difference
+final_scaled_state_difference
+```
+
+These are self-convergence differences, not approved-reference errors.
+
+### 11.5 Benchmark execution paths
+
+The package benchmark internals now distinguish:
+
+1. a genuinely report-only path;
+2. a lightweight observation path;
+3. a trajectory-retaining path.
+
+For I2-B1:
+
+* the report-only path returns `ValidationBenchmarkReport`;
+* the trajectory path returns a trajectory-bearing internal execution;
+* trajectory copying occurs only when explicitly required;
+* the direct Investigation execution receives one owned snapshot;
+* the retained performance operation uses the report-only path;
+* no extra full trajectory copying is included in retained timing.
+
+Public benchmark return types and defaults remain unchanged.
+
+### 11.6 Precision-safe canonical figure-eight values
+
+I2-B1 added package-owned canonical decimal strings and a scoped BigFloat constructor.
+
+The canonical constructor:
+
+* sets the requested precision before parsing;
+* parses decimal strings directly into `BigFloat`;
+* does not promote Float64 benchmark values;
+* restores the caller’s global precision afterward;
+* does not add digits or revise the published benchmark.
+
+This helper later became the basis of I2-B3.
+
+### 11.7 I2-B1 verification
+
+Before commit, the final focused suite reported:
+
+```text
+313 I2-B1 assertions passed
+```
+
+Also reported successful:
+
+* full `Pkg.test()`;
+* standalone figure-eight benchmark;
+* standalone hierarchical-triple benchmark;
+* four parameterised smoke points;
+* `git diff --check`.
+
+---
+
+## 12. I2-B2 — Core Duration and Diagnostic-Sampling Investigations
+
+### 12.1 Commit
+
+```text
+767bba5 Add core duration and sampling investigations
+```
+
+### 12.2 Approved duration series
+
+#### Figure-eight
+
+```text
+series: figure_eight_duration
+periods: 1, 2, 5, 10, 20
+algorithm: Vern9
+selector: :accurate
+reltol = abstol = 1e-12
+saveat = 0.02
+arithmetic = Float64
+```
+
+#### Hierarchical triple
+
+```text
+series: hierarchical_triple_duration
+duration: 25.0, 50.0, 100.0, 200.0
+algorithm: Vern9
+selector: :accurate
+reltol = abstol = 1e-13
+saveat = 0.02
+arithmetic = Float64
+```
+
+### 12.3 Approved diagnostic-sampling series
+
+#### Figure-eight
+
+```text
+series: figure_eight_diagnostic_sampling
+saveat: 0.1, 0.02, 0.004
+periods: 10
+algorithm: Vern9
+selector: :accurate
+reltol = abstol = 1e-12
+arithmetic = Float64
+```
+
+#### Hierarchical triple
+
+```text
+series: hierarchical_triple_diagnostic_sampling
+saveat: 0.1, 0.02, 0.004
+duration: 100.0
+algorithm: Vern9
+selector: :accurate
+reltol = abstol = 1e-13
+arithmetic = Float64
+```
+
+### 12.4 Lightweight observation path
+
+I2-B2 added a lightweight package observation retaining:
+
+* the existing `ValidationBenchmarkReport`;
+* saved physical times;
+* the physical system;
+* the initial state.
+
+It does not retain all saved trajectory states.
+
+The path:
+
+* integrates once;
+* copies the saved-time vector once;
+* copies only the initial state;
+* does not construct the I2-B1 trajectory execution;
+* does not invoke the complete trajectory snapshot helper.
+
+The report-only and trajectory-retaining paths remain distinct.
+
+### 12.5 Saved-grid convention
+
+A real smoke run exposed a one-bit reconstruction difference.
+
+The validator was corrected to match the actual OrdinaryDiffEq scalar-`saveat` convention:
+
+* retain the initial time;
+* construct requested entries from `saveat:saveat:final_time`;
+* retain or append the exact final endpoint as required.
+
+The validator rejects:
+
+* wrong spacing;
+* duplicated times;
+* omitted times;
+* reordered times;
+* extra times;
+* incorrect initial or final time;
+* nonfinite time values.
+
+### 12.6 Truthful parameterised case definitions
+
+I2-B2 introduced truthful Investigation 2 case definitions:
+
+```text
+:figure_eight_parameterized
+:hierarchical_triple_parameterized
+```
+
+They do not falsely claim that every duration point uses:
+
+* ten figure-eight periods; or
+* one fixed hierarchical-triple duration.
+
+They use the approved Investigation 2 plan as provenance.
+
+The existing Investigation 1 case definitions remain unchanged and are regression-tested field by field.
+
+### 12.7 Attempt and note integrity
+
+Both I2-B1 and I2-B2 attempts now require a factual execution summary when no direct evidence exists.
+
+Point-note construction:
+
+* preserves direct execution summaries;
+* preserves additional notes;
+* avoids duplicating identical text;
+* labels direct and performance failures separately.
+
+### 12.8 Performance infrastructure
+
+I2-B2 uses one parameterised process child:
+
+```text
+examples/validation/performance/core_duration_sampling_work.jl
+```
+
+Performance IDs are stable and encode:
+
+* experiment kind;
+* benchmark family;
+* algorithm;
+* point value.
+
+The timed operation uses:
+
+```julia
+configuration.solver_selector
+```
+
+rather than a hard-coded selector.
+
+The operation remains report-only and does not copy:
+
+* saved-time vectors;
+* saved-state trajectories;
+* Investigation records.
+
+### 12.9 I2-B2 verification
+
+Final reported focused results were:
+
+```text
+Definitions/configurations: 47/47
+Observation boundaries:     18/18
+Direct validation/grids:    32/32
+Attempt invariants:         10/10
+Performance contracts:      27/27
+Series/serialization:      236/236
+```
+
+Also reported successful:
+
+* full `Pkg.test()`;
+* standalone figure-eight benchmark;
+* standalone hierarchical-triple benchmark;
+* four direct I2-B2 smoke points;
+* duration performance-child smoke;
+* diagnostic-sampling performance-child smoke;
+* `git diff --check`.
+
+Representative direct smoke results were:
+
+```text
+Figure-eight, periods 1:
+    saved states: 318
+    accepted: 112
+    rejected: 0
+    RHS: 1794
+
+Hierarchical triple, duration 25.0:
+    saved states: 1251
+    accepted: 296
+    rejected: 0
+    RHS: 4738
+
+Figure-eight, saveat 0.1:
+    saved states: 634
+    accepted: 1088
+    rejected: 0
+    RHS: 17410
+
+Hierarchical triple, saveat 0.1:
+    saved states: 1001
+    accepted: 1168
+    rejected: 0
+    RHS: 18690
+```
+
+---
+
+## 13. I2-B3 — Conditional Figure-Eight Precision Confirmation
+
+### 13.1 Commit
+
+```text
+e968c1d Add conditional figure-eight precision investigation
+```
+
+This commit is currently local and must be pushed together with the continuation-report commit.
+
+### 13.2 Trigger source
+
+The trigger accepts only the exact approved source series:
+
+```text
+figure_eight_vern9_tolerance
+```
+
+It uses the exact points:
+
+```text
+1e-12
+1e-13
+```
+
+and exact metrics:
+
+```text
+periodicity_error
+maximum_relative_energy_drift
+```
+
+The trigger validates:
+
+* exact series identity;
+* exact definition;
+* exact point IDs;
+* exact independent values and order;
+* exact approved configurations;
+* complete direct metrics;
+* `integration_status = :completed`;
+* solver statistics;
+* complete performance-report contracts;
+* common environment.
+
+### 13.3 Direct versus performance failure
+
+The trigger requires completed direct numerical evidence.
+
+It does not evaluate from:
+
+* a terminated direct integration;
+* an errored direct integration;
+* missing direct metrics;
+* missing solver statistics;
+* manually inconsistent direct evidence.
+
+A genuine performance-only failure remains scientifically evaluable when:
+
+* direct numerical execution completed;
+* all direct metrics exist;
+* solver statistics exist;
+* only retained performance measurement failed.
+
+The source point’s combined execution outcome remains retained in the trigger assessment.
+
+### 13.4 Trigger mathematics
+
+Let:
+
+```text
+p12 = periodicity error at 1e-12
+p13 = periodicity error at 1e-13
+
+e12 = maximum relative energy drift at 1e-12
+e13 = maximum relative energy drift at 1e-13
+```
+
+#### Periodicity condition
+
+The periodicity error changes by less than a factor of two when:
+
+```text
+max(p12, p13) < 2 * min(p12, p13)
+```
+
+The comparison is strict.
+
+Special cases:
+
+* if both periodicity errors are zero, the factor is `1` and the condition is true;
+* if exactly one is zero, the condition is false and no finite factor is retained.
+
+#### Energy condition
+
+The tighter tolerance improves energy drift by at least a factor of ten when:
+
+```text
+e12 >= 10 * e13
+```
+
+and:
+
+```text
+e12 > 0
+```
+
+This condition is directional.
+
+A tenfold worsening does not trigger the experiment.
+
+Special cases:
+
+* if `e12 > 0` and `e13 == 0`, the improvement is retained as unbounded without serializing infinity;
+* if both are zero, the condition is false because no measured positive drift was improved tenfold.
+
+### 13.5 Trigger statuses
+
+The immutable trigger assessment uses:
+
+```text
+:triggered
+:not_triggered
+:unavailable
+```
+
+The status is:
+
+```text
+:triggered
+```
+
+only when both conditions are available and true.
+
+It is:
+
+```text
+:not_triggered
+```
+
+when both conditions are available and at least one is false.
+
+It is:
+
+```text
+:unavailable
+```
+
+when either condition cannot be evaluated from completed direct evidence.
+
+Unavailable is not treated as false.
+
+### 13.6 Trigger-record invariants
+
+One shared mathematical derivation governs:
+
+* trigger evaluation;
+* trigger-record construction;
+* TOML deserialization.
+
+The constructor and reader reject inconsistent combinations involving:
+
+* source identity;
+* source point IDs;
+* factors;
+* conditions;
+* unbounded flags;
+* statuses;
+* absent values;
+* retained optional values.
+
+A manually constructed or edited report cannot claim `:triggered` while retaining inconsistent measurements or false conditions.
+
+### 13.7 Trigger serialization
+
+The trigger assessment is a separate retained record rather than an artificial zero-point Investigation series.
+
+I2-B3 added deterministic operations for:
+
+* writing a trigger assessment;
+* producing deterministic TOML text;
+* reading the assessment;
+* atomic file writing.
+
+The serializer:
+
+* preserves schema identity;
+* preserves the source environment;
+* preserves source point outcomes;
+* preserves optional values explicitly;
+* does not serialize `NaN` or infinity;
+* rejects malformed records.
+
+### 13.8 Precision configurations
+
+The approved precision series is:
+
+```text
+figure_eight_precision_confirmation
+```
+
+with points:
+
+```text
+128
+256
+384
+```
 
 The independent variable is:
 
 ```text
-:regularization_backend
+:precision_bits
 ```
 
-with deterministic order:
-
-1. `:ks`
-2. `:levi_civita`
-
-### Purpose
-
-The experiment compares KS and Levi-Civita regularized propagation under the same fixed automatic-switching policy.
-
-The comparison is not a new switching policy or solver experiment. It reuses the existing fixed benchmark.
-
-### Successful benchmark baseline
-
-The final standalone benchmark retained the existing numerical results:
+Each point uses:
 
 ```text
-KS status: completed
-Levi-Civita status: completed
-KS switches: 2
-Levi-Civita switches: 2
-Maximum scaled state discrepancy:
-    1.8642114308446656e-9
-Entry-time discrepancy:
-    0.0
-Exit-time discrepancy:
-    4.8183679268731794e-14
-Maximum KS transition residual:
-    1.3877787807814457e-17
-Maximum Levi-Civita transition residual:
-    1.3877787807814457e-17
+scientific algorithm: Vern9
+internal selector: :extreme
+periods: 10
+reltol = abstol = 1e-30
+saveat = 0.02
+arithmetic: BigFloat
 ```
 
-The complete standalone benchmark passed all nine existing acceptance criteria.
+The term `:extreme` is the internal package selector. It is not treated as the scientific algorithm identity.
 
-### Resolved fixed settings
+### 13.9 Canonical BigFloat construction
 
-The final implementation removed vague configuration labels such as:
+All precision-experiment inputs are constructed directly from package-owned canonical decimal strings inside the requested precision scope.
+
+The canonical record includes:
+
+* masses;
+* gravitational constant;
+* all initial positions;
+* all initial velocities;
+* initial time;
+* period;
+* tolerance text;
+* `saveat` text.
+
+The implementation does not:
+
+* promote Float64 benchmark inputs;
+* add digits;
+* fit corrected values;
+* use external initial conditions;
+* revise the figure-eight period.
+
+The caller’s BigFloat precision is restored after construction and execution.
+
+### 13.10 Precision benchmark paths
+
+The package provides separate internal paths for:
+
+#### Report-only precision execution
+
+Returns:
 
 ```text
-:profile_defaults
-:backend_defaults
+ValidationBenchmarkReport
 ```
 
-One shared resolved-settings definition now drives:
+It is used for retained performance timing.
 
-* actual execution;
-* retained-segment evaluation;
-* diagnostic sampling;
-* structured configuration;
-* fixed controls;
-* tests.
+It does not copy saved times or states.
 
-The recorded settings include concrete values or explicit derived rules for:
+#### Lightweight precision observation
 
-#### Cartesian segments
+Retains:
 
-* solver profile: `:accurate`;
-* algorithm: `Vern9`;
-* relative tolerance: `1e-12`;
-* absolute tolerance: `1e-12`;
-* maximum iterations: `10^7`;
-* precision: `256`;
-* dense solution without `saveat`.
+* the report;
+* saved BigFloat times;
+* the physical system;
+* the initial state;
+* precision identity.
 
-#### Levi-Civita segments
+It:
 
-* algorithm: `Vern9`;
-* relative tolerance: `1e-12`;
-* absolute tolerance: `1e-12`;
-* physical-time-targeting initial step: `1.0`;
-* targeting tolerance: `sqrt(eps(Float64))`;
-* targeting maximum iterations: `256`;
-* dense solution without `saveat`.
+* copies saved times once;
+* copies only the initial state;
+* does not retain the complete trajectory;
+* does not construct the I2-B1 trajectory execution.
 
-#### KS segments
+The observation’s declared `precision_bits` is preserved and validated.
 
-* algorithm: `Vern9`;
-* relative tolerance: `1e-12`;
-* absolute tolerance: `1e-12`;
-* maximum fictitious-span expansions: `32`;
-* initial fictitious span: derived;
-* derivation rule and inputs retained explicitly;
-* non-selected-pair threshold rule: equal to entry threshold;
-* concrete non-selected threshold recorded;
-* dense solution without `saveat`.
+### 13.11 Direct precision validation
 
-#### Retained-segment evaluation
+Direct precision evidence is checked against:
 
-* tolerance: `100 * eps(Float64)`;
-* maximum iterations: `256`.
-
-Per-setting drift tests verify that changing any recorded numerical setting causes configuration validation to reject the report.
-
-### Typed supporting evidence
-
-The adapter defines a typed immutable backend report:
-
-```text
-KSSwitchingBackendReport
-```
-
-Each point retains this report through:
-
-```text
-supporting_evidence
-```
-
-The report includes:
-
-* backend identity;
-* benchmark definition and version;
-* complete configuration;
-* environment;
-* execution outcome;
-* actual final time;
-* sampled trajectory evidence;
-* diagnostics;
+* exact family;
+* exact `:extreme` report profile;
+* exact canonical physical inputs;
+* exact BigFloat precision;
+* exact tolerances;
+* exact period count;
+* exact final time;
+* exact `saveat`;
+* exact BigFloat saved-time grid;
+* supported completion status;
 * solver statistics;
-* ordered crossing observations;
-* original switch events;
-* shared pairwise comparison observations.
+* finite nonnegative diagnostics.
 
-### Ordered crossing observations
+Float64, promoted Float64, wrong-precision, malformed, or nonfinite evidence is rejected.
 
-The adapter defines:
+Direct Investigation metrics remain BigFloat and are not converted to Float64.
+
+### 13.12 Precision performance evidence
+
+Stable performance IDs are:
 
 ```text
-KSSwitchingCrossingObservation
+figure_eight_precision_128
+figure_eight_precision_256
+figure_eight_precision_384
 ```
 
-An observation can retain:
+The performance child is:
 
-* sequence number;
-* crossing or terminal-decision kind;
-* whether a successful switch occurred;
-* physical time;
-* fictitious/Sundman time if applicable;
-* original switch event;
-* original decision;
-* competition evidence;
-* progress evidence.
+```text
+examples/validation/performance/figure_eight_precision_work.jl
+```
 
-This preserves:
+It uses:
 
-* successful entry and exit crossings;
-* terminal safety decisions;
-* non-selected-pair KS safety crossings;
-* ambiguous or rejected decisions;
-* progress-certification failures;
-* repeated or unexpected crossing sequences.
+* process isolation;
+* `StandardBenchmark`;
+* the report-only precision benchmark path.
 
-Repeated entry/exit cycles are represented through ordered sequence evidence rather than duplicate metric identifiers.
+Every retained performance sample must contain exactly:
 
-### Partial and unsuccessful trajectories
+```text
+maximum_relative_energy_drift
+minimum_pair_separation
+```
 
-The production report builder now supports:
+Both values must be:
 
-* zero-switch trajectories;
-* one-switch trajectories;
-* terminated trajectories;
-* trajectories ending before the requested final time;
-* initial rejections;
-* missing numerical solutions on rejected segments;
-* safety-crossing termination;
-* progress-certification failures.
+* finite;
+* nonnegative;
+* BigFloat;
+* at the declared precision.
 
-Terminated trajectories are sampled only through their actual final epoch.
+Float64, wrong-precision, missing, duplicate, additional, or nonfinite deterministic measurements are rejected.
 
-Solver statistics skip segments without numerical solutions.
+Timing remains descriptive Float64 evidence.
 
-Pairwise observations are omitted when undefined, including:
+### 13.13 Precision-series construction
 
-* backend state discrepancy;
-* entry-time discrepancy;
-* exit-time discrepancy.
+The series builder requires a valid `:triggered` assessment.
 
-No sentinel numerical values are used.
+It rejects:
 
-A transition-state residual is omitted when no transition occurred.
+```text
+:not_triggered
+:unavailable
+```
 
-### Execution and acceptance semantics
+It does not fabricate an empty precision series.
 
-Execution failure is not converted into acceptance failure.
+All three declared precision points remain ordered even when a direct or performance point fails.
 
-For a successful complete comparison:
+Direct failure takes precedence over performance failure.
 
-* all nine acceptance criteria are declared and evaluated;
-* the structured execution outcome is completed;
-* exit status is zero.
+Only completed direct and performance evidence produces a completed combined point.
 
-For an incomplete comparison:
+### 13.14 I2-B3 verification
 
-* all available observations are retained;
-* undefined metrics are omitted;
-* acceptance criteria are not evaluated;
-* the structured execution outcome is terminated;
-* `validation_exit_code` returns nonzero;
-* direct standalone execution also exits nonzero after constructing the partial result and investigation series.
+Final reported focused results included:
 
-The report-requested and direct standalone paths therefore use consistent exit semantics.
+```text
+Trigger contract:                  25/25
+Trigger serialization:             20/20
+Evidence validation:               19/19
+Performance/series serialization:  79/79
+```
 
-### Validation completed
+Also reported successful:
 
-Before commit `aa87ff1`, the following passed:
-
-* focused validation suite;
-* production report-builder tests;
-* Investigation adapter tests;
+* complete focused framework suite;
 * full `Pkg.test()`;
-* complete standalone KS switching benchmark;
+* standalone figure-eight benchmark;
+* standalone hierarchical-triple benchmark;
+* triggered fixture;
+* not-triggered fixture;
+* unavailable fixture;
+* genuine performance-only-failure fixture;
+* direct-failure fixture;
+* real 128-bit direct precision run;
+* process-isolated 128-bit performance run;
 * `git diff --check`.
 
-The focused test counts reported in the final revision included:
+The real 128-bit direct run completed with:
 
 ```text
-Production report builder: 70/70
-Investigation adapter: 36/36
+saved states:   3164
+accepted steps: 105667
+precision:      128 bits
 ```
 
----
+It used:
 
-## 12. Investigation 1 Completion Status
+* canonical BigFloat inputs;
+* Vern9 through `:extreme`;
+* ten periods;
+* `1e-30` tolerances;
+* `0.02` sampling.
 
-The following sequence is complete:
+No Float64-promotion warning occurred.
 
-### I1-B — Investigation Record Types
+The caller’s BigFloat precision was restored afterward.
 
-Completed by:
+The process-isolated 128-bit performance child completed with:
 
 ```text
-dbe61c0 Add Investigation 1 record types
+five retained samples
+exit code zero
 ```
 
-### I1-C — Core Pilot Adapters
+Both deterministic sample measurements retained 128-bit BigFloat values.
 
-Completed by:
+---
+
+## 14. Current Benchmark Baselines
+
+The unchanged standalone benchmarks continued to pass after I2-B3.
+
+### Figure-eight accurate baseline
+
+Reported after final I2-B3 verification:
 
 ```text
-822f156 Add figure-eight Investigation 1 pilot adapter
-bff7a94 Add hierarchical-triple Investigation 1 pilot adapter
+final time:       63.2591398
+saved states:     3164
+accepted steps:   1088
+periodicity error:
+    3.504220230353128e-7
 ```
 
-### I1-D — Regularisation Pilot Adapters
+### Hierarchical-triple accurate baseline
 
-Completed by:
+Reported after final I2-B3 verification:
 
 ```text
-6ef5489 Add close-encounter Investigation 1 pilot adapter
-aa87ff1 Add KS switching Investigation 1 pilot adapter
+final time:      100.0
+saved states:    5001
+accepted steps:  1168
 ```
 
-All four pilot regimes defined for Investigation 1 now have structured adapters.
-
-No additional I1-D code is outstanding.
+These values remain regression baselines. Their continued appearance does not constitute Investigation 2 interpretation.
 
 ---
 
-## 13. Important Scientific Semantics Established During This Work
+## 15. Important Current Files
 
-The following principles were enforced and should be preserved.
-
-### 13.1 State error is distinct from conservation drift
-
-Energy, momentum, angular momentum, and centre-of-mass drift are not substitutes for state or trajectory accuracy.
-
-Where an independent or pairwise state comparison exists, it must be retained independently.
-
-### 13.2 Minimum sampled separation is not periapsis error
-
-For the close-encounter benchmark:
-
-* minimum sampled separation;
-* periapsis time error;
-* periapsis separation error;
-
-are separate measurements and must remain separate.
-
-### 13.3 Not applicable is not zero
-
-Examples:
-
-* Cartesian transition residual does not exist;
-* a trajectory with no switches has no transition residual;
-* unavailable pairwise comparisons after early termination must be omitted.
-
-Zero should be used only when a quantity was genuinely measured and found to be zero.
-
-### 13.4 Execution failure is not acceptance failure
-
-A trajectory can fail to complete before there is enough evidence to evaluate acceptance limits.
-
-Such a case should retain:
-
-* actual execution outcome;
-* failure summary;
-* exit code;
-* all partial observations;
-* solver work;
-* provenance.
-
-It should not be converted into an ordinary failed acceptance criterion.
-
-### 13.5 Raw observations must not be replaced by summaries
-
-Summary metrics are useful, but the underlying evidence should remain accessible when it is scientifically important.
-
-This motivated the `supporting_evidence` field and the typed KS backend reports.
-
-### 13.6 Configuration must be reproducible
-
-Labels such as “defaults” are inadequate when those defaults may change.
-
-Record:
-
-* concrete resolved values;
-* algorithms;
-* solver profiles;
-* iteration limits;
-* sampling rules;
-* evaluation settings;
-* stable derivation rules and all derivation inputs.
-
-Execution and configuration must be driven from the same shared settings object or definition.
-
----
-
-## 14. Known Non-Blocking Notes
-
-### 14.1 Existing manifest warning
-
-The full package test emits an existing manifest-resolution warning. Tests still complete successfully.
-
-Do not treat this as a regression without evidence that its behaviour has changed.
-
-### 14.2 Shared helper placement
-
-Some generic Investigation helper functions remain in `FigureEightInvestigation.jl`.
-
-A future neutral support module may be cleaner, but this is not an active blocker and should not displace scientific development.
-
-### 14.3 Large KS adapter
-
-`KSSwitchingInvestigation.jl` is substantial because it must preserve raw switching, crossing, failure, and configuration evidence.
-
-Do not split or refactor it merely for line-count reduction. Any restructuring should preserve:
-
-* evidence identity;
-* immutable records;
-* partial-execution support;
-* exact configuration provenance;
-* existing tests.
-
-### 14.4 `supporting_evidence::Any`
-
-The generic measurement point accepts experiment-specific immutable evidence through an `Any` field.
-
-This is intentional for now. A future type hierarchy could be considered, but only if it clearly improves maintainability without complicating the validation framework or distracting from numerical research.
-
----
-
-## 15. Earlier Major Project Milestones
-
-The following earlier work remains relevant.
-
-### 15.1 v0.4 regularization and switching
-
-The v0.4 development programme implemented and validated:
-
-* close-approach monitoring;
-* pair-centred transformations;
-* Levi-Civita regularization;
-* Kustaanheimo–Stiefel regularization;
-* explicit regularized segments;
-* automatic switching;
-* segment handoff;
-* retained-solution switching evaluation;
-* switching diagnostics;
-* KS comparison benchmarks.
-
-The Stage KS-12 validation suite previously passed all 11 validation benchmarks.
-
-### 15.2 v0.5 validation framework
-
-The v0.5 programme added:
-
-* immutable validation result types;
-* criterion evaluation;
-* deterministic serialization;
-* structured case-result builders;
-* structured suite-result builders;
-* console presentation;
-* execution semantics;
-* approved scientific reference records;
-* deterministic approved-reference serialization;
-* approval workflow;
-* validation-run workflow;
-* performance record types;
-* performance serialization;
-* performance measurement infrastructure.
-
-### 15.3 JET development environment
-
-JET was removed as a runtime dependency and placed in a dedicated development environment.
-
-The established setup is:
-
-```powershell
-julia --project=dev/jet -e 'using Pkg; Pkg.develop(path="."); Pkg.instantiate()'
-```
-
-Normal analysis:
-
-```powershell
-julia --project=dev/jet -e 'using ThreeBody3D, JET; JET.report_package(ThreeBody3D)'
-```
-
-`dev/jet/Manifest.toml` is ignored so each checkout can retain its local developed path.
-
-### 15.4 Scientific reference and performance work
-
-The approved scientific reference framework and the performance benchmark framework were designed and substantially implemented before the Investigation 1 work.
-
-These systems should continue to support, rather than dominate, future accuracy research.
-
----
-
-## 16. Recommended Restart Procedure
-
-At the beginning of the next conversation:
-
-1. State that development is resuming from commit:
-
-   ```text
-   aa87ff1 Add KS switching Investigation 1 pilot adapter
-   ```
-
-2. Upload the latest repository archive from:
-
-   ```text
-   C:\Dev\ThreeBody3D
-   ```
-
-3. Confirm:
-
-   ```powershell
-   git status
-   git log -5 --oneline
-   ```
-
-   Expected state:
-
-   ```text
-   On branch v0.5-development
-   Your branch is up to date with 'origin/v0.5-development'.
-
-   nothing to commit, working tree clean
-   ```
-
-4. Inspect the current version of:
-
-   ```text
-   docs/design/V0_6_INVESTIGATION_1_MEASUREMENT_PLAN.md
-   ```
-
-5. Determine the next approved stage directly from that document.
-
-6. Do not infer the next stage solely from this report.
-
-7. Before implementing, review the relevant existing benchmark, adapter, types, and tests from the uploaded repository.
-
----
-
-## 17. Recommended Next Development Decision
-
-The four Investigation 1 pilot adapters are complete.
-
-The next task should be chosen from the actual remaining stages in:
+### Approved plans
 
 ```text
 docs/design/V0_6_INVESTIGATION_1_MEASUREMENT_PLAN.md
+docs/design/V0_6_INVESTIGATION_2_EXPERIMENTAL_PLAN.md
 ```
 
-The next conversation should first determine whether the approved plan calls for work such as:
+### Investigation framework
 
-* executing and recording real Investigation 1 series;
-* deterministic serialization of investigation records;
-* presentation or analysis tooling;
-* integration with approved reference workflows;
-* review and consolidation of pilot evidence;
-* beginning the next numerical investigation;
-* updating design and continuation documents.
+```text
+examples/validation/framework/InvestigationTypes.jl
+examples/validation/framework/InvestigationSerialization.jl
+examples/validation/framework/InvestigationBaselineRunner.jl
+examples/validation/framework/InvestigationPresentation.jl
+examples/validation/framework/ValidationFramework.jl
+```
 
-These possibilities must not be assumed. The current design document should be read from the uploaded repository and treated as authoritative.
+### I2-B1
 
-The next development stage should continue to satisfy the central project test:
+```text
+examples/validation/framework/CoreToleranceInvestigation.jl
+examples/validation/performance/core_tolerance_accuracy_work.jl
+test/validation_framework/core_tolerance_investigation.jl
+```
 
-> Does this work directly help ThreeBody3D identify or produce more accurate and scientifically reliable three-body solutions?
+### I2-B2
+
+```text
+examples/validation/framework/CoreDurationSamplingInvestigation.jl
+examples/validation/performance/core_duration_sampling_work.jl
+test/validation_framework/core_duration_sampling_investigation.jl
+```
+
+### I2-B3
+
+```text
+examples/validation/framework/FigureEightPrecisionInvestigation.jl
+examples/validation/framework/PrecisionTriggerSerialization.jl
+examples/validation/performance/figure_eight_precision_work.jl
+test/validation_framework/figure_eight_precision_investigation.jl
+```
+
+### Package benchmark internals
+
+```text
+src/ValidationBenchmarks/FigureEight.jl
+src/ValidationBenchmarks/HierarchicalTriple.jl
+src/ValidationBenchmarks/Reports.jl
+src/ValidationBenchmarks/ValidationBenchmarks.jl
+```
+
+### Test entry
+
+```text
+test/validation_framework/runtests.jl
+```
 
 ---
 
-## 18. Exact Final Checkpoint
+## 16. Architectural Invariants That Must Be Preserved
 
-At the close of this session:
+### 16.1 Algorithm identity and package selector
+
+The scientific algorithm and package selector are distinct:
 
 ```text
-Repository:     IanGraceNz/ThreeBody3D
-Branch:         v0.5-development
-HEAD:           aa87ff1
-Remote branch:  origin/v0.5-development at aa87ff1
-Working tree:   clean
-Push status:    complete
-Pkg.test():     passed before latest commit
-Standalone KS switching benchmark:
-                passed all 9 criteria
-Investigation 1 pilots:
-                4 of 4 complete
-Outstanding uncommitted work:
-                none
-Known code blocker:
-                none
+Tsit5  → :fast
+Vern9  → :accurate
+Vern9 BigFloat → :extreme
 ```
 
-The project is safe to resume from this checkpoint in a fresh conversation.
+Do not report `:fast`, `:accurate`, or `:extreme` as though they were scientific algorithms.
+
+### 16.2 Benchmark paths
+
+The package now intentionally distinguishes:
+
+* report-only execution;
+* lightweight observation;
+* full trajectory snapshot.
+
+Do not collapse them into one path that copies unnecessary data.
+
+Performance measurement must use report-only execution.
+
+### 16.3 No fabricated unavailable values
+
+Unavailable or inapplicable evidence must not be represented as:
+
+* zero;
+* `NaN`;
+* infinity;
+* empty numerical fields;
+* invented metrics.
+
+Omit unavailable optional metrics and retain factual execution evidence.
+
+### 16.4 State accuracy and invariant drift
+
+Do not combine:
+
+* state error;
+* periodicity error;
+* hierarchy measurements;
+* invariant drift;
+* minimum separation;
+* solver work
+
+into a synthetic score.
+
+Improved invariant drift is not automatically improved trajectory accuracy.
+
+### 16.5 Minimum sampled separation
+
+Minimum sampled separation is not periapsis error.
+
+Do not use the terms interchangeably.
+
+### 16.6 BigFloat input construction
+
+For the precision experiment:
+
+* parse canonical strings inside the requested precision scope;
+* do not promote Float64 inputs;
+* do not revise the canonical period;
+* do not add digits;
+* do not source alternative initial conditions.
+
+### 16.7 Trigger evidence
+
+The precision trigger requires completed direct numerical evidence.
+
+A performance-only failure may remain evaluable.
+
+A direct failure makes the trigger unavailable.
+
+Unavailable must not be converted into not triggered.
+
+### 16.8 Interpretation boundaries
+
+Stage I2-B records measurements and controlled configurations.
+
+It does not establish causal conclusions.
+
+Do not claim:
+
+* a periodicity floor;
+* secular growth;
+* an algorithmic cause;
+* a sampling-based accuracy improvement;
+* superiority of a production profile;
+* a need to change a solver
+
+until the complete Investigation 2 evidence is evaluated under the approved interpretation rules.
+
+---
+
+## 17. Current Stage and Exact Next Work
+
+### 17.1 Current formal stage
+
+The project remains in:
+
+```text
+Stage I2-B — Core integration experiments
+```
+
+I2-B1, I2-B2, and I2-B3 are implemented and committed.
+
+However, Stage I2-B should not yet be treated as fully complete.
+
+The definitions, adapters, validation, performance children, trigger assessment, and conditional precision-series support now exist, but the components have not yet been integrated into one controlled core-experiment orchestration workflow.
+
+### 17.2 Recommended next implementation increment
+
+A useful working label is:
+
+```text
+I2-B4 — Controlled core-experiment orchestration
+```
+
+This is an implementation subdivision for planning convenience. It is not a separate stage named in the approved design document.
+
+The next increment should integrate the existing I2-B1, I2-B2, and I2-B3 components without changing their scientific definitions.
+
+### 17.3 Required orchestration scope
+
+The runner or workflow should be capable of constructing the following eight mandatory core series:
+
+```text
+figure_eight_tsit5_tolerance
+figure_eight_vern9_tolerance
+hierarchical_triple_tsit5_tolerance
+hierarchical_triple_vern9_tolerance
+
+figure_eight_duration
+hierarchical_triple_duration
+
+figure_eight_diagnostic_sampling
+hierarchical_triple_diagnostic_sampling
+```
+
+The mandatory nonprecision point count is:
+
+```text
+20 tolerance points
+ 9 duration points
+ 6 diagnostic-sampling points
+--------------------------------
+35 mandatory core points
+```
+
+After constructing the figure-eight Vern9 tolerance series, the workflow must evaluate and retain the precision trigger assessment.
+
+If the assessment is:
+
+```text
+:triggered
+```
+
+the workflow should be capable of constructing:
+
+```text
+figure_eight_precision_confirmation
+```
+
+with points:
+
+```text
+128
+256
+384
+```
+
+If the assessment is:
+
+```text
+:not_triggered
+```
+
+or:
+
+```text
+:unavailable
+```
+
+the workflow must retain the assessment and must not fabricate a precision series.
+
+### 17.4 Recommended runner responsibilities
+
+The next workflow should:
+
+* use the existing approved series factories;
+* use process-isolated performance children;
+* preserve declared point order;
+* continue after individual safe failures;
+* retain all factual partial evidence;
+* retain actual child exit codes;
+* validate report contracts before accepting them;
+* use one common parent environment where required;
+* atomically write deterministic machine-readable records;
+* use fixed output filenames;
+* prevent untrusted child IDs from controlling output paths;
+* preserve raw malformed or partial evidence separately;
+* avoid rerunning a numerical integration merely to build records.
+
+### 17.5 Output location
+
+The approved Investigation 2 plan places machine-readable outputs under:
+
+```text
+validation_reports/investigation_2/
+```
+
+The full explanatory report belongs to Stage I2-E:
+
+```text
+validation_reports/investigation_2/INVESTIGATION_2_EXPLANATORY_REPORT.md
+```
+
+The next Stage I2-B orchestration increment must not create causal interpretation or the final explanatory report.
+
+It may create deterministic development or core-series machine-readable outputs if required by the approved workflow, but their purpose and relationship to Stage I2-E must remain clear.
+
+### 17.6 Testing expectations for the next increment
+
+Use injected or synthetic child runners for ordinary orchestration tests.
+
+Unit tests should cover:
+
+* stable series order;
+* stable point order;
+* exact output filenames;
+* direct child failure;
+* performance child failure;
+* missing report;
+* malformed report;
+* partial evidence preservation;
+* continuation to later safe points;
+* trigger evaluation after source-series construction;
+* triggered precision path;
+* not-triggered path;
+* unavailable path;
+* raw operational-evidence preservation;
+* deterministic serialization;
+* nonzero workflow exit status when operational failures occur.
+
+Do not run all 35 mandatory core points in the ordinary package test suite.
+
+### 17.7 Execution boundary
+
+The approved Stage I2-E says:
+
+> Execute all approved series twice, preserve deterministic records, evaluate the registered hypotheses, and produce the Investigation 2 explanatory report.
+
+Therefore, the next I2-B orchestration increment should not silently expand into the complete two-execution Investigation 2 programme.
+
+Unless expressly approved otherwise, it should:
+
+* implement and test the orchestration;
+* use synthetic and limited smoke execution;
+* stop before full Investigation 2 causal analysis;
+* stop before I2-C;
+* stop before the explanatory report.
+
+---
+
+## 18. Work Explicitly Deferred
+
+The following work has not begun and must remain deferred until its approved stage.
+
+### Stage I2-C
+
+Do not yet implement:
+
+* Cartesian close-encounter tolerance series;
+* reference-defined temporal error localisation;
+* automatic regularised tolerance series;
+* explicit regularised tolerance series;
+* close-encounter threshold-scale series.
+
+### Stage I2-D
+
+Do not yet implement:
+
+* KS regularised-tolerance series;
+* KS/Levi-Civita threshold-scale series;
+* segment-localised backend discrepancy;
+* reconstruction-consistency evidence;
+* dense-output consistency evidence.
+
+### Stage I2-E
+
+Do not yet:
+
+* execute the complete Investigation 2 programme twice;
+* classify the hypotheses;
+* produce the explanatory report;
+* transfer candidate improvements to Investigation 3.
+
+### Investigation 3
+
+Do not implement:
+
+* solver changes;
+* profile changes;
+* production threshold changes;
+* new regularisation algorithms;
+* revised canonical benchmark data;
+* candidate numerical improvements.
+
+Investigation 2 must explain the evidence before Investigation 3 evaluates changes.
+
+---
+
+## 19. Suggested Opening Instruction for the Next Conversation
+
+A suitable opening request is:
+
+```text
+Continue with the ThreeBody3D project.
+
+The current repository is attached.
+
+1. Read CONTINUATION_REPORT.md.
+2. Read docs/design/V0_6_INVESTIGATION_2_EXPERIMENTAL_PLAN.md.
+3. Determine the current approved stage directly from the Investigation 2 plan.
+4. Verify the Git state.
+5. Review the committed I2-B1, I2-B2, and I2-B3 implementations.
+6. Design the smallest next increment needed to integrate the approved core experiments into a controlled orchestration workflow.
+7. Do not implement I2-C, causal interpretation, or the Investigation 2 explanatory report.
+```
+
+Before changing code, the next conversation should inspect the real current contents of:
+
+```text
+examples/validation/framework/CoreToleranceInvestigation.jl
+examples/validation/framework/CoreDurationSamplingInvestigation.jl
+examples/validation/framework/FigureEightPrecisionInvestigation.jl
+examples/validation/framework/PrecisionTriggerSerialization.jl
+examples/validation/framework/PerformanceRunner.jl
+examples/validation/framework/InvestigationSerialization.jl
+examples/validation/framework/InvestigationBaselineRunner.jl
+examples/validation/framework/ValidationFramework.jl
+
+examples/validation/performance/core_tolerance_accuracy_work.jl
+examples/validation/performance/core_duration_sampling_work.jl
+examples/validation/performance/figure_eight_precision_work.jl
+
+src/ValidationBenchmarks/FigureEight.jl
+src/ValidationBenchmarks/HierarchicalTriple.jl
+src/ValidationBenchmarks/Reports.jl
+src/ValidationBenchmarks/ValidationBenchmarks.jl
+
+test/validation_framework/core_tolerance_investigation.jl
+test/validation_framework/core_duration_sampling_investigation.jl
+test/validation_framework/figure_eight_precision_investigation.jl
+test/validation_framework/investigation_baseline_runner.jl
+test/validation_framework/runtests.jl
+```
+
+---
+
+## 20. Final Handoff Summary
+
+At the end of this session:
+
+* Investigation 1 is complete.
+* The Investigation 1 baseline is reproducible.
+* The Investigation 2 experimental plan is approved.
+* Stage I2-A is complete.
+* I2-B1 is complete, committed, and pushed.
+* I2-B2 is complete, committed, and pushed.
+* I2-B3 is complete and committed locally.
+* The working tree is clean.
+* Commit `e968c1d` still needs to be pushed.
+* This continuation report should be committed and pushed with it.
+* The project remains within Stage I2-B.
+* The next work is controlled orchestration of the existing core experiment components.
+* Close-encounter decomposition, KS localisation, causal interpretation, and numerical improvements remain deferred.
+
+The next conversation must use the newly uploaded repository as the implementation authority and the approved Investigation 2 plan as the stage authority.
