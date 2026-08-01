@@ -9,16 +9,15 @@ using .ValidationFramework
 # the system remains hierarchical throughout the integration.
 protocol = resolve_case_protocol(hierarchical_triple_case_definition(), VALIDATION_SCHEMA_VERSION)
 
-const HIERARCHICAL_RELTOL = 1e-13
-const HIERARCHICAL_ABSTOL = 1e-13
-
+investigation_profile = Symbol(get(ENV, "THREEBODY3D_INVESTIGATION_POINT", "accurate"))
+investigation_profile in (:fast, :accurate) || throw(ArgumentError("Unsupported hierarchical-triple investigation profile."))
+profile_tolerances = ValidationFramework._hierarchical_triple_profile_tolerances(investigation_profile)
 report = run_validation_benchmark(
     :hierarchical_triple;
     duration=100.0,
-    solver=:accurate,
+    solver=investigation_profile,
     saveat=0.02,
-    reltol=HIERARCHICAL_RELTOL,
-    abstol=HIERARCHICAL_ABSTOL,
+    profile_tolerances...,
 )
 println(report)
 
@@ -86,8 +85,8 @@ if report_requested(protocol)
         center_of_mass_limit=HIERARCHICAL_COM_RESIDUAL_LIMIT,
         minimum_ratio_limit=HIERARCHICAL_MINIMUM_RATIO_LIMIT,
         final_time_limit=HIERARCHICAL_FINAL_TIME_RESIDUAL_LIMIT,
-        reltol=HIERARCHICAL_RELTOL,
-        abstol=HIERARCHICAL_ABSTOL,
+        reltol=profile_tolerances.reltol,
+        abstol=profile_tolerances.abstol,
     )
     exit_code = publish_case_result(protocol, structured_result; render=false)
     exit_code == 0 || exit(exit_code)

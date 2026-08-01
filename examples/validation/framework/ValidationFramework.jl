@@ -48,6 +48,9 @@ include("KSLeviCivitaComparisonCase.jl")
 include("KSHierarchicalTripleCase.jl")
 include("KSSwitchingComparisonCase.jl")
 include("KSSwitchingInvestigation.jl")
+include("InvestigationSerialization.jl")
+include("InvestigationPresentation.jl")
+include("InvestigationBaselineRunner.jl")
 
 export AbstractValidationMetric,
        PerformanceBenchmarkDefinition,
@@ -89,6 +92,18 @@ export AbstractValidationMetric,
        InvestigationDefinition,
        InvestigationMeasurementPoint,
        InvestigationMeasurementSeries,
+       write_investigation_series,
+       investigation_series_report_text,
+       read_investigation_series,
+       write_investigation_series_atomic,
+       investigation_baseline_markdown,
+       write_investigation_baseline_atomic,
+       InvestigationBaselineResult,
+       InvestigationProcessRecord,
+       InvestigationOperationalFailure,
+       InvestigationReproducibilityResult,
+       compare_investigation_baselines,
+       run_investigation_1_baseline,
        build_accuracy_work_series,
        figure_eight_accuracy_work_definition,
        hierarchical_triple_accuracy_work_definition,

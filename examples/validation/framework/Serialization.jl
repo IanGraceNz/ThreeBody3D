@@ -416,6 +416,7 @@ function write_report_atomic(
         ValidationSuiteReferenceComparison,
         PerformanceBenchmarkReport,
         PerformanceSuiteReport,
+        InvestigationMeasurementSeries,
     },
 )
     final_path = abspath(path)
@@ -437,8 +438,10 @@ function write_report_atomic(
                 write_reference_comparison(io, result)
             elseif result isa PerformanceBenchmarkReport
                 write_performance_benchmark(io, result)
-            else
+            elseif result isa PerformanceSuiteReport
                 write_performance_suite(io, result)
+            else
+                write_investigation_series(io, result)
             end
             flush(io)
         end

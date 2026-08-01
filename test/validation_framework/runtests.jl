@@ -83,3 +83,5 @@ include("ks_hierarchical_triple_case.jl")
 
 include("ks_switching_comparison_case.jl")
 include("ks_switching_investigation.jl")
+include("investigation_reporting.jl")
+include("investigation_baseline_runner.jl")

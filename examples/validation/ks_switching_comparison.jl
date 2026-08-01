@@ -138,9 +138,12 @@ structured_result = build_ks_switching_comparison_case_result(
         transition_residual_limit=KS_SWITCHING_TRANSITION_RESIDUAL_LIMIT,
 )
 
-ks_switching_backend_investigation_series(
+investigation_series = ks_switching_backend_investigation_series(
     structured_result, (backend_reports.levi_civita, backend_reports.ks),
 )
+investigation_report_path = get(ENV, "THREEBODY3D_INVESTIGATION_SERIES_REPORT", "")
+isempty(investigation_report_path) ||
+    write_investigation_series_atomic(investigation_report_path, investigation_series)
 
 if report_requested(protocol)
     exit_code = publish_case_result(protocol, structured_result; render=false)

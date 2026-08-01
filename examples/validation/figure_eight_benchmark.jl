@@ -7,10 +7,12 @@ using .ValidationFramework
 # Increase `periods` to study long-duration phase and conservation behaviour.
 protocol = resolve_case_protocol(figure_eight_case_definition(), VALIDATION_SCHEMA_VERSION)
 
+investigation_profile = Symbol(get(ENV, "THREEBODY3D_INVESTIGATION_POINT", "accurate"))
+investigation_profile in (:fast, :accurate) || throw(ArgumentError("Unsupported figure-eight investigation profile."))
 report = run_validation_benchmark(
     :figure_eight;
     periods=10,
-    solver=:accurate,
+    solver=investigation_profile,
     saveat=0.02,
 )
 

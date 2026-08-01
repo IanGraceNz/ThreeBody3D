@@ -893,8 +893,7 @@ function validate_close_encounter_comparison(
     nothing
 end
 
-if report_requested(protocol)
-    structured_result = build_close_encounter_case_result(
+structured_result = build_close_encounter_case_result(
         cartesian,
         automatic,
         explicit,
@@ -912,7 +911,15 @@ if report_requested(protocol)
         cartesian_under_resolution_minimum=CLOSE_ENCOUNTER_CARTESIAN_UNDER_RESOLUTION_MINIMUM,
         automatic_improvement_ratio_limit=CLOSE_ENCOUNTER_AUTOMATIC_IMPROVEMENT_RATIO_LIMIT,
         configuration=experiment_configuration,
-    )
+)
+investigation_series = close_encounter_representation_investigation_series(
+    structured_result, cases,
+)
+investigation_report_path = get(ENV, "THREEBODY3D_INVESTIGATION_SERIES_REPORT", "")
+isempty(investigation_report_path) ||
+    write_investigation_series_atomic(investigation_report_path, investigation_series)
+
+if report_requested(protocol)
     exit_code = publish_case_result(protocol, structured_result; render=false)
     exit_code == 0 || exit(exit_code)
 else

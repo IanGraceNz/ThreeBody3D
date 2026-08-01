@@ -133,6 +133,61 @@ end
         reports.ks.crossing_observations
     @test map(point -> point.point_id, series.points) == (:ks, :levi_civita)
     @test series.points[1].environment === environment
+    restored = read_investigation_series(IOBuffer(investigation_series_report_text(series)))
+    for (original_point, restored_point) in zip(series.points, restored.points)
+        original = original_point.supporting_evidence
+        retained = restored_point.supporting_evidence
+        @test typeof(retained.samples) == typeof(original.samples)
+        @test typeof(retained.diagnostics) == typeof(original.diagnostics)
+        @test typeof(retained) == typeof(original)
+        for name in fieldnames(typeof(original))
+            name in (:samples, :diagnostics) && continue
+            @test getfield(retained, name) == getfield(original, name)
+        end
+        @test retained.samples.times == original.samples.times
+        @test retained.samples.states == original.samples.states
+        for name in fieldnames(typeof(original.diagnostics))
+            @test getfield(retained.diagnostics, name) == getfield(original.diagnostics, name)
+        end
+        @test length(retained.switch_events) == length(original.switch_events)
+        @test all(
+            ValidationFramework._record_fields_equal(left, right)
+            for (left, right) in zip(retained.switch_events, original.switch_events)
+        )
+        @test all(
+            ValidationFramework._record_fields_equal(left, right)
+            for (left, right) in zip(
+                retained.crossing_observations,
+                original.crossing_observations,
+            )
+        )
+    end
+
+    combined_failure = ExecutionOutcome(
+        actual_terminated; exit_code=23, summary="Combined comparison unsuccessful.",
+    )
+    first_point = series.points[1]
+    failed_point = InvestigationMeasurementPoint(
+        first_point.point_id, first_point.definition, first_point.configuration,
+        first_point.independent_value, first_point.environment, combined_failure,
+        first_point.metrics, first_point.solver_statistics;
+        supporting_evidence=first_point.supporting_evidence,
+    )
+    mixed_execution_series = InvestigationMeasurementSeries(
+        series.series_id, series.title, series.description, series.definition,
+        (failed_point, series.points[2]),
+    )
+    mixed_restored = read_investigation_series(IOBuffer(
+        investigation_series_report_text(mixed_execution_series),
+    ))
+    @test mixed_restored.points[1].execution == combined_failure
+    @test mixed_restored.points[1].supporting_evidence.execution.actual == actual_completed
+    @test mixed_restored.points[1].supporting_evidence.execution ==
+        first_point.supporting_evidence.execution
+    @test all(name -> ValidationFramework._record_fields_equal(
+        getfield(mixed_restored.points[1].supporting_evidence, name),
+        getfield(first_point.supporting_evidence, name),
+    ), fieldnames(typeof(first_point.supporting_evidence)))
 
     inside_state = copy(fixture.state)
     inside_state[7] = -0.4
@@ -314,7 +369,7 @@ function _ks_backend_report(backend; result=_ks_investigation_result(),
     ValidationFramework.KSSwitchingBackendReport(
         backend, definition, configuration, environment, execution,
         execution.actual == actual_completed ? 1.6 : 1.1,
-        (times=(0.0, 1.6),), diagnostics,
+        (times=(0.0, 1.6), states=((0.0,), (1.0,))), diagnostics,
         SolverStatistics(accepted_steps=100, rejected_steps=2,
             rhs_evaluations=700, saved_states=161, segment_count=3, switch_count=2),
         crossing_observations,

@@ -424,6 +424,15 @@ A separate report shall summarise:
 
 The report shall distinguish direct measurements from interpretation.
 
+The Stage I1-E baseline artifacts are regenerated from the repository root with:
+
+```powershell
+julia --project=. examples/validation/run_investigation_1_baseline.jl validation_reports/investigation_1
+```
+
+This writes the four ordered series reports and the Markdown baseline report to
+`validation_reports/investigation_1`.
+
 ### 11.3 No automatic ranking across incomparable metrics
 
 The framework shall not combine state error, invariant drift, elapsed time, and
