@@ -35,7 +35,7 @@ end
     norm(r3 - inner_center) / inner_separation
 end
 
-function _run_hierarchical_triple_benchmark(
+function _solve_hierarchical_triple_benchmark(
     duration::Real,
     solver::Symbol,
     saveat::Real;
@@ -57,7 +57,7 @@ function _run_hierarchical_triple_benchmark(
     status = terminated_by_close_approach(result) ? :terminated_close_approach : :completed
     hierarchy_ratios = map(state -> _hierarchy_ratio(system, state), result.solution.u)
 
-    ValidationBenchmarkReport(
+    report = ValidationBenchmarkReport(
         :hierarchical_triple,
         status,
         solver,
@@ -76,4 +76,14 @@ function _run_hierarchical_triple_benchmark(
         Int(stats.nreject),
         Int(stats.nf),
     )
+    (; report, result)
+end
+
+_run_hierarchical_triple_benchmark(args...; kwargs...) =
+    _solve_hierarchical_triple_benchmark(args...; kwargs...).report
+
+function _run_hierarchical_triple_benchmark_execution(args...;
+    snapshotter=_snapshot_core_validation_execution, kwargs...)
+    calculation = _solve_hierarchical_triple_benchmark(args...; kwargs...)
+    snapshotter(calculation.report, calculation.result)
 end

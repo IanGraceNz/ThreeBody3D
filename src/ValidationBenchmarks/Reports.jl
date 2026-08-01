@@ -22,6 +22,25 @@ struct ValidationBenchmarkReport{T,D}
     rhs_evaluations::Int
 end
 
+"""Repository-internal benchmark result with transient saved trajectory evidence."""
+struct CoreValidationBenchmarkExecution{R,T,S,Y,U}
+    report::R
+    times::T
+    states::S
+    system::Y
+    initial_state::U
+end
+
+function _snapshot_core_validation_execution(report, result)
+    CoreValidationBenchmarkExecution(
+        report,
+        copy(result.solution.t),
+        [copy(state) for state in result.solution.u],
+        result.system,
+        copy(first(result.solution.u)),
+    )
+end
+
 function Base.show(io::IO, report::ValidationBenchmarkReport)
     println(io, "ThreeBody3D validation benchmark: ", report.name)
     println(io, "  status:                        ", report.status)

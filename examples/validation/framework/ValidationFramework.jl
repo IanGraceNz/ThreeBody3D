@@ -38,6 +38,7 @@ include("SuiteRunner.jl")
 include("CoreBenchmarkCases.jl")
 include("FigureEightInvestigation.jl")
 include("HierarchicalTripleInvestigation.jl")
+include("CoreToleranceInvestigation.jl")
 include("CloseEncounterCase.jl")
 include("CloseEncounterInvestigation.jl")
 include("TripleCollisionCase.jl")
@@ -188,6 +189,22 @@ export AbstractValidationMetric,
        HIERARCHICAL_TRIPLE_INVESTIGATION_METRICS,
        hierarchical_triple_profile_investigation_definition,
        hierarchical_triple_profile_investigation_series,
+       CORE_TOLERANCE_VALUES,
+       CORE_TOLERANCE_COMPARISON_METRICS,
+       CoreToleranceExperimentConfiguration,
+       CoreToleranceExecution,
+       CoreToleranceAttempt,
+       core_tolerance_configuration,
+       run_core_tolerance_experiment,
+       attempt_core_tolerance_experiment,
+       compare_adjacent_core_tolerances,
+       core_tolerance_investigation_definition,
+       core_tolerance_investigation_series,
+       core_tolerance_performance_benchmark_id,
+       core_tolerance_performance_definition,
+       core_tolerance_performance_operation,
+       core_tolerance_performance_entry,
+       decode_core_tolerance_benchmark_id,
        CLOSE_ENCOUNTER_INVESTIGATION_DEFINITION_VERSION,
        CLOSE_ENCOUNTER_INVESTIGATION_METRICS,
        close_encounter_representation_investigation_definition,
