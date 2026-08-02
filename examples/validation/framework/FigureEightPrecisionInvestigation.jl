@@ -257,10 +257,19 @@ struct FigureEightPrecisionAttempt
             evidence.configuration == configuration || throw(ArgumentError("Precision evidence configuration differs."))
             evidence.report.status in (:completed, :terminated_close_approach) ||
                 throw(ArgumentError("Unsupported precision report status."))
-            evidence.report.status == :completed ?
-                (execution.actual == actual_completed && isnothing(execution.summary)) :
-                (execution.actual == actual_terminated && !isnothing(execution.summary)) ||
-                    throw(ArgumentError("Precision evidence and execution outcome differ."))
+            if evidence.report.status == :completed
+                execution.actual == actual_completed || throw(ArgumentError(
+                    "Completed precision evidence requires actual_completed execution."))
+                isnothing(execution.summary) || throw(ArgumentError(
+                    "Completed precision evidence must not retain an abnormal summary."))
+            else
+                execution.actual == actual_terminated || throw(ArgumentError(
+                    "Terminated precision evidence requires actual_terminated execution."))
+                if isnothing(execution.summary) || isempty(strip(execution.summary))
+                    throw(ArgumentError(
+                        "Terminated precision evidence requires a factual summary."))
+                end
+            end
         end
         new(configuration, execution, evidence,
             isnothing(notes) ? nothing : _nonempty_string(notes, "notes"))

@@ -364,6 +364,16 @@ end
         ExecutionOutcome(actual_completed; exit_code=0))
     @test_throws ArgumentError FigureEightPrecisionAttempt(configuration,
         ExecutionOutcome(actual_stopped; exit_code=1))
+    @test_throws ArgumentError FigureEightPrecisionAttempt(configuration,
+        ExecutionOutcome(actual_terminated; exit_code=1, summary="terminated"), evidence)
+    @test_throws ArgumentError FigureEightPrecisionAttempt(configuration,
+        ExecutionOutcome(actual_completed; exit_code=0, summary="unexpected"), evidence)
+    @test_throws ArgumentError FigureEightPrecisionAttempt(configuration,
+        ExecutionOutcome(actual_completed; exit_code=0), terminated)
+    @test_throws ArgumentError FigureEightPrecisionAttempt(configuration,
+        ExecutionOutcome(actual_terminated; exit_code=1), terminated)
+    @test_throws ArgumentError FigureEightPrecisionAttempt(configuration,
+        ExecutionOutcome(actual_terminated; exit_code=1, summary="   "), terminated)
     errored = attempt_figure_eight_precision(configuration;
         runner=_ -> error("synthetic precision error"))
     @test errored.execution.actual == actual_errored

@@ -55,6 +55,7 @@ include("KSSwitchingInvestigation.jl")
 include("InvestigationSerialization.jl")
 include("InvestigationPresentation.jl")
 include("InvestigationBaselineRunner.jl")
+include("CoreInvestigationRunner.jl")
 
 export AbstractValidationMetric,
        PerformanceBenchmarkDefinition,
@@ -108,6 +109,8 @@ export AbstractValidationMetric,
        InvestigationReproducibilityResult,
        compare_investigation_baselines,
        run_investigation_1_baseline,
+       CoreInvestigationWorkflowResult,
+       run_investigation_2_core,
        build_accuracy_work_series,
        figure_eight_accuracy_work_definition,
        hierarchical_triple_accuracy_work_definition,
