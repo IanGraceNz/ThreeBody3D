@@ -331,12 +331,52 @@ function _write_ks_supporting_evidence(io, report::KSSwitchingBackendReport, hea
     end
 end
 
+function _write_close_supporting_evidence(io, evidence::CloseEncounterTemporalLocalizationEvidence, heading)
+    println(io, "[$heading]")
+    _write_key_value(io, "kind", "close_encounter_temporal_localization")
+    _write_key_value(io, "base_grid_convention", evidence.base_grid_convention)
+    _write_key_value(io, "augmentation_convention", evidence.augmentation_convention)
+    _write_key_value(io, "sample_count", length(evidence.samples))
+    _write_key_value(io, "region_count", length(evidence.regions))
+    println(io)
+    boundaries = evidence.boundaries
+    println(io, "[$heading.boundaries]")
+    _write_key_value(io, "arithmetic", boundaries.arithmetic)
+    _write_key_value(io, "precision_bits", boundaries.precision_bits)
+    for name in (
+        :entry_time, :entry_separation, :entry_residual,
+        :periapsis_time, :periapsis_separation, :periapsis_residual,
+        :exit_time, :exit_separation, :exit_residual,
+    )
+        _write_tagged_value(io, getfield(boundaries, name); prefix=String(name))
+    end
+    println(io)
+    for (index, sample) in enumerate(evidence.samples)
+        println(io, "[$heading.sample_$index]")
+        _write_key_value(io, "location", sample.location)
+        _write_key_value(io, "state_source", sample.state_source)
+        for name in (:time, :pair_position_error, :pair_velocity_error, :full_state_error)
+            _write_tagged_value(io, getfield(sample, name); prefix=String(name))
+        end
+        println(io)
+    end
+    for (index, region) in enumerate(evidence.regions)
+        println(io, "[$heading.region_$index]")
+        _write_key_value(io, "region", region.region)
+        for name in (:pair_position_error, :pair_velocity_error, :full_state_error)
+            _write_tagged_value(io, getfield(region, name); prefix=String(name))
+        end
+        println(io)
+    end
+end
+
 function _write_supporting_evidence(io, evidence, heading)
     isnothing(evidence) && return
-    evidence isa KSSwitchingBackendReport || throw(ArgumentError(
-        "Unsupported investigation supporting evidence type $(typeof(evidence)).",
-    ))
-    _write_ks_supporting_evidence(io, evidence, heading)
+    evidence isa KSSwitchingBackendReport &&
+        return _write_ks_supporting_evidence(io, evidence, heading)
+    evidence isa CloseEncounterTemporalLocalizationEvidence &&
+        return _write_close_supporting_evidence(io, evidence, heading)
+    throw(ArgumentError("Unsupported investigation supporting evidence type $(typeof(evidence))."))
 end
 
 """Write one investigation series in deterministic schema-1 TOML text."""
@@ -409,6 +449,49 @@ function _read_ks_supporting_evidence(table, definition, configuration, environm
     )
 end
 
+function _read_close_supporting_evidence(table)
+    get(table, "sample_count", nothing) == 4 ||
+        throw(ArgumentError("Close-encounter evidence requires four samples."))
+    get(table, "region_count", nothing) == 3 ||
+        throw(ArgumentError("Close-encounter evidence requires three regions."))
+    boundaries_table = get(table, "boundaries", nothing)
+    isnothing(boundaries_table) && throw(ArgumentError("Close-encounter boundaries are missing."))
+    boundary_names = (
+        :entry_time, :entry_separation, :entry_residual,
+        :periapsis_time, :periapsis_separation, :periapsis_residual,
+        :exit_time, :exit_separation, :exit_residual,
+    )
+    values = map(name -> _read_tagged_value(boundaries_table; prefix=String(name)),
+        boundary_names)
+    boundaries = CloseEncounterReferenceBoundaries(
+        values...,
+        Symbol(boundaries_table["arithmetic"]),
+        Int(boundaries_table["precision_bits"]),
+    )
+    samples = ntuple(4) do index
+        sample = get(table, "sample_$index", nothing)
+        isnothing(sample) && throw(ArgumentError("Close-encounter sample $index is missing."))
+        values = map(name -> _read_tagged_value(sample; prefix=String(name)),
+            (:time, :pair_position_error, :pair_velocity_error, :full_state_error))
+        CloseEncounterLocalErrorSample(
+            Symbol(sample["location"]), values[1], Symbol(sample["state_source"]),
+            values[2], values[3], values[4],
+        )
+    end
+    regions = ntuple(3) do index
+        region = get(table, "region_$index", nothing)
+        isnothing(region) && throw(ArgumentError("Close-encounter region $index is missing."))
+        values = map(name -> _read_tagged_value(region; prefix=String(name)),
+            (:pair_position_error, :pair_velocity_error, :full_state_error))
+        CloseEncounterRegionMaximum(Symbol(region["region"]), values...)
+    end
+    CloseEncounterTemporalLocalizationEvidence(
+        boundaries, samples, regions;
+        base_grid_convention=table["base_grid_convention"],
+        augmentation_convention=table["augmentation_convention"],
+    )
+end
+
 """Read and validate one deterministic investigation-series TOML report."""
 function read_investigation_series(source)
     data = source isa IO ? TOML.parse(read(source, String)) : TOML.parsefile(source)
@@ -423,12 +506,16 @@ function read_investigation_series(source)
         execution = _read_execution(table["execution"])
         evidence = if haskey(table, "supporting_evidence")
             evidence_table = table["supporting_evidence"]
-            get(evidence_table, "kind", nothing) == "ks_switching_backend" || throw(
-                ArgumentError("Unsupported supporting evidence kind."),
-            )
-            _read_ks_supporting_evidence(
-                evidence_table, definition, configuration, environment,
-            )
+            kind = get(evidence_table, "kind", nothing)
+            if kind == "ks_switching_backend"
+                _read_ks_supporting_evidence(
+                    evidence_table, definition, configuration, environment,
+                )
+            elseif kind == "close_encounter_temporal_localization"
+                _read_close_supporting_evidence(evidence_table)
+            else
+                throw(ArgumentError("Unsupported supporting evidence kind."))
+            end
         else
             nothing
         end

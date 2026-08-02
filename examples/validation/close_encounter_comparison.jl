@@ -48,172 +48,9 @@ case_definition = close_encounter_case_definition()
 experiment_environment = current_validation_environment()
 protocol = resolve_case_protocol(case_definition, VALIDATION_SCHEMA_VERSION)
 
-@inline decimal(::Type{Float64}, value::AbstractString) = parse(Float64, value)
-@inline decimal(::Type{BigFloat}, value::AbstractString) = parse(BigFloat, value)
-
-function close_encounter_problem(::Type{T}) where {T<:AbstractFloat}
-    m1 = decimal(T, "1")
-    m2 = decimal(T, "1")
-    m3 = decimal(T, "0.001")
-    G = decimal(T, "1")
-
-    apoapsis = decimal(T, "1")
-    periapsis = decimal(T, "0.0001")
-    semimajor_axis = (apoapsis + periapsis) / T(2)
-    binary_mu = G * (m1 + m2)
-    relative_speed = sqrt(
-        binary_mu * (T(2) / apoapsis - one(T) / semimajor_axis),
-    )
-
-    third_offset = decimal(T, "10")
-    total_mass_value = m1 + m2 + m3
-    binary_com_x = -(m3 / total_mass_value) * third_offset
-    third_x = binary_com_x + third_offset
-
-    r1 = T[binary_com_x + apoapsis / T(2), zero(T), zero(T)]
-    r2 = T[binary_com_x - apoapsis / T(2), zero(T), zero(T)]
-    r3 = T[third_x, zero(T), zero(T)]
-
-    v1 = T[zero(T), relative_speed / T(2), zero(T)]
-    v2 = T[zero(T), -relative_speed / T(2), zero(T)]
-    v3 = T[zero(T), zero(T), zero(T)]
-
-    system = ThreeBodySystem((m1, m2, m3); G=G)
-    (
-        system=system,
-        u0=statevector(r1, v1, r2, v2, r3, v3),
-        tspan=(zero(T), decimal(T, "1.6")),
-        nominal_periapsis=periapsis,
-        physical_parameters=(
-            masses=Tuple(system.masses),
-            gravitational_constant=system.G,
-            apoapsis=apoapsis,
-            third_body_offset=third_offset,
-        ),
-    )
-end
-
-function sample_times(tspan; step=SAMPLE_STEP)
-    times = collect(range(first(tspan); step=step, stop=last(tspan)))
-    times[end] == last(tspan) || push!(times, last(tspan))
-    times
-end
-
-@inline function body_state_ranges(body)
-    position = (6body - 5):(6body - 3)
-    velocity = (6body - 2):(6body)
-    position, velocity
-end
-
-function pair_relative_components(state, pair=SELECTED_PAIR)
-    i, j = pair
-    ri, vi = body_state_ranges(i)
-    rj, vj = body_state_ranges(j)
-    (
-        position=state[ri] .- state[rj],
-        velocity=state[vi] .- state[vj],
-    )
-end
-
-function pair_errors(state, reference_state)
-    actual = pair_relative_components(state)
-    reference = pair_relative_components(reference_state)
-    position_error = norm(Float64.(actual.position) .- Float64.(reference.position))
-    velocity_error = norm(Float64.(actual.velocity) .- Float64.(reference.velocity))
-    (
-        position=position_error,
-        velocity=velocity_error,
-        combined=hypot(position_error, velocity_error),
-    )
-end
-
-function trajectory_errors(states, reference_states)
-    errors = map(pair_errors, states, reference_states)
-    (
-        maximum_position=maximum(error.position for error in errors),
-        maximum_velocity=maximum(error.velocity for error in errors),
-        maximum_combined=maximum(error.combined for error in errors),
-        final_position=last(errors).position,
-        final_velocity=last(errors).velocity,
-        final_combined=last(errors).combined,
-    )
-end
-
-function conservation_report(system, times, states)
-    initial_state = first(states)
-    initial_time = first(times)
-    initial_energy = total_energy(system, initial_state)
-    initial_momentum = linear_momentum(system, initial_state)
-    initial_angular_momentum = angular_momentum(system, initial_state)
-    initial_com = center_of_mass(system, initial_state)
-    initial_com_velocity = center_of_mass_velocity(system, initial_state)
-
-    maximum_relative_energy_drift = zero(initial_energy)
-    maximum_momentum_drift = zero(initial_energy)
-    maximum_angular_momentum_drift = zero(initial_energy)
-    maximum_com_residual = zero(initial_energy)
-    minimum_pair_separation = oftype(initial_energy, Inf)
-
-    for (time, state) in zip(times, states)
-        energy = total_energy(system, state)
-        relative_energy_drift = iszero(initial_energy) ?
-            abs(energy - initial_energy) :
-            abs((energy - initial_energy) / initial_energy)
-        expected_com = initial_com + (time - initial_time) * initial_com_velocity
-
-        maximum_relative_energy_drift = max(
-            maximum_relative_energy_drift,
-            relative_energy_drift,
-        )
-        maximum_momentum_drift = max(
-            maximum_momentum_drift,
-            norm(linear_momentum(system, state) - initial_momentum),
-        )
-        maximum_angular_momentum_drift = max(
-            maximum_angular_momentum_drift,
-            norm(angular_momentum(system, state) - initial_angular_momentum),
-        )
-        maximum_com_residual = max(
-            maximum_com_residual,
-            norm(center_of_mass(system, state) - expected_com),
-        )
-        minimum_pair_separation = min(
-            minimum_pair_separation,
-            minimum_separation(state),
-        )
-    end
-
-    (
-        maximum_relative_energy_drift=maximum_relative_energy_drift,
-        maximum_momentum_drift=maximum_momentum_drift,
-        maximum_angular_momentum_drift=maximum_angular_momentum_drift,
-        maximum_com_residual=maximum_com_residual,
-        minimum_separation=minimum_pair_separation,
-    )
-end
-
-@inline function solution_work(solution)
-    statistics = solution.stats
-    (
-        saved_states=length(solution.t),
-        accepted_steps=Int(statistics.naccept),
-        rejected_steps=Int(statistics.nreject),
-        rhs_evaluations=Int(statistics.nf),
-    )
-end
-
-function sum_work(items)
-    (
-        saved_states=sum(item.saved_states for item in items),
-        accepted_steps=sum(item.accepted_steps for item in items),
-        rejected_steps=sum(item.rejected_steps for item in items),
-        rhs_evaluations=sum(item.rhs_evaluations for item in items),
-    )
-end
-
 function switching_work(trajectory)
-    sum_work([
-        solution_work(
+    ValidationFramework.close_encounter_sum_work([
+        ValidationFramework.close_encounter_solution_work(
             segment isa AutomaticCartesianSegment ?
                 segment.location.simulation.solution :
                 segment.location.regularized_result.solution,
@@ -221,9 +58,8 @@ function switching_work(trajectory)
         for segment in trajectory.segments
     ])
 end
-
 function composed_work(trajectory)
-    sum_work([
+    ValidationFramework.close_encounter_sum_work([
         (
             saved_states=statistics.saved_states,
             accepted_steps=statistics.accepted_steps,
@@ -233,56 +69,12 @@ function composed_work(trajectory)
         for statistics in trajectory.solver_statistics
     ])
 end
-
 function first_event(trajectory, kind)
     index = findfirst(event -> event.kind == kind, trajectory.switch_events)
     isnothing(index) && error("No $(kind) switch event was recorded.")
     trajectory.switch_events[index]
 end
 
-
-@inline function pair_radial_numerator(state, pair=SELECTED_PAIR)
-    relative = pair_relative_components(state, pair)
-    dot(relative.position, relative.velocity)
-end
-
-function periapsis_state(
-    state_at_time,
-    left,
-    right;
-    iterations=160,
-)
-    a = left
-    b = right
-    fa = pair_radial_numerator(state_at_time(a))
-    fb = pair_radial_numerator(state_at_time(b))
-    fa < zero(fa) || error(
-        "Periapsis bracket must start on the inbound branch; r dot v=$(fa).",
-    )
-    fb > zero(fb) || error(
-        "Periapsis bracket must end on the outbound branch; r dot v=$(fb).",
-    )
-
-    for _ in 1:iterations
-        midpoint = a + (b - a) / 2
-        (midpoint == a || midpoint == b) && break
-        fm = pair_radial_numerator(state_at_time(midpoint))
-        if fm <= zero(fm)
-            a = midpoint
-        else
-            b = midpoint
-        end
-    end
-
-    time = a + (b - a) / 2
-    state = state_at_time(time)
-    (
-        time=time,
-        separation=norm(pair_relative_components(state).position),
-        radial_numerator=pair_radial_numerator(state),
-        state=state,
-    )
-end
 
 function regularized_segment(trajectory)
     index = findfirst(segment -> segment isa AutomaticRegularizedSegment, trajectory.segments)
@@ -291,27 +83,23 @@ function regularized_segment(trajectory)
 end
 
 function boundary_state_difference(reference_state, comparison_state)
-    reference = pair_relative_components(reference_state)
-    comparison = pair_relative_components(comparison_state)
+    reference = ValidationFramework.close_encounter_pair_components(reference_state)
+    comparison = ValidationFramework.close_encounter_pair_components(comparison_state)
     (
         position=norm(comparison.position - reference.position),
         velocity=norm(comparison.velocity - reference.velocity),
         state=maximum(abs, comparison_state .- reference_state),
     )
 end
-
-
 function endpoint_reference_report(state, reference_state)
-    errors = pair_errors(state, reference_state)
-    relative = pair_relative_components(state)
+    errors = ValidationFramework.close_encounter_state_errors(state, reference_state)
+    relative = ValidationFramework.close_encounter_pair_components(state)
     separation = norm(relative.position)
     radial_rate = dot(relative.position, relative.velocity) / separation
     (
         pair_position_error=errors.position,
         pair_velocity_error=errors.velocity,
-        full_state_error=maximum(
-            abs, Float64.(state) .- Float64.(reference_state),
-        ),
+        full_state_error=errors.full_state,
         separation=Float64(separation),
         radial_rate=Float64(radial_rate),
     )
@@ -363,9 +151,9 @@ function run_cartesian(
         execution=ExecutionOutcome(actual_completed; exit_code=0),
         elapsed=elapsed,
         states=states,
-        conservation=conservation_report(problem.system, times, states),
-        errors=trajectory_errors(states, reference_states),
-        work=solution_work(result.solution),
+        conservation=ValidationFramework.close_encounter_conservation(problem.system, times, states),
+        errors=ValidationFramework.close_encounter_trajectory_errors(states, reference_states),
+        work=ValidationFramework.close_encounter_solution_work(result.solution),
         segments=1,
         switches=0,
         final_time=last(result.solution.t),
@@ -429,8 +217,8 @@ function run_automatic(
         execution=ExecutionOutcome(actual_completed; exit_code=0),
         elapsed=elapsed,
         states=samples.states,
-        conservation=conservation_report(problem.system, times, samples.states),
-        errors=trajectory_errors(samples.states, reference_states),
+        conservation=ValidationFramework.close_encounter_conservation(problem.system, times, samples.states),
+        errors=ValidationFramework.close_encounter_trajectory_errors(samples.states, reference_states),
         work=switching_work(trajectory),
         segments=diagnostics.segment_count,
         switches=diagnostics.switch_count,
@@ -496,8 +284,8 @@ function run_explicit(
         execution=ExecutionOutcome(actual_completed; exit_code=0),
         elapsed=elapsed,
         states=states,
-        conservation=conservation_report(problem.system, times, states),
-        errors=trajectory_errors(states, reference_states),
+        conservation=ValidationFramework.close_encounter_conservation(problem.system, times, states),
+        errors=ValidationFramework.close_encounter_trajectory_errors(states, reference_states),
         work=composed_work(trajectory),
         segments=3,
         switches=2,
@@ -577,8 +365,8 @@ function print_method_table(cases)
     end
 end
 
-problem = close_encounter_problem(Float64)
-times = sample_times(problem.tspan)
+problem = ValidationFramework.close_encounter_problem(Float64)
+times = ValidationFramework.close_encounter_sample_times(problem.tspan)
 experiment_configuration = ValidationFramework._close_encounter_configuration(
     initial_state=Tuple(problem.u0),
     masses=problem.physical_parameters.masses,
@@ -613,21 +401,8 @@ experiment_configuration = ValidationFramework._close_encounter_configuration(
 )
 
 println("Computing independent BigFloat Cartesian reference...")
-reference_elapsed = @elapsed reference = setprecision(BigFloat, REFERENCE_PRECISION) do
-    reference_problem = close_encounter_problem(BigFloat)
-    simulate(
-        reference_problem.system,
-        reference_problem.u0,
-        reference_problem.tspan;
-        solver=:extreme,
-        precision=REFERENCE_PRECISION,
-        reltol=parse(BigFloat, REFERENCE_TOLERANCE),
-        abstol=parse(BigFloat, REFERENCE_TOLERANCE),
-        dense=true,
-        save_everystep=true,
-    )
-end
-reference_states = [reference.solution(BigFloat(time)) for time in times]
+reference_elapsed = @elapsed reference = build_close_encounter_reference()
+reference_states = reference.sampled_states
 
 println("Computing Float64 comparison runs...")
 cartesian = run_cartesian(
@@ -674,15 +449,19 @@ exit_difference = boundary_state_difference(
     explicit.result.regularized_segment.exit_state,
 )
 
-reference_periapsis = periapsis_state(
-    time -> reference.solution(BigFloat(time)),
-    BigFloat(entry_time),
-    BigFloat(exit_time),
+reference_boundaries = reference.boundaries
+reference_periapsis = (
+    time=reference_boundaries.periapsis_time,
+    separation=reference_boundaries.periapsis_separation,
+    radial_numerator=reference_boundaries.periapsis_residual,
+    state=ValidationFramework.close_encounter_reference_state(
+        reference, reference_boundaries.periapsis_time,
+    ),
 )
 periapses = [
     (
         name=case.name,
-        result=periapsis_state(
+        result=ValidationFramework.close_encounter_periapsis(
             case.state_at_time,
             Float64(entry_time),
             Float64(exit_time),
@@ -748,7 +527,7 @@ for item in periapses
     )
 end
 
-reference_exit_state = reference.solution(BigFloat(exit_time))
+reference_exit_state = ValidationFramework.close_encounter_reference_state(reference, exit_time)
 automatic_exit_report = endpoint_reference_report(
     automatic_segment.exit_state,
     reference_exit_state,
