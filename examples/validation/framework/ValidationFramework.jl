@@ -43,6 +43,8 @@ include("CoreDurationSamplingInvestigation.jl")
 include("FigureEightPrecisionInvestigation.jl")
 include("PrecisionTriggerSerialization.jl")
 include("CloseEncounterExperiment.jl")
+include("CloseEncounterRegularizedExperiment.jl")
+include("CloseEncounterRegularizedInvestigation.jl")
 include("CloseEncounterCase.jl")
 include("CloseEncounterCartesianInvestigation.jl")
 include("CloseEncounterInvestigation.jl")
@@ -168,11 +170,18 @@ export AbstractValidationMetric,
        CloseEncounterCartesianConfiguration,
        CloseEncounterCartesianAttempt,
        CloseEncounterTemporalLocalizationEvidence,
+       CloseEncounterRegularizedToleranceConfiguration,
+       CloseEncounterRegularizedPropagationFacts,
+       CloseEncounterRegularizedPairAttempt,
        build_close_encounter_reference,
        close_encounter_cartesian_configuration,
        attempt_close_encounter_cartesian,
        close_encounter_cartesian_investigation_series,
        close_encounter_cartesian_performance_entry,
+       close_encounter_regularized_tolerance_configuration,
+       attempt_close_encounter_regularized_pair,
+       close_encounter_regularized_performance_entries,
+       close_encounter_regularized_investigation_series,
        TRIPLE_COLLISION_DEFINITION_VERSION,
        RANDOMIZED_REGRESSION_DEFINITION_VERSION,
        KS_KEPLER_DEFINITION_VERSION,

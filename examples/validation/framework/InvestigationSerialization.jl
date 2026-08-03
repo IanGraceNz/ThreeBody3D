@@ -370,13 +370,456 @@ function _write_close_supporting_evidence(io, evidence::CloseEncounterTemporalLo
     end
 end
 
+function _write_regularized_transition(io, transition, heading)
+    println(io, "[$heading]")
+    _write_key_value(io, "pair", collect(transition.pair))
+    for name in fieldnames(CloseEncounterTransitionEvidence)
+        name == :pair && continue
+        _write_tagged_value(io, getfield(transition, name); prefix=String(name))
+    end
+    println(io)
+end
+
+function _write_regularized_boundaries(io, boundaries, heading)
+    println(io, "[$heading]")
+    _write_key_value(io, "arithmetic", boundaries.arithmetic)
+    _write_key_value(io, "precision_bits", boundaries.precision_bits)
+    for name in (:entry_time, :entry_separation, :entry_residual,
+        :periapsis_time, :periapsis_separation, :periapsis_residual,
+        :exit_time, :exit_separation, :exit_residual)
+        _write_tagged_value(io, getfield(boundaries, name); prefix=String(name))
+    end
+    println(io)
+end
+
+function _write_regularized_named_values(io, values, heading)
+    println(io, "[$heading]")
+    for name in keys(values)
+        _write_tagged_value(io, getfield(values, name); prefix=String(name))
+    end
+    println(io)
+end
+
+function _write_regularized_supporting_evidence(io,
+    evidence::CloseEncounterRegularizedPointEvidence, heading)
+    println(io, "[$heading]")
+    _write_key_value(io, "kind", "close_encounter_regularized_tolerance")
+    _write_key_value(io, "method", evidence.method)
+    _write_tagged_value(io, evidence.configuration.regularized_relative_tolerance;
+        prefix="regularized_relative_tolerance")
+    _write_tagged_value(io, evidence.configuration.regularized_absolute_tolerance;
+        prefix="regularized_absolute_tolerance")
+    _write_tagged_value(io, evidence.automatic_interval[1]; prefix="automatic_entry_time")
+    _write_tagged_value(io, evidence.automatic_interval[2]; prefix="automatic_exit_time")
+    _write_key_value(io, "comparison_grid_convention", evidence.comparison.comparison_grid_convention)
+    _write_key_value(io, "comparison_epoch_count", evidence.comparison.comparison_epoch_count)
+    _write_key_value(io, "periapsis_inside_interval", evidence.comparison.periapsis_inside_interval)
+    _write_key_value(io, "sample_count", length(evidence.comparison.samples))
+    _write_key_value(io, "transition_count", length(evidence.method_reference.transitions))
+    println(io)
+    _write_regularized_boundaries(io, evidence.boundaries, "$heading.boundaries")
+    event = evidence.event_evidence
+    println(io, "[$heading.events]")
+    for name in fieldnames(CloseEncounterAutomaticEventEvidence)
+        _write_tagged_value(io, getfield(event, name); prefix=String(name))
+    end
+    println(io)
+    reference = evidence.method_reference
+    println(io, "[$heading.method_reference]")
+    _write_key_value(io, "method", reference.method)
+    _write_key_value(io, "segment_count", reference.segment_count)
+    _write_key_value(io, "switch_count", reference.switch_count)
+    println(io)
+    _write_regularized_named_values(io, reference.errors, "$heading.method_reference.errors")
+    _write_regularized_named_values(io, reference.dense_periapsis, "$heading.method_reference.dense_periapsis")
+    _write_regularized_named_values(io, reference.conservation, "$heading.method_reference.conservation")
+    _write_regularized_named_values(io, reference.work, "$heading.method_reference.work")
+    for (index, transition) in enumerate(reference.transitions)
+        _write_regularized_transition(io, transition, "$heading.transition_$index")
+    end
+    for (index, sample) in enumerate(evidence.comparison.samples)
+        println(io, "[$heading.sample_$index]")
+        _write_key_value(io, "location", sample.location)
+        for name in (:time, :pair_position_difference, :pair_velocity_difference, :full_state_difference)
+            _write_tagged_value(io, getfield(sample, name); prefix=String(name))
+        end
+        println(io)
+    end
+    println(io, "[$heading.maximum_interval_difference]")
+    for name in (:maximum_pair_position_difference, :maximum_pair_velocity_difference,
+        :maximum_full_state_difference)
+        _write_tagged_value(io, getfield(evidence.comparison, name); prefix=String(name))
+    end
+    println(io)
+    endpoint = evidence.fictitious_endpoints
+    println(io, "[$heading.fictitious_endpoints]")
+    _write_tagged_value(io, endpoint.automatic.terminal_fictitious_time; prefix="automatic_terminal_fictitious_time")
+    _write_tagged_value(io, endpoint.explicit.terminal_fictitious_time; prefix="explicit_terminal_fictitious_time")
+    _write_tagged_value(io, endpoint.fictitious_time_difference; prefix="fictitious_time_difference")
+    _write_tagged_value(io, endpoint.automatic.terminal_physical_time; prefix="automatic_terminal_physical_time")
+    _write_tagged_value(io, endpoint.explicit.terminal_physical_time; prefix="explicit_terminal_physical_time")
+    _write_tagged_value(io, endpoint.automatic.terminal_physical_time_residual; prefix="automatic_terminal_physical_time_residual")
+    _write_tagged_value(io, endpoint.explicit.terminal_physical_time_residual; prefix="explicit_terminal_physical_time_residual")
+    println(io)
+end
+
+function _write_staged_regularized_supporting_evidence(io,
+    evidence::CloseEncounterRegularizedSupportingEvidence, heading)
+    propagation = isnothing(evidence.method_evidence) ? evidence.propagation_evidence :
+        evidence.method_evidence.propagation
+    println(io, "[$heading]")
+    _write_key_value(io, "kind", "close_encounter_regularized_tolerance_staged")
+    _write_key_value(io, "method", evidence.method)
+    _write_key_value(io, "stage", evidence.stage)
+    !isnothing(evidence.summary) && _write_key_value(io, "summary", evidence.summary)
+    _write_key_value(io, "has_method_measurement", !isnothing(evidence.method_evidence))
+    _write_key_value(io, "has_propagation_evidence", !isnothing(evidence.propagation_evidence))
+    _write_key_value(io, "has_method_endpoint", !isnothing(evidence.method_evidence) &&
+        !isnothing(evidence.method_evidence.endpoint))
+    _write_key_value(io, "has_comparison", !isnothing(evidence.comparison))
+    _write_key_value(io, "has_matched_endpoints", !isnothing(evidence.matched_endpoints))
+    _write_key_value(io, "has_validated_event_evidence",
+        propagation isa CloseEncounterRegularizedPropagationEvidence)
+    _write_key_value(io, "sampled_state_count", length(propagation.sampled_states))
+    _write_key_value(io, "transition_count", length(propagation.transitions))
+    _write_tagged_value(io, propagation.configuration.regularized_relative_tolerance;
+        prefix="regularized_tolerance")
+    _write_tagged_value(io, propagation.automatic_interval[1]; prefix="automatic_entry_time")
+    _write_tagged_value(io, propagation.automatic_interval[2]; prefix="automatic_exit_time")
+    _write_tagged_value(io, propagation.achieved_final_time; prefix="achieved_final_time")
+    _write_key_value(io, "segment_count", propagation.segment_count)
+    _write_key_value(io, "switch_count", propagation.switch_count)
+    println(io)
+    if propagation isa CloseEncounterRegularizedPropagationEvidence
+        _write_regularized_boundaries(io, propagation.boundaries, "$heading.boundaries")
+        println(io, "[$heading.events]")
+        for name in fieldnames(CloseEncounterAutomaticEventEvidence)
+            _write_tagged_value(io, getfield(propagation.event_evidence, name); prefix=String(name))
+        end
+        println(io)
+    end
+    _write_regularized_named_values(io, propagation.work, "$heading.work")
+    for (index, transition) in enumerate(propagation.transitions)
+        _write_regularized_transition(io, transition, "$heading.transition_$index")
+    end
+    for (index, state) in enumerate(propagation.sampled_states)
+        println(io, "[$heading.sampled_state_$index]")
+        _write_key_value(io, "component_count", length(state))
+        for component in eachindex(state)
+            _write_tagged_value(io, state[component]; prefix="component_$component")
+        end
+        println(io)
+    end
+    if !isnothing(evidence.method_evidence)
+        method = evidence.method_evidence
+        reference = method.reference
+        println(io, "[$heading.method_reference]")
+        _write_key_value(io, "method", reference.method)
+        println(io)
+        _write_regularized_named_values(io, reference.errors, "$heading.method_reference.errors")
+        _write_regularized_named_values(io, reference.dense_periapsis, "$heading.method_reference.dense_periapsis")
+        _write_regularized_named_values(io, reference.conservation, "$heading.method_reference.conservation")
+        if !isnothing(method.endpoint)
+            println(io, "[$heading.method_endpoint]")
+            for name in (:automatic_exit_time, :terminal_fictitious_time,
+                :terminal_physical_time, :terminal_physical_time_residual)
+                _write_tagged_value(io, getfield(method.endpoint, name); prefix=String(name))
+            end
+            println(io)
+        end
+    end
+    if !isnothing(evidence.comparison)
+        comparison = evidence.comparison
+        println(io, "[$heading.comparison]")
+        _write_key_value(io, "comparison_grid_convention", comparison.comparison_grid_convention)
+        _write_key_value(io, "comparison_epoch_count", comparison.comparison_epoch_count)
+        _write_tagged_value(io, comparison.automatic_interval[1]; prefix="automatic_entry_time")
+        _write_tagged_value(io, comparison.automatic_interval[2]; prefix="automatic_exit_time")
+        println(io)
+        for (index, sample) in enumerate(comparison.samples)
+            println(io, "[$heading.comparison.sample_$index]")
+            _write_key_value(io, "location", sample.location)
+            for name in (:time, :pair_position_difference, :pair_velocity_difference, :full_state_difference)
+                _write_tagged_value(io, getfield(sample, name); prefix=String(name))
+            end
+            println(io)
+        end
+        println(io, "[$heading.comparison.maximum]")
+        for name in (:maximum_pair_position_difference, :maximum_pair_velocity_difference,
+            :maximum_full_state_difference)
+            _write_tagged_value(io, getfield(comparison, name); prefix=String(name))
+        end
+        println(io)
+    end
+    if !isnothing(evidence.matched_endpoints)
+        endpoints = evidence.matched_endpoints
+        println(io, "[$heading.matched_endpoints]")
+        _write_tagged_value(io, endpoints.automatic.automatic_exit_time; prefix="automatic_exit_time")
+        _write_tagged_value(io, endpoints.explicit.automatic_exit_time; prefix="explicit_exit_time")
+        _write_tagged_value(io, endpoints.automatic.terminal_fictitious_time; prefix="automatic_terminal_fictitious_time")
+        _write_tagged_value(io, endpoints.automatic.terminal_physical_time; prefix="automatic_terminal_physical_time")
+        _write_tagged_value(io, endpoints.automatic.terminal_physical_time_residual; prefix="automatic_terminal_physical_time_residual")
+        _write_tagged_value(io, endpoints.explicit.terminal_fictitious_time; prefix="explicit_terminal_fictitious_time")
+        _write_tagged_value(io, endpoints.explicit.terminal_physical_time; prefix="explicit_terminal_physical_time")
+        _write_tagged_value(io, endpoints.explicit.terminal_physical_time_residual; prefix="explicit_terminal_physical_time_residual")
+        _write_tagged_value(io, endpoints.fictitious_time_difference; prefix="fictitious_time_difference")
+        println(io)
+    end
+end
+
 function _write_supporting_evidence(io, evidence, heading)
     isnothing(evidence) && return
     evidence isa KSSwitchingBackendReport &&
         return _write_ks_supporting_evidence(io, evidence, heading)
     evidence isa CloseEncounterTemporalLocalizationEvidence &&
         return _write_close_supporting_evidence(io, evidence, heading)
+    evidence isa CloseEncounterRegularizedPointEvidence &&
+        return _write_regularized_supporting_evidence(io, evidence, heading)
+    if evidence isa CloseEncounterRegularizedSupportingEvidence
+        return _write_staged_regularized_supporting_evidence(io, evidence, heading)
+    end
     throw(ArgumentError("Unsupported investigation supporting evidence type $(typeof(evidence))."))
+end
+
+function _read_regularized_boundaries(table)
+    names = (:entry_time, :entry_separation, :entry_residual,
+        :periapsis_time, :periapsis_separation, :periapsis_residual,
+        :exit_time, :exit_separation, :exit_residual)
+    CloseEncounterReferenceBoundaries(
+        (map(name -> _read_tagged_value(table; prefix=String(name)), names))...,
+        Symbol(table["arithmetic"]), Int(table["precision_bits"]))
+end
+
+function _read_regularized_named_values(table, names)
+    NamedTuple{names}(Tuple(_read_tagged_value(table; prefix=String(name)) for name in names))
+end
+
+function _read_regularized_transition(table)
+    names = (:physical_time, :state_residual, :position_residual, :velocity_residual,
+        :energy_jump, :momentum_jump, :angular_momentum_jump,
+        :center_of_mass_jump, :center_of_mass_velocity_jump)
+    values = _read_regularized_named_values(table, names)
+    CloseEncounterTransitionEvidence(merge(values, (pair=Tuple(Int.(table["pair"])),)))
+end
+
+function _read_regularized_supporting_evidence(table)
+    get(table, "sample_count", nothing) == 4 || throw(ArgumentError("Regularised evidence requires four ordered samples."))
+    get(table, "transition_count", nothing) == 2 || throw(ArgumentError("Regularised evidence requires two transitions."))
+    method = Symbol(table["method"])
+    tolerance = _read_tagged_value(table; prefix="regularized_relative_tolerance")
+    tolerance == _read_tagged_value(table; prefix="regularized_absolute_tolerance") || throw(ArgumentError("Regularised tolerances differ."))
+    configuration = CloseEncounterRegularizedToleranceConfiguration(tolerance)
+    boundaries = _read_regularized_boundaries(table["boundaries"])
+    event_names = fieldnames(CloseEncounterAutomaticEventEvidence)
+    event_values = _read_regularized_named_values(table["events"], event_names)
+    # Reconstruct through the invariant-preserving field constructor because serialized
+    # event evidence no longer contains raw controller events.
+    event = CloseEncounterAutomaticEventEvidence(
+        event_values.automatic_entry_time, event_values.automatic_exit_time,
+        event_values.reference_entry_time, event_values.reference_exit_time,
+        event_values.signed_entry_time_difference, event_values.absolute_entry_time_error,
+        event_values.signed_exit_time_difference, event_values.absolute_exit_time_error,
+        event_values.entry_separation, event_values.entry_threshold_residual,
+        event_values.exit_separation, event_values.exit_threshold_residual,
+        event_values.entry_radial_rate, event_values.exit_radial_rate)
+    reference_table = table["method_reference"]
+    Symbol(reference_table["method"]) == method || throw(ArgumentError("Serialized method identifiers differ."))
+    error_names = (:maximum_position, :maximum_velocity, :maximum_full_state, :maximum_combined,
+        :final_position, :final_velocity, :final_full_state, :final_combined)
+    dense_names = (:time, :separation, :radial_numerator, :time_error, :separation_error)
+    conservation_names = (:maximum_relative_energy_drift, :maximum_momentum_drift,
+        :maximum_angular_momentum_drift, :maximum_com_residual, :minimum_separation)
+    work_names = (:saved_states, :accepted_steps, :rejected_steps, :rhs_evaluations)
+    transitions = ntuple(i -> _read_regularized_transition(table["transition_$i"]), 2)
+    reference = CloseEncounterMethodReferenceEvidence(method, boundaries,
+        _read_regularized_named_values(reference_table["errors"], error_names),
+        _read_regularized_named_values(reference_table["dense_periapsis"], dense_names),
+        _read_regularized_named_values(reference_table["conservation"], conservation_names),
+        _read_regularized_named_values(reference_table["work"], work_names),
+        Int(reference_table["segment_count"]), Int(reference_table["switch_count"]), transitions)
+    samples = ntuple(4) do index
+        sample = table["sample_$index"]
+        differences = (pair_position=_read_tagged_value(sample; prefix="pair_position_difference"),
+            pair_velocity=_read_tagged_value(sample; prefix="pair_velocity_difference"),
+            full_state=_read_tagged_value(sample; prefix="full_state_difference"))
+        CloseEncounterMethodDifferenceSample(Symbol(sample["location"]),
+            _read_tagged_value(sample; prefix="time"), differences)
+    end
+    maximum_table = table["maximum_interval_difference"]
+    maxima = (pair_position=_read_tagged_value(maximum_table; prefix="maximum_pair_position_difference"),
+        pair_velocity=_read_tagged_value(maximum_table; prefix="maximum_pair_velocity_difference"),
+        full_state=_read_tagged_value(maximum_table; prefix="maximum_full_state_difference"))
+    interval = (Float64(_read_tagged_value(table; prefix="automatic_entry_time")),
+        Float64(_read_tagged_value(table; prefix="automatic_exit_time")))
+    comparison = CloseEncounterAutomaticExplicitComparisonEvidence(interval, samples, maxima,
+        Int(table["comparison_epoch_count"]), table["comparison_grid_convention"],
+        Bool(table["periapsis_inside_interval"]))
+    endpoint_table = table["fictitious_endpoints"]
+    automatic_endpoint = CloseEncounterMethodFictitiousEndpointEvidence(:automatic,
+        interval[2], _read_tagged_value(endpoint_table; prefix="automatic_terminal_fictitious_time"),
+        _read_tagged_value(endpoint_table; prefix="automatic_terminal_physical_time"),
+        _read_tagged_value(endpoint_table; prefix="automatic_terminal_physical_time_residual"))
+    explicit_endpoint = CloseEncounterMethodFictitiousEndpointEvidence(:explicit,
+        interval[2], _read_tagged_value(endpoint_table; prefix="explicit_terminal_fictitious_time"),
+        _read_tagged_value(endpoint_table; prefix="explicit_terminal_physical_time"),
+        _read_tagged_value(endpoint_table; prefix="explicit_terminal_physical_time_residual"))
+    endpoints = CloseEncounterMatchedEndpointEvidence(automatic_endpoint, explicit_endpoint,
+        _read_tagged_value(endpoint_table; prefix="fictitious_time_difference"))
+    CloseEncounterRegularizedPointEvidence(method, configuration, boundaries, interval,
+        reference, event, comparison, endpoints)
+end
+
+function _read_staged_regularized_supporting_evidence(table)
+    method = Symbol(table["method"])
+    stage = Symbol(table["stage"])
+    has_method_measurement = Bool(table["has_method_measurement"])
+    has_method_endpoint = Bool(table["has_method_endpoint"])
+    has_comparison = Bool(table["has_comparison"])
+    has_matched_endpoints = Bool(table["has_matched_endpoints"])
+    has_method_measurement == haskey(table, "method_reference") ||
+        throw(ArgumentError("Method-measurement flag differs from serialized tables."))
+    has_method_endpoint == haskey(table, "method_endpoint") ||
+        throw(ArgumentError("Method-endpoint flag differs from serialized tables."))
+    has_comparison == haskey(table, "comparison") ||
+        throw(ArgumentError("Comparison flag differs from serialized tables."))
+    has_matched_endpoints == haskey(table, "matched_endpoints") ||
+        throw(ArgumentError("Matched-endpoint flag differs from serialized tables."))
+    has_method_endpoint && !has_method_measurement &&
+        throw(ArgumentError("Method endpoint cannot exist without method measurement."))
+    has_propagation_evidence = Bool(get(table, "has_propagation_evidence",
+        !has_method_measurement))
+    has_method_measurement || has_propagation_evidence ||
+        throw(ArgumentError("Serialized staged evidence retains no method or propagation evidence."))
+    has_method_measurement && has_propagation_evidence &&
+        throw(ArgumentError("Serialized staged evidence retains contradictory complete and partial evidence."))
+    configuration = CloseEncounterRegularizedToleranceConfiguration(
+        _read_tagged_value(table; prefix="regularized_tolerance"))
+    interval = (Float64(_read_tagged_value(table; prefix="automatic_entry_time")),
+        Float64(_read_tagged_value(table; prefix="automatic_exit_time")))
+    transition_count = Int(get(table, "transition_count", 2))
+    transition_count in (0, 2) || throw(ArgumentError("Staged transition count is invalid."))
+    transition_keys = Set("transition_$index" for index in 1:transition_count)
+    actual_transition_keys = Set(String(key) for key in keys(table)
+        if occursin(r"^transition_\d+$", String(key)))
+    actual_transition_keys == transition_keys ||
+        throw(ArgumentError("Serialized transition tables differ from transition_count."))
+    transitions = ntuple(index -> _read_regularized_transition(table["transition_$index"]),
+        transition_count)
+    work_names = (:saved_states, :accepted_steps, :rejected_steps, :rhs_evaluations)
+    work = _read_regularized_named_values(table["work"], work_names)
+    state_count = Int(table["sampled_state_count"])
+    state_keys = Set("sampled_state_$index" for index in 1:state_count)
+    actual_state_keys = Set(String(key) for key in keys(table)
+        if occursin(r"^sampled_state_\d+$", String(key)))
+    actual_state_keys == state_keys ||
+        throw(ArgumentError("Serialized sampled-state tables differ from sampled_state_count."))
+    states = ntuple(state_count) do index
+        state_table = table["sampled_state_$index"]
+        get(state_table, "component_count", nothing) == 18 ||
+            throw(ArgumentError("Staged sampled state must contain 18 components."))
+        Float64[_read_tagged_value(state_table; prefix="component_$component")
+            for component in 1:18]
+    end
+    facts = CloseEncounterRegularizedPropagationFacts(configuration, method,
+        interval, _read_tagged_value(table; prefix="achieved_final_time"),
+        transitions, states, work, Int(table["segment_count"]), Int(table["switch_count"]))
+    validated = Bool(get(table, "has_validated_event_evidence", true))
+    has_boundaries = haskey(table, "boundaries")
+    has_events = haskey(table, "events")
+    has_boundaries == has_events ||
+        throw(ArgumentError("Serialized boundaries and events tables must appear together."))
+    validated == (has_boundaries && has_events) ||
+        throw(ArgumentError("Validated-event flag differs from serialized tables."))
+    boundaries = validated ? _read_regularized_boundaries(table["boundaries"]) : nothing
+    propagation = if validated
+        event_names = fieldnames(CloseEncounterAutomaticEventEvidence)
+        event_values = _read_regularized_named_values(table["events"], event_names)
+        event = CloseEncounterAutomaticEventEvidence(
+            (getfield(event_values, name) for name in event_names)...)
+        CloseEncounterRegularizedPropagationEvidence(facts, boundaries, event)
+    else
+        facts
+    end
+    method_evidence = if has_method_measurement
+        propagation isa CloseEncounterRegularizedPropagationEvidence ||
+            throw(ArgumentError("Method measurement requires validated propagation evidence."))
+        reference_table = table["method_reference"]
+        Symbol(reference_table["method"]) == method ||
+            throw(ArgumentError("Staged method identifiers differ."))
+        error_names = (:maximum_position, :maximum_velocity, :maximum_full_state,
+            :maximum_combined, :final_position, :final_velocity, :final_full_state,
+            :final_combined)
+        dense_names = (:time, :separation, :radial_numerator, :time_error, :separation_error)
+        conservation_names = (:maximum_relative_energy_drift, :maximum_momentum_drift,
+            :maximum_angular_momentum_drift, :maximum_com_residual, :minimum_separation)
+        reference = CloseEncounterMethodReferenceEvidence(method, boundaries,
+            _read_regularized_named_values(reference_table["errors"], error_names),
+            _read_regularized_named_values(reference_table["dense_periapsis"], dense_names),
+            _read_regularized_named_values(reference_table["conservation"], conservation_names),
+            work, propagation.segment_count, propagation.switch_count, transitions)
+        endpoint = if has_method_endpoint
+            endpoint_table = table["method_endpoint"]
+            CloseEncounterMethodFictitiousEndpointEvidence(method,
+                _read_tagged_value(endpoint_table; prefix="automatic_exit_time"),
+                _read_tagged_value(endpoint_table; prefix="terminal_fictitious_time"),
+                _read_tagged_value(endpoint_table; prefix="terminal_physical_time"),
+                _read_tagged_value(endpoint_table; prefix="terminal_physical_time_residual"))
+        else
+            nothing
+        end
+        CloseEncounterRegularizedMethodEvidence(propagation, reference, endpoint)
+    else
+        nothing
+    end
+    comparison = if has_comparison
+        comparison_table = table["comparison"]
+        expected_ordered_tables = Set(["sample_1", "sample_2", "sample_3", "sample_4", "maximum"])
+        actual_ordered_tables = Set(String(key) for key in keys(comparison_table)
+            if occursin(r"^sample_\d+$", String(key)) ||
+                String(key) == "maximum" || occursin(r"^maximum_\d+$", String(key)))
+        actual_ordered_tables == expected_ordered_tables ||
+            throw(ArgumentError("Serialized comparison tables are not the exact ordered evidence set."))
+        samples = ntuple(4) do index
+            sample = comparison_table["sample_$index"]
+            differences = (pair_position=_read_tagged_value(sample; prefix="pair_position_difference"),
+                pair_velocity=_read_tagged_value(sample; prefix="pair_velocity_difference"),
+                full_state=_read_tagged_value(sample; prefix="full_state_difference"))
+            CloseEncounterMethodDifferenceSample(Symbol(sample["location"]),
+                _read_tagged_value(sample; prefix="time"), differences)
+        end
+        maximum_table = comparison_table["maximum"]
+        maxima = (pair_position=_read_tagged_value(maximum_table; prefix="maximum_pair_position_difference"),
+            pair_velocity=_read_tagged_value(maximum_table; prefix="maximum_pair_velocity_difference"),
+            full_state=_read_tagged_value(maximum_table; prefix="maximum_full_state_difference"))
+        comparison_interval = (
+            Float64(_read_tagged_value(comparison_table; prefix="automatic_entry_time")),
+            Float64(_read_tagged_value(comparison_table; prefix="automatic_exit_time")))
+        CloseEncounterAutomaticExplicitComparisonEvidence(comparison_interval, samples, maxima,
+            Int(comparison_table["comparison_epoch_count"]),
+            comparison_table["comparison_grid_convention"], true)
+    else
+        nothing
+    end
+    matched = if has_matched_endpoints
+        endpoint_table = table["matched_endpoints"]
+        automatic = CloseEncounterMethodFictitiousEndpointEvidence(:automatic,
+            _read_tagged_value(endpoint_table; prefix="automatic_exit_time"),
+            _read_tagged_value(endpoint_table; prefix="automatic_terminal_fictitious_time"),
+            _read_tagged_value(endpoint_table; prefix="automatic_terminal_physical_time"),
+            _read_tagged_value(endpoint_table; prefix="automatic_terminal_physical_time_residual"))
+        explicit = CloseEncounterMethodFictitiousEndpointEvidence(:explicit,
+            _read_tagged_value(endpoint_table; prefix="explicit_exit_time"),
+            _read_tagged_value(endpoint_table; prefix="explicit_terminal_fictitious_time"),
+            _read_tagged_value(endpoint_table; prefix="explicit_terminal_physical_time"),
+            _read_tagged_value(endpoint_table; prefix="explicit_terminal_physical_time_residual"))
+        CloseEncounterMatchedEndpointEvidence(automatic, explicit,
+            _read_tagged_value(endpoint_table; prefix="fictitious_time_difference"))
+    else
+        nothing
+    end
+    CloseEncounterRegularizedSupportingEvidence(method, method_evidence,
+        isnothing(method_evidence) ? propagation : nothing, comparison, matched, stage;
+        summary=get(table, "summary", nothing))
 end
 
 """Write one investigation series in deterministic schema-1 TOML text."""
@@ -513,6 +956,10 @@ function read_investigation_series(source)
                 )
             elseif kind == "close_encounter_temporal_localization"
                 _read_close_supporting_evidence(evidence_table)
+            elseif kind == "close_encounter_regularized_tolerance"
+                _read_regularized_supporting_evidence(evidence_table)
+            elseif kind == "close_encounter_regularized_tolerance_staged"
+                _read_staged_regularized_supporting_evidence(evidence_table)
             else
                 throw(ArgumentError("Unsupported supporting evidence kind."))
             end

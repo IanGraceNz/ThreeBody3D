@@ -49,47 +49,24 @@ experiment_environment = current_validation_environment()
 protocol = resolve_case_protocol(case_definition, VALIDATION_SCHEMA_VERSION)
 
 function switching_work(trajectory)
-    ValidationFramework.close_encounter_sum_work([
-        ValidationFramework.close_encounter_solution_work(
-            segment isa AutomaticCartesianSegment ?
-                segment.location.simulation.solution :
-                segment.location.regularized_result.solution,
-        )
-        for segment in trajectory.segments
-    ])
+    ValidationFramework.close_encounter_automatic_work(trajectory)
 end
 function composed_work(trajectory)
-    ValidationFramework.close_encounter_sum_work([
-        (
-            saved_states=statistics.saved_states,
-            accepted_steps=statistics.accepted_steps,
-            rejected_steps=statistics.rejected_steps,
-            rhs_evaluations=statistics.rhs_evaluations,
-        )
-        for statistics in trajectory.solver_statistics
-    ])
+    ValidationFramework.close_encounter_explicit_work(trajectory)
 end
 function first_event(trajectory, kind)
-    index = findfirst(event -> event.kind == kind, trajectory.switch_events)
-    isnothing(index) && error("No $(kind) switch event was recorded.")
-    trajectory.switch_events[index]
+    events = ValidationFramework.close_encounter_switch_events(trajectory)
+    kind == :entry ? first(events) : kind == :exit ? last(events) : error("Unsupported event kind.")
 end
 
 
 function regularized_segment(trajectory)
-    index = findfirst(segment -> segment isa AutomaticRegularizedSegment, trajectory.segments)
-    isnothing(index) && error("No automatic regularized segment was retained.")
-    trajectory.segments[index]
+    ValidationFramework.close_encounter_automatic_regularized_segment(trajectory)
 end
 
 function boundary_state_difference(reference_state, comparison_state)
-    reference = ValidationFramework.close_encounter_pair_components(reference_state)
-    comparison = ValidationFramework.close_encounter_pair_components(comparison_state)
-    (
-        position=norm(comparison.position - reference.position),
-        velocity=norm(comparison.velocity - reference.velocity),
-        state=maximum(abs, comparison_state .- reference_state),
-    )
+    value = ValidationFramework.close_encounter_state_difference(reference_state, comparison_state)
+    (position=value.pair_position, velocity=value.pair_velocity, state=value.full_state)
 end
 function endpoint_reference_report(state, reference_state)
     errors = ValidationFramework.close_encounter_state_errors(state, reference_state)
@@ -105,23 +82,17 @@ function endpoint_reference_report(state, reference_state)
     )
 end
 
-function regularized_endpoint_time_report(automatic_segment, explicit_segment, exit_time)
-    automatic_s = Float64(automatic_segment.location.fictitious_time)
-    explicit_s = Float64(explicit_segment.exit_fictitious_time)
-    automatic_solution_time = Float64(
-        automatic_segment.location.regularized_result.solution(automatic_s)[14],
-    )
-    explicit_solution_time = Float64(
-        explicit_segment.regularized_result.solution(explicit_s)[14],
-    )
+function regularized_endpoint_time_report(automatic, explicit, exit_time)
+    evidence = ValidationFramework.close_encounter_fictitious_endpoints(
+        automatic, explicit, Float64(exit_time))
     (
-        automatic_s=automatic_s,
-        explicit_s=explicit_s,
-        fictitious_time_difference=abs(explicit_s - automatic_s),
-        automatic_solution_time=automatic_solution_time,
-        explicit_solution_time=explicit_solution_time,
-        automatic_time_residual=automatic_solution_time - Float64(exit_time),
-        explicit_time_residual=explicit_solution_time - Float64(exit_time),
+        automatic_s=evidence.automatic_terminal_fictitious_time,
+        explicit_s=evidence.explicit_terminal_fictitious_time,
+        fictitious_time_difference=abs(evidence.fictitious_time_difference),
+        automatic_solution_time=evidence.automatic_terminal_physical_time,
+        explicit_solution_time=evidence.explicit_terminal_physical_time,
+        automatic_time_residual=evidence.automatic_terminal_physical_time_residual,
+        explicit_time_residual=evidence.explicit_terminal_physical_time_residual,
     )
 end
 
@@ -170,30 +141,8 @@ function run_automatic(
     configuration,
     environment,
 )
-    parameters = AutomaticSwitchingParameters(
-        enter_threshold=ENTRY_THRESHOLD,
-        exit_threshold=EXIT_THRESHOLD,
-        ambiguity_threshold=EXIT_THRESHOLD,
-        minimum_separation_ratio=AUTOMATIC_MINIMUM_SEPARATION_RATIO,
-        maximum_switches=AUTOMATIC_MAXIMUM_SWITCHES,
-    )
-
-    elapsed = @elapsed trajectory = simulate_experimental_switching(
-        problem.system,
-        problem.u0,
-        problem.tspan,
-        parameters;
-        cartesian_kwargs=(
-            solver=:accurate,
-            reltol=CARTESIAN_TOLERANCE,
-            abstol=CARTESIAN_TOLERANCE,
-        ),
-        regularized_kwargs=(
-            reltol=REGULARIZED_TOLERANCE,
-            abstol=REGULARIZED_TOLERANCE,
-            initial_step=REGULARIZED_INITIAL_STEP,
-        ),
-    )
+    controls = ValidationFramework.close_encounter_regularized_controls(REGULARIZED_TOLERANCE)
+    elapsed = @elapsed trajectory = ValidationFramework.close_encounter_automatic_propagation(problem, controls)
     trajectory.status == :completed || error(
         "Automatic switching failed: $(trajectory.failure)",
     )
@@ -224,14 +173,7 @@ function run_automatic(
         switches=diagnostics.switch_count,
         transition_residual=diagnostics.maximum_transition_state_residual,
         final_time=last(samples.times),
-        state_at_time=time -> experimental_switching_state(
-            trajectory,
-            time;
-            regularized_kwargs=(
-                tolerance=EVALUATION_TOLERANCE,
-                max_iterations=EVALUATION_MAX_ITERATIONS,
-            ),
-        ),
+        state_at_time=time -> ValidationFramework.close_encounter_automatic_state(trajectory, time, controls),
         result=trajectory,
     )
 end
@@ -248,29 +190,10 @@ function run_explicit(
     entry_time = Float64(first_event(automatic.result, :entry).physical_time)
     exit_time = Float64(first_event(automatic.result, :exit).physical_time)
 
-    elapsed = @elapsed trajectory = compose_regularized_trajectory(
-        problem.system,
-        problem.u0,
-        problem.tspan,
-        SELECTED_PAIR,
-        (entry_time, exit_time);
-        saveat=times,
-        cartesian_solver=:accurate,
-        cartesian_reltol=CARTESIAN_TOLERANCE,
-        cartesian_abstol=CARTESIAN_TOLERANCE,
-        regularized_reltol=REGULARIZED_TOLERANCE,
-        regularized_abstol=REGULARIZED_TOLERANCE,
-        regularized_initial_step=REGULARIZED_INITIAL_STEP,
-        regularized_max_iterations=REGULARIZED_MAX_ITERATIONS,
-    )
-    states = [
-        composed_regularized_state(
-            trajectory,
-            time;
-            tolerance=EVALUATION_TOLERANCE,
-        )
-        for time in times
-    ]
+    controls = ValidationFramework.close_encounter_regularized_controls(REGULARIZED_TOLERANCE)
+    elapsed = @elapsed trajectory = ValidationFramework.close_encounter_explicit_propagation(
+        problem, (entry_time, exit_time), controls; saveat=times)
+    states = ValidationFramework.close_encounter_explicit_states(trajectory, times, controls)
     transition_residual = max(
         trajectory.entry_continuity.state_residual,
         trajectory.exit_continuity.state_residual,
@@ -291,11 +214,7 @@ function run_explicit(
         switches=2,
         transition_residual=transition_residual,
         final_time=last(times),
-        state_at_time=time -> composed_regularized_state(
-            trajectory,
-            time;
-            tolerance=EVALUATION_TOLERANCE,
-        ),
+        state_at_time=time -> ValidationFramework.close_encounter_explicit_state(trajectory, time, controls),
         result=trajectory,
     )
 end
@@ -537,8 +456,8 @@ explicit_exit_report = endpoint_reference_report(
     reference_exit_state,
 )
 endpoint_times = regularized_endpoint_time_report(
-    automatic_segment,
-    explicit.result.regularized_segment,
+    automatic.result,
+    explicit.result,
     exit_time,
 )
 
