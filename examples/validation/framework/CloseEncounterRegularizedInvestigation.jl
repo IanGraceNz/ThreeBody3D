@@ -5,7 +5,9 @@ const CLOSE_ENCOUNTER_DIFFERENCE_SAMPLE_ORDER = (:entry, :periapsis, :exit, :fin
 const CLOSE_ENCOUNTER_COMPARISON_GRID_CONVENTION =
     "approved 0.002 physical grid within automatic interval plus exact entry, reference periapsis, and exit; sorted and deduplicated"
 
-struct CloseEncounterRegularizedToleranceConfiguration
+abstract type AbstractCloseEncounterRegularizedConfiguration end
+
+struct CloseEncounterRegularizedToleranceConfiguration <: AbstractCloseEncounterRegularizedConfiguration
     regularized_relative_tolerance::Float64
     regularized_absolute_tolerance::Float64
     cartesian_relative_tolerance::Float64
@@ -27,6 +29,8 @@ close_encounter_regularized_tolerance_configuration(tolerance) =
     CloseEncounterRegularizedToleranceConfiguration(tolerance)
 _close_regularized_controls(c::CloseEncounterRegularizedToleranceConfiguration) =
     CloseEncounterRegularizedExecutionControls((getfield(c, n) for n in fieldnames(typeof(c)))...)
+_close_regularized_configuration_is_approved(c::CloseEncounterRegularizedToleranceConfiguration) =
+    c == CloseEncounterRegularizedToleranceConfiguration(c.regularized_relative_tolerance)
 
 struct CloseEncounterTransitionEvidence
     physical_time::Float64
@@ -76,7 +80,8 @@ struct CloseEncounterAutomaticEventEvidence
         absolute_exit_time_error::BigFloat, entry_separation::Float64,
         entry_threshold_residual::Float64, exit_separation::Float64,
         exit_threshold_residual::Float64, entry_radial_rate::Float64,
-        exit_radial_rate::Float64)
+        exit_radial_rate::Float64; entry_threshold::Float64=0.1,
+        exit_threshold::Float64=0.25)
         precision(reference_entry_time) == 256 && precision(reference_exit_time) == 256 ||
             throw(ArgumentError("Reference event times must retain 256-bit precision."))
         all(value -> precision(value) == 256, (signed_entry_time_difference,
@@ -90,8 +95,8 @@ struct CloseEncounterAutomaticEventEvidence
             absolute_entry_time_error == abs(signed_entry_time_difference) || throw(ArgumentError("Entry-time error is inconsistent."))
             absolute_exit_time_error == abs(signed_exit_time_difference) || throw(ArgumentError("Exit-time error is inconsistent."))
         end
-        entry_threshold_residual == entry_separation - 0.1 || throw(ArgumentError("Entry residual is inconsistent."))
-        exit_threshold_residual == exit_separation - 0.25 || throw(ArgumentError("Exit residual is inconsistent."))
+        entry_threshold_residual == entry_separation - entry_threshold || throw(ArgumentError("Entry residual is inconsistent."))
+        exit_threshold_residual == exit_separation - exit_threshold || throw(ArgumentError("Exit residual is inconsistent."))
         entry_radial_rate < 0 && exit_radial_rate > 0 || throw(ArgumentError("Event directions are invalid."))
         all(isfinite, (automatic_entry_time, automatic_exit_time, entry_separation,
             entry_threshold_residual, exit_separation, exit_threshold_residual,
@@ -123,13 +128,38 @@ struct CloseEncounterAutomaticEventEvidence
     end
 end
 
+function CloseEncounterAutomaticEventEvidence(entry, exit, boundaries,
+    configuration::AbstractCloseEncounterRegularizedConfiguration)
+    precision(boundaries.entry_time) == 256 && precision(boundaries.exit_time) == 256 ||
+        throw(ArgumentError("Reference event times must retain 256-bit precision."))
+    entry_time, exit_time = Float64(entry.physical_time), Float64(exit.physical_time)
+    entry_time < exit_time || throw(ArgumentError("Automatic event times are unordered."))
+    entry.pair == (1, 2) && exit.pair == (1, 2) ||
+        throw(ArgumentError("Automatic events selected the wrong pair."))
+    entry_sep = Float64(entry.separations[1]); exit_sep = Float64(exit.separations[1])
+    entry_rate = Float64(entry.radial_rates[1]); exit_rate = Float64(exit.radial_rates[1])
+    entry_rate < 0 && exit_rate > 0 || throw(ArgumentError("Automatic event directions are invalid."))
+    setprecision(BigFloat, 256) do
+        entry_difference = BigFloat(entry_time) - boundaries.entry_time
+        exit_difference = BigFloat(exit_time) - boundaries.exit_time
+        CloseEncounterAutomaticEventEvidence(entry_time, exit_time,
+            BigFloat(boundaries.entry_time), BigFloat(boundaries.exit_time),
+            entry_difference, abs(entry_difference), exit_difference, abs(exit_difference),
+            entry_sep, entry_sep - configuration.entry_threshold,
+            exit_sep, exit_sep - configuration.exit_threshold, entry_rate, exit_rate;
+            entry_threshold=configuration.entry_threshold,
+            exit_threshold=configuration.exit_threshold)
+    end
+end
+
 function CloseEncounterAutomaticEventEvidence(automatic_entry_time::Real,
     automatic_exit_time::Real, reference_entry_time::BigFloat,
     reference_exit_time::BigFloat, signed_entry_time_difference::BigFloat,
     absolute_entry_time_error::BigFloat, signed_exit_time_difference::BigFloat,
     absolute_exit_time_error::BigFloat, entry_separation::Real,
     entry_threshold_residual::Real, exit_separation::Real,
-    exit_threshold_residual::Real, entry_radial_rate::Real, exit_radial_rate::Real)
+    exit_threshold_residual::Real, entry_radial_rate::Real, exit_radial_rate::Real;
+    entry_threshold::Real=0.1, exit_threshold::Real=0.25)
     precision(reference_entry_time) == 256 && precision(reference_exit_time) == 256 ||
         throw(ArgumentError("Reference event times must retain 256-bit precision."))
     automatic_entry_time < automatic_exit_time || throw(ArgumentError("Automatic event times are unordered."))
@@ -139,8 +169,8 @@ function CloseEncounterAutomaticEventEvidence(automatic_entry_time::Real,
         absolute_entry_time_error == abs(signed_entry_time_difference) || throw(ArgumentError("Entry-time error is inconsistent."))
         absolute_exit_time_error == abs(signed_exit_time_difference) || throw(ArgumentError("Exit-time error is inconsistent."))
     end
-    entry_threshold_residual == entry_separation - 0.1 || throw(ArgumentError("Entry residual is inconsistent."))
-    exit_threshold_residual == exit_separation - 0.25 || throw(ArgumentError("Exit residual is inconsistent."))
+    entry_threshold_residual == entry_separation - entry_threshold || throw(ArgumentError("Entry residual is inconsistent."))
+    exit_threshold_residual == exit_separation - exit_threshold || throw(ArgumentError("Exit residual is inconsistent."))
     entry_radial_rate < 0 && exit_radial_rate > 0 || throw(ArgumentError("Event directions are invalid."))
     values = (automatic_entry_time, automatic_exit_time, entry_separation,
         entry_threshold_residual, exit_separation, exit_threshold_residual,
@@ -150,7 +180,8 @@ function CloseEncounterAutomaticEventEvidence(automatic_entry_time::Real,
         reference_entry_time, reference_exit_time, signed_entry_time_difference,
         absolute_entry_time_error, signed_exit_time_difference, absolute_exit_time_error,
         Float64(entry_separation), Float64(entry_threshold_residual), Float64(exit_separation),
-        Float64(exit_threshold_residual), Float64(entry_radial_rate), Float64(exit_radial_rate))
+        Float64(exit_threshold_residual), Float64(entry_radial_rate), Float64(exit_radial_rate);
+        entry_threshold=Float64(entry_threshold), exit_threshold=Float64(exit_threshold))
 end
 
 struct CloseEncounterMethodFictitiousEndpointEvidence
@@ -290,7 +321,7 @@ end
 
 struct CloseEncounterRegularizedPointEvidence
     method::Symbol
-    configuration::CloseEncounterRegularizedToleranceConfiguration
+    configuration::AbstractCloseEncounterRegularizedConfiguration
     boundaries::CloseEncounterReferenceBoundaries
     automatic_interval::Tuple{Float64,Float64}
     method_reference::CloseEncounterMethodReferenceEvidence
@@ -315,7 +346,7 @@ end
 
 
 struct CloseEncounterRegularizedPropagationFacts
-    configuration::CloseEncounterRegularizedToleranceConfiguration
+    configuration::AbstractCloseEncounterRegularizedConfiguration
     method::Symbol
     automatic_interval::Tuple{Float64,Float64}
     achieved_final_time::Float64
@@ -371,6 +402,12 @@ struct CloseEncounterRegularizedPropagationEvidence
         event_evidence.reference_entry_time == boundaries.entry_time &&
             event_evidence.reference_exit_time == boundaries.exit_time ||
             throw(ArgumentError("Propagation event reference times differ from shared boundaries."))
+        event_evidence.entry_threshold_residual ==
+            event_evidence.entry_separation - facts.configuration.entry_threshold ||
+            throw(ArgumentError("Propagation entry residual differs from its controller threshold."))
+        event_evidence.exit_threshold_residual ==
+            event_evidence.exit_separation - facts.configuration.exit_threshold ||
+            throw(ArgumentError("Propagation exit residual differs from its controller threshold."))
         new(facts, boundaries, event_evidence)
     end
 end
@@ -412,7 +449,7 @@ struct CloseEncounterRegularizedMethodEvidence
 end
 
 struct CloseEncounterRegularizedPairAttempt
-    configuration::CloseEncounterRegularizedToleranceConfiguration
+    configuration::AbstractCloseEncounterRegularizedConfiguration
     reference::CloseEncounterReferenceExecution
     automatic_execution::ExecutionOutcome
     explicit_execution::ExecutionOutcome
@@ -427,8 +464,8 @@ struct CloseEncounterRegularizedPairAttempt
         automatic_execution, explicit_execution, automatic_evidence, explicit_evidence,
         automatic_partial, explicit_partial, comparison, matched_endpoints,
         comparison_failure=nothing)
-        configuration == CloseEncounterRegularizedToleranceConfiguration(
-            configuration.regularized_relative_tolerance) || throw(ArgumentError("Attempt configuration is not approved."))
+        _close_regularized_configuration_is_approved(configuration) ||
+            throw(ArgumentError("Attempt configuration is not approved."))
         for (method, execution, evidence, partial) in ((:automatic, automatic_execution,
             automatic_evidence, automatic_partial), (:explicit, explicit_execution,
             explicit_evidence, explicit_partial))
@@ -629,7 +666,7 @@ function _close_regularized_method_measurement(propagation, trajectory, referenc
         propagation.transitions)
 end
 
-function attempt_close_encounter_regularized_pair(configuration::CloseEncounterRegularizedToleranceConfiguration,
+function attempt_close_encounter_regularized_pair(configuration::AbstractCloseEncounterRegularizedConfiguration,
     reference::CloseEncounterReferenceExecution; automatic_runner=close_encounter_automatic_propagation,
     interval_runner=close_encounter_automatic_interval,
     event_runner=close_encounter_switch_events,
@@ -685,7 +722,9 @@ function attempt_close_encounter_regularized_pair(configuration::CloseEncounterR
     end
     if event_extracted
         try
-            event_evidence = event_evidence_runner(entry, exit, reference.boundaries)
+            event_evidence = configuration isa CloseEncounterRegularizedToleranceConfiguration ?
+                event_evidence_runner(entry, exit, reference.boundaries) :
+                event_evidence_runner(entry, exit, reference.boundaries, configuration)
         catch error
             automatic_failure = append_failure(automatic_failure, sprint(showerror, error))
         end
@@ -861,16 +900,16 @@ function _close_regularized_validation_configuration(configuration, method)
         relative_tolerance=configuration.regularized_relative_tolerance,
         absolute_tolerance=configuration.regularized_absolute_tolerance,
         time_interval=(0.0, 1.6), sampling="step=0.002", selected_pair=(1, 2),
-        thresholds=(ValidationParameter(:entry_threshold, 0.1),
-            ValidationParameter(:ambiguity_threshold, 0.25),
-            ValidationParameter(:exit_threshold, 0.25)),
+        thresholds=(ValidationParameter(:entry_threshold, configuration.entry_threshold),
+            ValidationParameter(:ambiguity_threshold, configuration.ambiguity_threshold),
+            ValidationParameter(:exit_threshold, configuration.exit_threshold)),
         parameters=(ValidationParameter(:method, method),
-            ValidationParameter(:cartesian_relative_tolerance, 1e-13),
-            ValidationParameter(:cartesian_absolute_tolerance, 1e-13),
-            ValidationParameter(:state_evaluation_tolerance, 1e-14),
-            ValidationParameter(:regularized_initial_step, 0.1),
-            ValidationParameter(:regularized_maximum_iterations, 256),
-            ValidationParameter(:state_evaluation_maximum_iterations, 256),
+            ValidationParameter(:cartesian_relative_tolerance, configuration.cartesian_relative_tolerance),
+            ValidationParameter(:cartesian_absolute_tolerance, configuration.cartesian_absolute_tolerance),
+            ValidationParameter(:state_evaluation_tolerance, configuration.state_evaluation_tolerance),
+            ValidationParameter(:regularized_initial_step, configuration.regularized_initial_step),
+            ValidationParameter(:regularized_maximum_iterations, configuration.regularized_maximum_iterations),
+            ValidationParameter(:state_evaluation_maximum_iterations, configuration.state_evaluation_maximum_iterations),
             ValidationParameter(:explicit_interval_source, :corresponding_automatic_run)))
 end
 
@@ -898,27 +937,32 @@ end
 
 function close_encounter_regularized_performance_operation(method, configuration;
     automatic_runner=close_encounter_automatic_propagation,
-    explicit_runner=close_encounter_explicit_propagation)
+    explicit_runner=close_encounter_explicit_propagation,
+    interval_runner=close_encounter_automatic_interval,
+    automatic_work_runner=close_encounter_automatic_work,
+    explicit_work_runner=close_encounter_explicit_work,
+    automatic_count_runner=trajectory ->
+        (length(trajectory.segments), length(trajectory.switch_events)))
     controls = _close_regularized_controls(configuration)
     problem = close_encounter_problem(Float64)
     if method == :automatic
         return () -> begin
             trajectory = automatic_runner(problem, controls)
-            close_encounter_automatic_interval(trajectory)
-            work = close_encounter_automatic_work(trajectory)
+            interval_runner(trajectory)
+            work = automatic_work_runner(trajectory)
+            segment_count, switch_count = automatic_count_runner(trajectory)
             PerformanceObservation(solver_statistics=SolverStatistics(
                 accepted_steps=work.accepted_steps, rejected_steps=work.rejected_steps,
                 rhs_evaluations=work.rhs_evaluations, saved_states=work.saved_states,
-                segment_count=length(trajectory.segments),
-                switch_count=length(trajectory.switch_events)),
+                segment_count=segment_count, switch_count=switch_count),
                 saved_states=work.saved_states)
         end
     elseif method == :explicit
         automatic = automatic_runner(problem, controls)
-        interval = close_encounter_automatic_interval(automatic)
+        interval = interval_runner(automatic)
         return () -> begin
             trajectory = explicit_runner(problem, interval, controls)
-            work = close_encounter_explicit_work(trajectory)
+            work = explicit_work_runner(trajectory)
             PerformanceObservation(solver_statistics=SolverStatistics(
                 accepted_steps=work.accepted_steps, rejected_steps=work.rejected_steps,
                 rhs_evaluations=work.rhs_evaluations, saved_states=work.saved_states,

@@ -45,6 +45,7 @@ include("PrecisionTriggerSerialization.jl")
 include("CloseEncounterExperiment.jl")
 include("CloseEncounterRegularizedExperiment.jl")
 include("CloseEncounterRegularizedInvestigation.jl")
+include("CloseEncounterThresholdScaleInvestigation.jl")
 include("CloseEncounterCase.jl")
 include("CloseEncounterCartesianInvestigation.jl")
 include("CloseEncounterInvestigation.jl")
@@ -171,6 +172,7 @@ export AbstractValidationMetric,
        CloseEncounterCartesianAttempt,
        CloseEncounterTemporalLocalizationEvidence,
        CloseEncounterRegularizedToleranceConfiguration,
+       CloseEncounterThresholdScaleConfiguration,
        CloseEncounterRegularizedPropagationFacts,
        CloseEncounterRegularizedPairAttempt,
        build_close_encounter_reference,
@@ -182,6 +184,9 @@ export AbstractValidationMetric,
        attempt_close_encounter_regularized_pair,
        close_encounter_regularized_performance_entries,
        close_encounter_regularized_investigation_series,
+       close_encounter_threshold_scale_configuration,
+       close_encounter_threshold_performance_entries,
+       close_encounter_threshold_investigation_series,
        TRIPLE_COLLISION_DEFINITION_VERSION,
        RANDOMIZED_REGRESSION_DEFINITION_VERSION,
        KS_KEPLER_DEFINITION_VERSION,

@@ -468,7 +468,10 @@ function _write_staged_regularized_supporting_evidence(io,
     propagation = isnothing(evidence.method_evidence) ? evidence.propagation_evidence :
         evidence.method_evidence.propagation
     println(io, "[$heading]")
-    _write_key_value(io, "kind", "close_encounter_regularized_tolerance_staged")
+    threshold_family = propagation.configuration isa CloseEncounterThresholdScaleConfiguration
+    _write_key_value(io, "kind", threshold_family ?
+        "close_encounter_threshold_scale_staged" :
+        "close_encounter_regularized_tolerance_staged")
     _write_key_value(io, "method", evidence.method)
     _write_key_value(io, "stage", evidence.stage)
     !isnothing(evidence.summary) && _write_key_value(io, "summary", evidence.summary)
@@ -484,6 +487,17 @@ function _write_staged_regularized_supporting_evidence(io,
     _write_key_value(io, "transition_count", length(propagation.transitions))
     _write_tagged_value(io, propagation.configuration.regularized_relative_tolerance;
         prefix="regularized_tolerance")
+    if threshold_family
+        configuration = propagation.configuration
+        _write_tagged_value(io, configuration.threshold_scale; prefix="threshold_scale")
+        _write_tagged_value(io, configuration.entry_threshold; prefix="entry_threshold")
+        _write_tagged_value(io, configuration.ambiguity_threshold; prefix="ambiguity_threshold")
+        _write_tagged_value(io, configuration.exit_threshold; prefix="exit_threshold")
+        _write_tagged_value(io, configuration.cartesian_relative_tolerance;
+            prefix="cartesian_tolerance")
+        _write_tagged_value(io, configuration.state_evaluation_tolerance;
+            prefix="state_evaluation_tolerance")
+    end
     _write_tagged_value(io, propagation.automatic_interval[1]; prefix="automatic_entry_time")
     _write_tagged_value(io, propagation.automatic_interval[2]; prefix="automatic_exit_time")
     _write_tagged_value(io, propagation.achieved_final_time; prefix="achieved_final_time")
@@ -669,7 +683,7 @@ function _read_regularized_supporting_evidence(table)
         reference, event, comparison, endpoints)
 end
 
-function _read_staged_regularized_supporting_evidence(table)
+function _read_staged_regularized_supporting_evidence(table; threshold_family=false)
     method = Symbol(table["method"])
     stage = Symbol(table["stage"])
     has_method_measurement = Bool(table["has_method_measurement"])
@@ -692,8 +706,22 @@ function _read_staged_regularized_supporting_evidence(table)
         throw(ArgumentError("Serialized staged evidence retains no method or propagation evidence."))
     has_method_measurement && has_propagation_evidence &&
         throw(ArgumentError("Serialized staged evidence retains contradictory complete and partial evidence."))
-    configuration = CloseEncounterRegularizedToleranceConfiguration(
-        _read_tagged_value(table; prefix="regularized_tolerance"))
+    configuration = if threshold_family
+        scale = _read_tagged_value(table; prefix="threshold_scale")
+        regularized_tolerance = _read_tagged_value(table; prefix="regularized_tolerance")
+        cartesian_tolerance = _read_tagged_value(table; prefix="cartesian_tolerance")
+        CloseEncounterThresholdScaleConfiguration(scale,
+            regularized_tolerance, regularized_tolerance,
+            cartesian_tolerance, cartesian_tolerance,
+            _read_tagged_value(table; prefix="entry_threshold"),
+            _read_tagged_value(table; prefix="ambiguity_threshold"),
+            _read_tagged_value(table; prefix="exit_threshold"),
+            _read_tagged_value(table; prefix="state_evaluation_tolerance"),
+            0.1, 256, 256)
+    else
+        CloseEncounterRegularizedToleranceConfiguration(
+            _read_tagged_value(table; prefix="regularized_tolerance"))
+    end
     interval = (Float64(_read_tagged_value(table; prefix="automatic_entry_time")),
         Float64(_read_tagged_value(table; prefix="automatic_exit_time")))
     transition_count = Int(get(table, "transition_count", 2))
@@ -735,7 +763,9 @@ function _read_staged_regularized_supporting_evidence(table)
         event_names = fieldnames(CloseEncounterAutomaticEventEvidence)
         event_values = _read_regularized_named_values(table["events"], event_names)
         event = CloseEncounterAutomaticEventEvidence(
-            (getfield(event_values, name) for name in event_names)...)
+            (getfield(event_values, name) for name in event_names)...;
+            entry_threshold=configuration.entry_threshold,
+            exit_threshold=configuration.exit_threshold)
         CloseEncounterRegularizedPropagationEvidence(facts, boundaries, event)
     else
         facts
@@ -940,6 +970,9 @@ function read_investigation_series(source)
     data = source isa IO ? TOML.parse(read(source, String)) : TOML.parsefile(source)
     _validate_report_header(data, INVESTIGATION_REPORT_KIND)
     definition = _read_investigation_definition(data["definition"])
+    threshold_definition = definition.family_id in (
+        :close_encounter_automatic_threshold_scale,
+        :close_encounter_explicit_threshold_scale)
     points = map(get(data, "points", Any[])) do table
         configuration = _read_configuration(table["configuration"])
         environment = _read_environment(table["environment"])
@@ -950,6 +983,14 @@ function read_investigation_series(source)
         evidence = if haskey(table, "supporting_evidence")
             evidence_table = table["supporting_evidence"]
             kind = get(evidence_table, "kind", nothing)
+            if threshold_definition
+                kind == "close_encounter_threshold_scale_staged" ||
+                    throw(ArgumentError(
+                        "Threshold-scale definitions require threshold-scale staged evidence."))
+            elseif kind == "close_encounter_threshold_scale_staged"
+                throw(ArgumentError(
+                    "Threshold-scale staged evidence requires a threshold-scale definition."))
+            end
             if kind == "ks_switching_backend"
                 _read_ks_supporting_evidence(
                     evidence_table, definition, configuration, environment,
@@ -960,6 +1001,9 @@ function read_investigation_series(source)
                 _read_regularized_supporting_evidence(evidence_table)
             elseif kind == "close_encounter_regularized_tolerance_staged"
                 _read_staged_regularized_supporting_evidence(evidence_table)
+            elseif kind == "close_encounter_threshold_scale_staged"
+                _read_staged_regularized_supporting_evidence(evidence_table;
+                    threshold_family=true)
             else
                 throw(ArgumentError("Unsupported supporting evidence kind."))
             end
@@ -969,8 +1013,12 @@ function read_investigation_series(source)
         performance = haskey(table, "performance_report") ?
             read_performance_benchmark(IOBuffer(table["performance_report"]["toml"])) : nothing
         independent = only(get(table, "independent_value", Any[]))
+        independent_parameter = _read_parameter(independent)
+        threshold_definition && !isnothing(evidence) &&
+            _validate_close_threshold_serialized_point(evidence, definition,
+                configuration, independent_parameter)
         InvestigationMeasurementPoint(
-            Symbol(table["point_id"]), definition, configuration, _read_parameter(independent),
+            Symbol(table["point_id"]), definition, configuration, independent_parameter,
             environment, execution,
             Tuple(_read_metric(item) for item in get(table, "metrics", Any[])),
             haskey(table, "solver_statistics") ?
