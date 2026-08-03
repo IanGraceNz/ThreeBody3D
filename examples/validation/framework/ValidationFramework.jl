@@ -61,6 +61,7 @@ include("InvestigationSerialization.jl")
 include("InvestigationPresentation.jl")
 include("InvestigationBaselineRunner.jl")
 include("CoreInvestigationRunner.jl")
+include("CloseEncounterInvestigationRunner.jl")
 
 export AbstractValidationMetric,
        PerformanceBenchmarkDefinition,
@@ -116,6 +117,8 @@ export AbstractValidationMetric,
        run_investigation_1_baseline,
        CoreInvestigationWorkflowResult,
        run_investigation_2_core,
+       CloseEncounterInvestigationWorkflowResult,
+       run_investigation_2_close_encounter,
        build_accuracy_work_series,
        figure_eight_accuracy_work_definition,
        hierarchical_triple_accuracy_work_definition,
